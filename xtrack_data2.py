@@ -19,8 +19,7 @@ def tokenize(text):
 
 
 class XTrackData2(object):
-    attrs_to_save = ['sequences', 'labels', 'labels_seq_id', 'labels_time',
-                     'vocab', 'vocab_rev', 'classes', 'slots']
+    attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes', 'slots']
 
     null_class = '_null_'
 
@@ -55,11 +54,12 @@ class XTrackData2(object):
 
         self.sequences = []
 
-        self.labels = {slot: [] for slot in slots}
-        self.labels_seq_id = []
-        self.labels_time = []
         for dialog_ndx, dialog in enumerate(dialogs):
-            seq = []
+            seq = {
+                'data': [],
+                'labels': []
+            }
+
             for msg, state, actor in zip(dialog.messages,
                                          dialog.states,
                                          dialog.actors):
@@ -73,14 +73,17 @@ class XTrackData2(object):
                 token_seq.append('#EOS')
                 for i, token in enumerate(token_seq):
                     token_ndx = self.get_token_ndx(token)
-                    seq.append(token_ndx)
+                    seq['data'].append(token_ndx)
 
+                label = {
+                    'time': len(seq) - 1,
+                    'slots': {}
+                }
                 for slot, val in zip(slots, self.state_to_cls(state, slots)):
-                    self.labels[slot].append(val)
-                self.labels_seq_id.append(dialog_ndx)
-                self.labels_time.append(len(seq) - 1)
+                    label['slots'][slot] = val
+                seq['labels'].append(label)
 
-            if len(seq) > 0:
+            if len(seq['data']) > 0:
                 self.sequences.append(seq)
 
     def get_token_ndx(self, token):

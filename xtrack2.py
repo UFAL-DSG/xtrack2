@@ -15,7 +15,8 @@ theano.scan.allow_gc=False
 #theano.config.mode = 'FAST_COMPILE'
 theano.config.mode = 'FAST_RUN'
 
-from passage.iterators import padded
+from passage.iterators import (padded, SortedPadded)
+from passage.utils import iter_data
 from xtrack_data2 import XTrackData2
 from utils import (pdb_on_error, ConfusionMatrix)
 from model import Model
@@ -26,8 +27,8 @@ def compute_stats(slots, classes, prediction, y):
     for slot in slots:
         conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
 
-    for slot, pred in zip(slots, prediction):
-        slot_y = y[slot]
+    for i, (slot, pred) in enumerate(zip(slots, prediction)):
+        slot_y = y[i]
         slot_y_hat = np.argmax(pred, axis=1)
 
         conf_mats[slot].batchAdd(slot_y, slot_y_hat)
@@ -85,7 +86,7 @@ def init_env(output_dir):
 
 def main(experiment_path, out, n_cells, visualize_every, emb_size,
          n_epochs, lr, opt_type, gradient_clipping, model_file,
-         final_model_file,
+         final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
          rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden):
     out = init_env(out)
@@ -117,18 +118,35 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
         model = Model.load(model_file)
         logging.info('Loading took: %.1f' % (time.time() - t))
 
-    x = padded(xtd_t.sequences)
-    y_seq_id = xtd_t.labels_seq_id
-    y_time = xtd_t.labels_time
-    y = xtd_t.labels
-    y_labels = {}
-    for slot in slots:
-        y_labels['y_label_%s' % slot] = y[slot]
+    seqs = xtd_t.sequences
+    random.shuffle(seqs)
+
+    seqs_mb = iter_data(seqs, size=mb_size)
+    minibatches = []
+    for mb in seqs_mb:
+        x = []
+        y_seq_id = []
+        y_time = []
+        y_labels = [[] for slot in slots]
+        for item in mb:
+            x.append(item['data'])
+            for label in item['labels']:
+                y_seq_id.append(len(x) - 1)
+                y_time.append(label['time'])
+
+                for i, slot in enumerate(slots):
+                    y_labels[i].append(label['slots'][slot])
+
+
+        minibatches.append((zip(*x), y_seq_id, y_time, y_labels, ))
 
     for i in range(100):
-        print model._train(x, y_seq_id, y_time, **y_labels)
-        prediction = model._predict(x, y_seq_id, y_time)
-        compute_stats(slots, classes, prediction, y)
+        print '>>> iter', i
+        for x, y_seq_id, y_time, y_labels in minibatches:
+            print model._train(x, y_seq_id, y_time, *y_labels)
+
+            prediction = model._predict(x, y_seq_id, y_time)
+            compute_stats(slots, classes, prediction, y_labels)
 
     logging.info('Saving final model to: %s' % final_model_file)
     model.save(final_model_file)
@@ -165,6 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--rinit_scale', default=0.1, type=float)
     parser.add_argument('--rinit_scale_emb', default=1.0, type=float)
     parser.add_argument('--init_scale_gates_bias', default=0.0, type=float)
+    parser.add_argument('--mb_size', default=32, type=int)
 
     parser.add_argument('--oclf_n_hidden', default=30, type=int)
 

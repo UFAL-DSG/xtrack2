@@ -4,7 +4,7 @@ from collections import Counter
 
 from utils import floatX, intX, shuffle, iter_data
 
-def padded(seqs, pad_back=False):
+def padded(seqs, pad_back=True):
     lens = map(len, seqs)
     max_len = max(lens)
     seqs_padded = []
@@ -37,27 +37,23 @@ class Padded(object):
             yield xmb, ymb
 
 class SortedPadded(object):
-
-    def __init__(self, seqs, targets, size=64, shuffle=True):
+    def __init__(self, seqs, seq_ids, labels, size=64):
         self.seqs = seqs
-        self.targets = targets
+        self.seq_ids = seq_ids
+        self.labels = labels
         self.size = size
-        self.shuffle = shuffle
 
     def iter(self):
-        
-        if self.shuffle:
-            self.seqs, self.targets = shuffle(self.seqs, self.targets)
+        for chunks in iter_data(*self.seqs, size=self.size*20):
+            sort = np.argsort([len(x) for x in chunks[0]])
 
-        for x_chunk, y_chunk in iter_data(self.seqs, self.targets, size=self.size*20):
-            sort = np.argsort([len(x) for x in x_chunk])
-            x_chunk = [x_chunk[idx] for idx in sort]
-            y_chunk = [y_chunk[idx] for idx in sort]
+            for i in range(len(chunks)):
+                chunks[i] = [chunks[i][idx] for idx in sort]
+
             # print range(len(x_chunk))[::self.size]
-            mb_chunks = [[x_chunk[idx:idx+self.size], y_chunk[idx:idx+self.size]] for idx in range(len(x_chunk))[::self.size]]
+            mb_chunks = [[chunks[i][idx:idx+self.size] for i in range(len(chunks))] for idx in range(len(chunks[0]))[::self.size]]
             mb_chunks = shuffle(mb_chunks)
-            for xmb, ymb in mb_chunks:
-                xmb = padded(xmb)
-                # print xmb.shape
-                ymb = floatX(ymb)
-                yield xmb, ymb
+            for res in mb_chunks:
+                res[0] = padded(res[0])
+
+                yield res
