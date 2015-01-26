@@ -149,7 +149,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
         minibatches.append((x, y_seq_id, y_time, y_labels, ))
 
     prev_conf_mats = None
-    for i in range(100):
+    for i in range(n_epochs):
         logging.info('Iteration #%d' % i)
         random.shuffle(minibatches)
         avg_loss = 0.0
