@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# expects: EXPERIMENT_NAME, CFG1, CFG2 env variables
-
+EXPERIMENT_NAME=$(basename "$1")
 SMP=${SMP:-4}
 MEM_PER_WORKER=${MEM_PER_WORKER:-4}
 
@@ -26,7 +25,4 @@ while read cfg; do
         PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py data/xtrack/e2/ --out out/${eid} --rebuild_model --model_file out/${eid}.model --n_epochs 100 ${cfg}
 ENDOFSCRIPT
     done
-done << ENDOFINPUT
-$CMD1
-$CMD2
-ENDOFINPUT
+done < $1
