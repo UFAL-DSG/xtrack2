@@ -20,7 +20,7 @@ class Model(NeuralModel):
         input_layer = Embedding(size=emb_size, n_features=n_input_tokens)
         x = input_layer.input
 
-        lstm_layer = LstmRecurrent(size=128, seq_output=True)
+        lstm_layer = LstmRecurrent(size=16, seq_output=True)
         lstm_layer.connect(input_layer)
 
         cpt = CherryPick()
@@ -42,7 +42,7 @@ class Model(NeuralModel):
         params = list(cost.get_params())
         cost_value = cost.output()
 
-        updater = updates.Adam()
+        updater = updates.RProp()
         model_updates = updater.get_updates(params, cost_value)
 
 

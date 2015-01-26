@@ -18,12 +18,16 @@ theano.config.mode = 'FAST_RUN'
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
 from xtrack_data2 import XTrackData2
-from utils import (pdb_on_error, ConfusionMatrix)
+from utils import (pdb_on_error, ConfusionMatrix, P)
 from model import Model
 
 
-def compute_stats(slots, classes, prediction, y):
-    conf_mats = {}
+def compute_stats(slots, classes, prediction, y, prev_conf_mats=None):
+    if not prev_conf_mats:
+        conf_mats = {}
+    else:
+        conf_mats = prev_conf_mats
+
     for slot in slots:
         conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
 
@@ -33,12 +37,14 @@ def compute_stats(slots, classes, prediction, y):
 
         conf_mats[slot].batchAdd(slot_y, slot_y_hat)
 
-    for slot in slots:
-        print slot, conf_mats[slot].accuracy()
+    return conf_mats
 
 
-def vlog(txt, separator="\n", **kwargs):
+def vlog(txt, *args, **kwargs):
+    separator = kwargs.pop('separator', '\n')
     res = [txt]
+    for k, v in args:
+        res.append('\t%s(%s)' % (k, str(v)))
     for k, v in sorted(kwargs.iteritems()):
         res.append('\t%s(%s)' % (k, str(v)))
     logging.info(separator.join(res))
@@ -137,16 +143,46 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                 for i, slot in enumerate(slots):
                     y_labels[i].append(label['slots'][slot])
 
+        x = padded(x).transpose(1, 0)
 
-        minibatches.append((zip(*x), y_seq_id, y_time, y_labels, ))
 
+        minibatches.append((x, y_seq_id, y_time, y_labels, ))
+
+    prev_conf_mats = None
     for i in range(100):
-        print '>>> iter', i
-        for x, y_seq_id, y_time, y_labels in minibatches:
-            print model._train(x, y_seq_id, y_time, *y_labels)
+        logging.info('Iteration #%d' % i)
+        random.shuffle(minibatches)
+        avg_loss = 0.0
+        for mb_id, (x, y_seq_id, y_time, y_labels) in enumerate(minibatches):
+            t = time.time()
+            loss = model._train(x, y_seq_id, y_time, *y_labels)
+            t = time.time() - t
+            avg_loss += loss
+            vlog(' > ',
+                 ('minibatch', mb_id, ),
+                 ('loss', "%.2f" % loss),
+                 ('time', "%.1f" % t),
+                 ('xsize', str(x.shape)),
+                 ('ysize', len(y_seq_id)),
+                 separator=" ",)
 
             prediction = model._predict(x, y_seq_id, y_time)
-            compute_stats(slots, classes, prediction, y_labels)
+
+            prev_conf_mats = compute_stats(slots, classes, prediction,
+                                           y_labels,
+                                           prev_conf_mats=prev_conf_mats)
+        avg_loss = avg_loss / len(minibatches)
+        logging.info('Mean loss: %.2f' % avg_loss)
+
+        logging.info('Results:')
+        for slot in slots:
+            p = P()
+            p.tab(3)
+            p.print_out(slot)
+            p.tab(15)
+            p.print_out("%d" % int(prev_conf_mats[slot].accuracy() * 100))
+            logging.info(p.render())
+
 
     logging.info('Saving final model to: %s' % final_model_file)
     model.save(final_model_file)

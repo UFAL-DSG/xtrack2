@@ -76,7 +76,7 @@ class XTrackData2(object):
                     seq['data'].append(token_ndx)
 
                 label = {
-                    'time': len(seq) - 1,
+                    'time': len(seq['data']) - 1,
                     'slots': {}
                 }
                 for slot, val in zip(slots, self.state_to_cls(state, slots)):
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     for f_name in os.listdir(args.data_dir):
         if f_name.endswith('.json'):
             dialogs.append(
-                model.Dialog.deserialize(
+                data_model.Dialog.deserialize(
                     open(os.path.join(args.data_dir, f_name)).read()
                 )
             )

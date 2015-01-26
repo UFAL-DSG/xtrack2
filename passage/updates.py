@@ -40,7 +40,7 @@ class Update(object):
     def __init__(self, regularizer=Regularizer(), clipnorm=0.):
         self.__dict__.update(locals())
 
-    def get_updates(self, params, grads):
+    def get_updates(self, params, cost):
         raise NotImplementedError
 
 
@@ -202,4 +202,60 @@ class Adadelta(Update):
 
             acc_delta_new = self.rho * acc_delta + (1 - self.rho) * update ** 2
             updates.append((acc_delta,acc_delta_new))
+        return updates
+
+class RProp(Update):
+    def __init__(self, lr=0.1, plus=1.4, minus=0.5, *args, **kwargs):
+        Update.__init__(self, *args, **kwargs)
+        self.__dict__.update(locals())
+
+    def get_updates(self, params, cost):
+        grads_rprop = []
+        grads_history = []
+        grads_rprop_new = []
+
+        shapes = []
+
+        grads = T.grad(cost, params)
+
+        for param, grad in zip(params, grads):
+            shape = param.shape.eval()
+            shapes.append(shape)
+            #grad = tt.grad(loss, wrt=param)
+            #grads.append(grad)
+
+            # Save gradients histories for RProp.
+            grad_hist = theano.shared(param.get_value() * 0.0 + 1.0,
+                                      name="_opt_%s_hist" % param)
+            grads_history.append(
+                grad_hist
+            )
+
+            # Create variables where rprop rates will be stored.
+            grad_rprop = theano.shared(param.get_value() * 0.0 + self.lr,
+                                       name="_opt_%s_rprop" % param)
+            grads_rprop.append(grad_rprop)
+
+            # Compute the new RProp coefficients.
+            rprop_sign = T.sgn(grad_hist * grad)
+            grad_rprop_new = grad_rprop * (
+                T.eq(rprop_sign, 1) * self.plus
+                + T.neq(rprop_sign, 1) * self.minus
+            )
+            grads_rprop_new.append(grad_rprop_new)
+
+        updates = [
+            # Update parameters according to the RProp update rule.
+            (p, T.cast(p - rg * T.sgn(g), 'float32'))
+            for p, g, rg in zip(params, grads, grads_rprop_new)
+        ] + [
+            # Save current gradient for the next step..
+            (hg, T.cast(g, 'float32')) for hg, g in zip(
+                grads_history, grads)
+        ] + [
+            # Save the new rprop grads.
+            (rg, T.cast(rg_new, 'float32')) for rg, rg_new in zip(
+                grads_rprop, grads_rprop_new)
+        ]
+
         return updates

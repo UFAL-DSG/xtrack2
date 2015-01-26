@@ -15,7 +15,8 @@ def padded(seqs, pad_back=True):
         else:
             seq = [0] * n_pad + seq
         seqs_padded.append(seq)
-    return intX(seqs_padded).transpose(1, 0)
+    return intX(seqs_padded)
+
 
 class Padded(object):
 
