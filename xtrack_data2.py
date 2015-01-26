@@ -19,7 +19,8 @@ def tokenize(text):
 
 
 class XTrackData2(object):
-    attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes', 'slots']
+    attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes',
+                     'classes_rev', 'slots']
 
     null_class = '_null_'
 
@@ -56,6 +57,7 @@ class XTrackData2(object):
 
         for dialog_ndx, dialog in enumerate(dialogs):
             seq = {
+                'id': dialog.session_id,
                 'data': [],
                 'labels': []
             }

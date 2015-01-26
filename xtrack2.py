@@ -25,11 +25,12 @@ from model import Model
 def compute_stats(slots, classes, prediction, y, prev_conf_mats=None):
     if not prev_conf_mats:
         conf_mats = {}
+        for slot in slots:
+            conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
     else:
         conf_mats = prev_conf_mats
 
-    for slot in slots:
-        conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
+
 
     for i, (slot, pred) in enumerate(zip(slots, prediction)):
         slot_y = y[i]
@@ -130,21 +131,12 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
     seqs_mb = iter_data(seqs, size=mb_size)
     minibatches = []
     for mb in seqs_mb:
-        x = []
-        y_seq_id = []
-        y_time = []
-        y_labels = [[] for slot in slots]
-        for item in mb:
-            x.append(item['data'])
-            for label in item['labels']:
-                y_seq_id.append(len(x) - 1)
-                y_time.append(label['time'])
+        res = model.prepare_data(mb, slots)
 
-                for i, slot in enumerate(slots):
-                    y_labels[i].append(label['slots'][slot])
-
-        x = padded(x).transpose(1, 0)
-
+        x = res['x']
+        y_seq_id = res['y_seq_id']
+        y_time = res['y_time']
+        y_labels = res['y_labels']
 
         minibatches.append((x, y_seq_id, y_time, y_labels, ))
 

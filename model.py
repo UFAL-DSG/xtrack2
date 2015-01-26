@@ -4,8 +4,9 @@ import time
 import theano
 import theano.tensor as tt
 
-from passage.layers import *
 from passage import updates
+from passage.iterators import padded
+from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
@@ -63,6 +64,25 @@ class Model(NeuralModel):
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
 
+    def prepare_data(self, seqs, slots):
+        x = []
+        y_seq_id = []
+        y_time = []
+        y_labels = [[] for slot in slots]
+        for item in seqs:
+            x.append(item['data'])
+            for label in item['labels']:
+                y_seq_id.append(len(x) - 1)
+                y_time.append(label['time'])
 
+                for i, slot in enumerate(slots):
+                    y_labels[i].append(label['slots'][slot])
 
+        x = padded(x).transpose(1, 0)
 
+        return {
+            'x': x,
+            'y_seq_id': y_seq_id,
+            'y_time': y_time,
+            'y_labels': y_labels,
+        }

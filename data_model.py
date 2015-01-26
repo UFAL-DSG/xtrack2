@@ -5,11 +5,12 @@ class Dialog(object):
     ACTOR_SYSTEM = 0
     ACTOR_USER = 1
 
-    def __init__(self, id):
+    def __init__(self, object_id, session_id):
         self.messages = []
         self.states = []  # Each message has one state.
         self.actors = []  # Each message has an actor id associated.
-        self.id = id
+        self.object_id = object_id
+        self.session_id = session_id
 
     def add_message(self, text, state, actor):
         self.messages.append(text)
@@ -22,14 +23,15 @@ class Dialog(object):
                 'messages': self.messages,
                 'states': self.states,
                 'actors': self.actors,
-                'id': self.id
+                'object_id': self.object_id,
+                'session_id': self.session_id
             }, indent=4)
 
     @classmethod
     def deserialize(cls, input_data):
         data = json.loads(input_data)
 
-        obj = Dialog(data['id'])
+        obj = Dialog(data['object_id'], data['session_id'])
         obj.messages = data['messages']
         obj.states = data['states']
         obj.actors= data['actors']

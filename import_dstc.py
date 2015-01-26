@@ -19,7 +19,7 @@ def import_dstc(data_dir, out_dir):
     for i, dialog_dir in enumerate(dialog_dirs):
         dialog = dstc_util.parse_dialog_from_directory(dialog_dir)
 
-        out_dialog = Dialog(dialog_dir)
+        out_dialog = Dialog(dialog_dir, dialog.session_id)
         last_goal = None
         for turn in dialog.turns:
             out_dialog.add_message(turn.output.transcript, last_goal,
