@@ -25,20 +25,71 @@ from model import Model
 def compute_stats(slots, classes, prediction, y, prev_conf_mats=None):
     if not prev_conf_mats:
         conf_mats = {}
+        conf_mats['joint'] = ConfusionMatrix(2)
         for slot in slots:
             conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
     else:
         conf_mats = prev_conf_mats
 
-
-
+    joint_correct = np.array([True for _ in prediction[0]])
+    joint_all = np.array([True for _ in prediction[0]])
     for i, (slot, pred) in enumerate(zip(slots, prediction)):
         slot_y = y[i]
         slot_y_hat = np.argmax(pred, axis=1)
 
         conf_mats[slot].batchAdd(slot_y, slot_y_hat)
 
+        joint_correct &= slot_y == slot_y_hat
+
+    conf_mats['joint'].batchAdd(joint_all, joint_correct)
     return conf_mats
+
+
+def visualize_prediction(xtd, data, prediction):
+    x = data['x'].transpose(1, 0)
+    pred_ptr = 0
+
+    classes_rev = {}
+    for slot in xtd.slots:
+        classes_rev[slot] = {val: key
+                             for key, val in xtd.classes[slot].iteritems()}
+
+    for d_id, dialog in enumerate(xtd.sequences[:3]):
+        print ">> Dialog %d" % d_id, "=" * 30
+
+        labeling = {}
+        for label in dialog['labels']:
+            pred_ptr += 1
+            pred_label = {}
+            for i, slot in enumerate(xtd.slots):
+                pred = prediction[i][pred_ptr]
+                pred_label[slot] = np.argmax(pred)
+
+            labeling[label['time']] = (label['slots'], pred_label)
+
+        for i, word_id in enumerate(dialog['data']):
+            print xtd.vocab_rev[word_id]
+            if i in labeling:
+                for slot in xtd.slots:
+                    lbl, pred_lbl = labeling[i]
+                    p = P()
+                    p.print_out(" * ")
+                    p.print_out(slot)
+                    p.tab(15)
+                    p.print_out(classes_rev[slot][lbl[slot]])
+                    p.tab(25)
+                    p.print_out(classes_rev[slot][pred_lbl[slot]])
+                    print p.render()
+        print
+
+
+
+
+    #for dialog in x:
+    #    for i, word in enumerate(dialog):
+    #        print xtd.vocab_rev[word]
+
+
 
 
 def vlog(txt, *args, **kwargs):
@@ -95,7 +146,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          n_epochs, lr, opt_type, gradient_clipping, model_file,
          final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
-         rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden):
+         rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden, oclf_n_layers):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -117,7 +168,15 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
     t = time.time()
     if rebuild_model:
         logging.info('Rebuilding model.')
-        model = Model(slots, xtd_t.classes, 10, n_input_tokens, None)
+        model = Model(slots=slots,
+                      slot_classes=xtd_t.classes,
+                      emb_size=emb_size,
+                      n_cells=n_cells,
+                      n_input_tokens=n_input_tokens,
+                      oclf_n_hidden=oclf_n_hidden,
+                      oclf_n_layers=oclf_n_layers,
+                      lr=lr
+        )
         model.save(model_file)
         logging.info('Rebuilding took: %.1f' % (time.time() - t))
     else:
@@ -140,6 +199,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
 
         minibatches.append((x, y_seq_id, y_time, y_labels, ))
 
+    valid_data = model.prepare_data(xtd_v.sequences, slots)
+
     prev_conf_mats = None
     for i in range(n_epochs):
         logging.info('Iteration #%d' % i)
@@ -158,16 +219,23 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                  ('ysize', len(y_seq_id)),
                  separator=" ",)
 
-            prediction = model._predict(x, y_seq_id, y_time)
+        prediction = model._predict(
+            valid_data['x'],
+            valid_data['y_seq_id'],
+            valid_data['y_time']
+        )
 
-            prev_conf_mats = compute_stats(slots, classes, prediction,
-                                           y_labels,
-                                           prev_conf_mats=prev_conf_mats)
+
+        prev_conf_mats = compute_stats(slots, classes, prediction,
+                                       valid_data['y_labels'],
+                                       prev_conf_mats=prev_conf_mats)
+
+        visualize_prediction(xtd_v, valid_data, prediction)
         avg_loss = avg_loss / len(minibatches)
         logging.info('Mean loss: %.2f' % avg_loss)
 
         logging.info('Results:')
-        for slot in slots:
+        for slot in slots + ['joint']:
             p = P()
             p.tab(3)
             p.print_out(slot)
@@ -203,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
     parser.add_argument('--n_epochs', default=1000, type=int)
-    parser.add_argument('--lr', default=1.0, type=float)
+    parser.add_argument('--lr', default=0.2, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--gradient_clipping', default=None, type=float)
     #parser.add_argument('--unit_act', )
@@ -213,7 +281,8 @@ if __name__ == '__main__':
     parser.add_argument('--init_scale_gates_bias', default=0.0, type=float)
     parser.add_argument('--mb_size', default=32, type=int)
 
-    parser.add_argument('--oclf_n_hidden', default=30, type=int)
+    parser.add_argument('--oclf_n_hidden', default=32, type=int)
+    parser.add_argument('--oclf_n_layers', default=0, type=int)
 
     args = parser.parse_args()
     #climate.call(main)

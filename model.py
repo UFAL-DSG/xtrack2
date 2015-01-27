@@ -10,7 +10,8 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size, n_input_tokens, updater):
+    def __init__(self, slots, slot_classes, emb_size, n_input_tokens, n_cells,
+                 oclf_n_hidden, oclf_n_layers, lr):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -21,7 +22,7 @@ class Model(NeuralModel):
         input_layer = Embedding(size=emb_size, n_features=n_input_tokens)
         x = input_layer.input
 
-        lstm_layer = LstmRecurrent(size=16, seq_output=True)
+        lstm_layer = LstmRecurrent(size=n_cells, seq_output=True)
         lstm_layer.connect(input_layer)
 
         cpt = CherryPick()
@@ -31,7 +32,8 @@ class Model(NeuralModel):
         predictions = []
         for slot in slots:
             n_classes = len(slot_classes[slot])
-            slot_mlp = MLP([16, 32, n_classes], ['tanh', 'tanh', 'softmax'])
+            slot_mlp = MLP([oclf_n_hidden] * oclf_n_layers + [n_classes],
+                           ['tanh'] * oclf_n_layers + ['softmax'])
             slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output())
 
@@ -43,7 +45,7 @@ class Model(NeuralModel):
         params = list(cost.get_params())
         cost_value = cost.output()
 
-        updater = updates.RProp()
+        updater = updates.RProp(lr=lr)
         model_updates = updater.get_updates(params, cost_value)
 
 
@@ -63,6 +65,9 @@ class Model(NeuralModel):
             predictions
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
+
+    def init_loaded(self):
+        pass
 
     def prepare_data(self, seqs, slots):
         x = []

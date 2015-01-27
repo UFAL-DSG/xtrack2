@@ -51,7 +51,7 @@ class Embedding(object):
 
 class LstmRecurrent(object):
 
-    def __init__(self, size=256, activation='tanh', gate_activation='steeper_sigmoid', init='normal', truncate_gradient=-1, seq_output=False, p_drop=0.):
+    def __init__(self, size=256, activation='tanh', gate_activation='sigmoid', init='normal', truncate_gradient=-1, seq_output=False, p_drop=0.):
         self.activation_str = activation
         self.activation = getattr(activations, activation)
         self.gate_activation = getattr(activations, gate_activation)
@@ -65,45 +65,55 @@ class LstmRecurrent(object):
         self.l_in = l_in
         self.n_in = l_in.size
 
-        self.w_i = self.init((self.n_in, self.size))
-        self.w_f = self.init((self.n_in, self.size))
-        self.w_o = self.init((self.n_in, self.size))
-        self.w_c = self.init((self.n_in, self.size))
+        self.w = self.init((self.n_in, self.size * 4))
 
-        self.b_i = shared0s((self.size))
         self.b_f = shared0s((self.size))
+        self.b_i = shared0s((self.size))
         self.b_o = shared0s((self.size))
-        self.b_c = shared0s((self.size))
+        self.b_m = shared0s((self.size))
 
-        self.u_i = self.init((self.size, self.size))
-        self.u_f = self.init((self.size, self.size))
-        self.u_o = self.init((self.size, self.size))
-        self.u_c = self.init((self.size, self.size))
+        self.u = self.init((self.size, self.size * 4))
 
-        self.params = [self.w_i, self.w_f, self.w_o, self.w_c, 
-            self.u_i, self.u_f, self.u_o, self.u_c,  
-            self.b_i, self.b_f, self.b_o, self.b_c]
+        # Peep-hole connections.
+        self.p = self.init((self.size, self.size * 4))
 
-    def step(self, xi_t, xf_t, xo_t, xc_t, h_tm1, c_tm1, u_i, u_f, u_o, u_c):
-        i_t = self.gate_activation(xi_t + T.dot(h_tm1, u_i))
-        f_t = self.gate_activation(xf_t + T.dot(h_tm1, u_f))
-        c_t = f_t * c_tm1 + i_t * self.activation(xc_t + T.dot(h_tm1, u_c))
-        o_t = self.gate_activation(xo_t + T.dot(h_tm1, u_o))
-        h_t = o_t * self.activation(c_t)
+        self.params = [self.w, self.u, self.b_i, self.b_f, self.b_o, self.b_m]
+
+    def _slice(self, x, n):
+            return x[:, n * self.size:(n + 1) * self.size]
+
+    def step(self, x_t, h_tm1, c_tm1, u, p):
+        h_tm1_dot_u = T.dot(h_tm1, u)
+        c_tm1_dot_p = T.dot(c_tm1, p)
+
+        g_f = self._slice(x_t, 0) + self._slice(h_tm1_dot_u, 0) + self.b_f
+        g_i = self._slice(x_t, 1) + self._slice(h_tm1_dot_u, 1) + self.b_i
+        g_o = self._slice(x_t, 2) + self._slice(h_tm1_dot_u, 2) + self.b_o
+        g_m = self._slice(x_t, 3) + self._slice(h_tm1_dot_u, 3) + self.b_m
+
+        g_f += self._slice(c_tm1_dot_p, 0)
+        g_i += self._slice(c_tm1_dot_p, 1)
+        g_o += self._slice(c_tm1_dot_p, 2)
+
+        g_f = self.gate_activation(g_f)
+        g_i = self.gate_activation(g_i)
+        g_o = self.gate_activation(g_o)
+        g_m = self.activation(g_m)
+
+        c_t = g_f * c_tm1 + g_i * g_m
+        h_t = g_o * self.activation(c_t)
         return h_t, c_t
 
     def output(self, dropout_active=False):
         X = self.l_in.output(dropout_active=dropout_active)
         if self.p_drop > 0. and dropout_active:
             X = dropout(X, self.p_drop)
-        x_i = T.dot(X, self.w_i) + self.b_i
-        x_f = T.dot(X, self.w_f) + self.b_f
-        x_o = T.dot(X, self.w_o) + self.b_o
-        x_c = T.dot(X, self.w_c) + self.b_c
+
+        x_dot_w = T.dot(X, self.w)
         [out, cells], _ = theano.scan(self.step,
-            sequences=[x_i, x_f, x_o, x_c], 
+            sequences=[x_dot_w],
             outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)], 
-            non_sequences=[self.u_i, self.u_f, self.u_o, self.u_c],
+            non_sequences=[self.u, self.p],
             truncate_gradient=self.truncate_gradient
         )
         if self.seq_output:

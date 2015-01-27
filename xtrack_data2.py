@@ -19,7 +19,7 @@ def tokenize(text):
 
 
 class XTrackData2(object):
-    attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes',
+    attrs_to_save = ['sequences', 'vocab', 'classes',
                      'classes_rev', 'slots']
 
     null_class = '_null_'
@@ -29,7 +29,6 @@ class XTrackData2(object):
         if vocab_from:
             data = XTrackData2.load(vocab_from)
             self.vocab = data.vocab
-            self.vocab_rev = data.vocab_rev
             self.classes = data.classes
             self.vocab_fixed = True
         else:
@@ -39,16 +38,16 @@ class XTrackData2(object):
                 "#OOV": 2,
             }
 
-            self.vocab_rev = {
-                val: key for key, val in self.vocab.iteritems()
-            }
-
             self.classes = {}
             for slot in slots:
                 self.classes[slot] = {self.null_class: 0}
 
             self.vocab_fixed = False
 
+        self._init_after_load()
+
+    def _init_after_load(self):
+        self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
     def build(self, dialogs, slots, vocab_from):
         self._init(slots, vocab_from)
@@ -148,7 +147,10 @@ class XTrackData2(object):
             val = data[attr]
             setattr(xtd, attr, val)
 
+        xtd._init_after_load()
+
         return xtd
+
 
 
 if __name__ == '__main__':

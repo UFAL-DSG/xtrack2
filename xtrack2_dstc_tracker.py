@@ -45,6 +45,22 @@ from utils import pdb_on_error
 from model import Model
 
 
+def init_logging():
+    # Setup logging.
+    logger = logging.getLogger('XTrack')
+    logger.setLevel(logging.DEBUG)
+
+    logging_format = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    formatter = logging.Formatter(logging_format)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    logging.root = logger  #
+
+
 class XTrack2DSTCTracker(object):
     def __init__(self, data, model):
         self.data = data
@@ -66,10 +82,10 @@ class XTrack2DSTCTracker(object):
                 goal_labels[slot] != self.data.null_class
             },
             "method-label": {
-                "byconstraints": 1.0
+                #"byconstraints": 1.0
             },
             "requested-slots": {
-                slot: 0.0 for slot in self.data.slots
+                #slot: 0.0 for slot in self.data.slots
             }
         }
 
@@ -105,6 +121,7 @@ class XTrack2DSTCTracker(object):
 def main(dataset_name, data_file, output_file, model_file):
     logging.info('Loading model from: %s' % model_file)
     model = Model.load(model_file)
+
     logging.info('Loading data: %s' % data_file)
     data = XTrackData2.load(data_file)
 
@@ -138,4 +155,5 @@ if __name__ == '__main__':
     parser.add_argument('--model_file', required=True)
 
     pdb_on_error()
+    init_logging()
     main(**vars(parser.parse_args()))
