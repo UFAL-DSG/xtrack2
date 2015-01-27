@@ -19,8 +19,7 @@ def tokenize(text):
 
 
 class XTrackData2(object):
-    attrs_to_save = ['sequences', 'vocab', 'classes',
-                     'classes_rev', 'slots']
+    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots']
 
     null_class = '_null_'
 
