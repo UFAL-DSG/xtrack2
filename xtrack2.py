@@ -9,8 +9,8 @@ import theano.gradient
 import time
 
 theano.config.floatX = 'float32'
-theano.config.allow_gc=False
-theano.scan.allow_gc=False
+#theano.config.allow_gc=False
+#theano.scan.allow_gc=False
 #theano.config.profile=True
 #theano.config.mode = 'FAST_COMPILE'
 theano.config.mode = 'FAST_RUN'

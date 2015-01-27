@@ -1,0 +1,1 @@
+--n_epochs 1000 --n_cells 128 --emb_size 30

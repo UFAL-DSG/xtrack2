@@ -4,7 +4,7 @@ EXPERIMENT_NAME=$(basename "$1")
 SMP=${SMP:-4}
 MEM_PER_WORKER=${MEM_PER_WORKER:-4}
 
-EXPERIMENT_OUT=experiments/${EXPERIMENT_NAME}
+EXPERIMENT_OUT=exp/results/${EXPERIMENT_NAME}
 mkdir -p ${EXPERIMENT_OUT}
 
 cfg_cnt=0
