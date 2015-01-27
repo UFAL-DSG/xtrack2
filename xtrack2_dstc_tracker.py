@@ -71,10 +71,19 @@ class XTrack2DSTCTracker(object):
             self.classes_rev[slot] = {val: key for key, val in
                                       self.data.classes[slot].iteritems()}
 
-    def build_output(self, pred):
+    def build_output(self, pred, label):
 
         goal_labels = {slot: self.classes_rev[slot][np.argmax(pred[i])]
                        for i, slot in enumerate(self.data.slots)}
+
+        raw_goal_labels = {slot: np.argmax(pred[i])
+                       for i, slot in enumerate(self.data.slots)}
+        goal_labels = {slot: self.classes_rev[slot][val]
+                       for slot, val in raw_goal_labels.iteritems()}
+
+        goals_correct = True
+        for i, slot in enumerate(self.data.slots):
+            goals_correct &= raw_goal_labels[slot] == label[slot]
 
         return {
             "goal-labels": {
@@ -87,7 +96,13 @@ class XTrack2DSTCTracker(object):
             "requested-slots": {
                 #slot: 0.0 for slot in self.data.slots
             }
-        }
+        }, goals_correct
+
+    def _label_empty(self, lbl):
+        res = True
+        for val in lbl.values():
+            res &= val == 0
+        return res
 
     def track(self):
         data = self.model.prepare_data(self.data.sequences, self.data.slots)
@@ -98,15 +113,23 @@ class XTrack2DSTCTracker(object):
         pred = self.model._predict(x, y_seq_id, y_time)
         pred_ptr = 0
 
+        accuracy = 0
+        accuracy_n = 0
         result = []
         for dialog in self.data.sequences:
             turns = []
             for lbl in dialog['labels']:
-                out = self.build_output(
-                    [pred[i][pred_ptr] for i, _ in enumerate(self.data.slots)]
+                out, goals_correct = self.build_output(
+                    [pred[i][pred_ptr] for i, _ in enumerate(self.data.slots)],
+                    lbl['slots']
                 )
                 turns.append(out)
                 pred_ptr += 1
+
+                if not self._label_empty(lbl['slots']):
+                    if goals_correct:
+                        accuracy += 1
+                    accuracy_n += 1
 
             result.append({
                 'session-id': dialog['id'],
@@ -116,7 +139,8 @@ class XTrack2DSTCTracker(object):
         if len(pred[0]) != pred_ptr:
             raise Exception('Data mismatch.')
 
-        return result
+        assert accuracy_n > 0
+        return result, accuracy * 1.0 / accuracy_n
 
 def main(dataset_name, data_file, output_file, model_file):
     logging.info('Loading model from: %s' % model_file)
@@ -129,9 +153,10 @@ def main(dataset_name, data_file, output_file, model_file):
     tracker = XTrack2DSTCTracker(data, model)
 
     t = time.time()
-    result = tracker.track()
+    result, accuracy = tracker.track()
     t = time.time() - t
-    logging.info('Tracking took: %.1f' % t)
+    logging.info('Tracking took: %.1fs' % t)
+    logging.info('Accuracy: %.2f %%' % (accuracy * 100))
 
 
     tracker_output = {

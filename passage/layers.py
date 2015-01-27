@@ -51,11 +51,12 @@ class Embedding(object):
 
 class LstmRecurrent(object):
 
-    def __init__(self, size=256, activation='tanh', gate_activation='sigmoid', init='normal', truncate_gradient=-1, seq_output=False, p_drop=0.):
+    def __init__(self, size=256, activation='tanh', gate_activation='sigmoid', init='normal', truncate_gradient=-1, seq_output=False, p_drop=0., init_scale=0.1):
         self.activation_str = activation
         self.activation = getattr(activations, activation)
         self.gate_activation = getattr(activations, gate_activation)
         self.init = getattr(inits, init)
+        self.init_scale = init_scale
         self.size = size
         self.truncate_gradient = truncate_gradient
         self.seq_output = seq_output
@@ -65,17 +66,17 @@ class LstmRecurrent(object):
         self.l_in = l_in
         self.n_in = l_in.size
 
-        self.w = self.init((self.n_in, self.size * 4))
+        self.w = self.init((self.n_in, self.size * 4), scale=self.init_scale)
 
-        self.b_f = shared0s((self.size))
-        self.b_i = shared0s((self.size))
-        self.b_o = shared0s((self.size))
-        self.b_m = shared0s((self.size))
+        self.b_f = self.init((self.size, ), scale=self.init_scale)
+        self.b_i = self.init((self.size, ), scale=self.init_scale)
+        self.b_o = self.init((self.size, ), scale=self.init_scale)
+        self.b_m = self.init((self.size, ), scale=self.init_scale)
 
-        self.u = self.init((self.size, self.size * 4))
+        self.u = self.init((self.size, self.size * 4), scale=self.init_scale)
 
         # Peep-hole connections.
-        self.p = self.init((self.size, self.size * 4))
+        self.p = self.init((self.size, self.size * 4), scale=self.init_scale)
 
         self.params = [self.w, self.u, self.b_i, self.b_f, self.b_o, self.b_m]
 

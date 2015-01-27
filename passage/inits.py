@@ -16,6 +16,7 @@ def uniform(shape, scale=0.05):
 def normal(shape, scale=0.05):
     global init_var_cntr
     init_var_cntr += 1
+    scale = scale / np.sqrt(shape[0])
     return sharedX(np.random.randn(*shape) * scale, name="normal_%d" %
                                                          init_var_cntr)
 

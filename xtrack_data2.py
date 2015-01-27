@@ -56,6 +56,7 @@ class XTrackData2(object):
         for dialog_ndx, dialog in enumerate(dialogs):
             seq = {
                 'id': dialog.session_id,
+                'source_dir': dialog.object_id,
                 'data': [],
                 'labels': []
             }
@@ -111,7 +112,7 @@ class XTrackData2(object):
             value = state.get(slot)
 
             if value:
-                food = next(tokenize(value))
+                food = value  #next(tokenize(value))
 
                 if self.vocab_fixed:
                     if not food in self.classes[slot]:
@@ -161,6 +162,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', required=True)
     parser.add_argument('--out_file', required=True)
+    parser.add_argument('--out_flist_file', required=False)
     parser.add_argument('--vocab_from', type=str, required=False, default=None)
     parser.add_argument('--slots', default='food')
 
@@ -181,4 +183,11 @@ if __name__ == '__main__':
     xtd = XTrackData2()
     xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots)
     xtd.save(args.out_file)
+
+    if args.out_flist_file:
+        flist = []
+        for dialog in xtd.sequences:
+            flist.append(dialog['source_dir'])
+        with open(args.out_flist_file, "w") as f_out:
+            f_out.write("\n".join(flist))
 

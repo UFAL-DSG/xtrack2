@@ -20,6 +20,7 @@ from passage.utils import iter_data
 from xtrack_data2 import XTrackData2
 from utils import (pdb_on_error, ConfusionMatrix, P)
 from model import Model
+from xtrack2_dstc_tracker import XTrack2DSTCTracker
 
 
 def compute_stats(slots, classes, prediction, y, prev_conf_mats=None):
@@ -184,6 +185,10 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
         model = Model.load(model_file)
         logging.info('Loading took: %.1f' % (time.time() - t))
 
+    tracker = XTrack2DSTCTracker(xtd_v, model)
+
+
+
     seqs = xtd_t.sequences
     random.shuffle(seqs)
 
@@ -242,6 +247,9 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
             p.tab(15)
             p.print_out("%d" % int(prev_conf_mats[slot].accuracy() * 100))
             logging.info(p.render())
+
+        _, accuracy = tracker.track()
+        logging.info('Tracking accuracy: %d' % int(accuracy * 100))
 
 
     logging.info('Saving final model to: %s' % final_model_file)
