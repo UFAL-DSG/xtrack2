@@ -24,11 +24,16 @@ def theano_one_hot(idx, n):
 srng = RandomStreams()
 
 class Layer(object):
-    def connect(self):
-        pass
+    name = "unnamed_layer"
+    #def connect(self):
+    #    pass
 
     def output(self, dropout_active=False):
         raise NotImplementedError()
+
+    def _name_param(self, param_name):
+        return "%s__%s" % (self.name, param_name, )
+
 
 
 class MatrixInput(object):
@@ -74,7 +79,7 @@ class Embedding(object):
 
 
 
-class LstmRecurrent(object):
+class LstmRecurrent(Layer):
 
     def __init__(self, size=256, init='normal', truncate_gradient=-1, seq_output=False, p_drop=0., init_scale=0.1, out_cells=False):
         self.init = getattr(inits, init)
@@ -89,20 +94,24 @@ class LstmRecurrent(object):
         self.l_in = l_in
         self.n_in = l_in.size
 
-        self.w = self.init((self.n_in, self.size * 4), scale=self.init_scale)
-        self.b = self.init((self.size * 4, ), scale=self.init_scale)
+        self.w = self.init((self.n_in, self.size * 4), scale=self.init_scale,
+                           name=self._name_param("W"))
+        self.b = self.init((self.size * 4, ), scale=self.init_scale,
+                           name=self._name_param("b"))
 
         #self.b_f = self.init((self.size, ), scale=self.init_scale)
         #self.b_i = self.init((self.size, ), scale=self.init_scale)
         #self.b_o = self.init((self.size, ), scale=self.init_scale)
         #self.b_m = self.init((self.size, ), scale=self.init_scale)
 
-        self.u = self.init((self.size, self.size * 4), scale=self.init_scale)
+        self.u = self.init((self.size, self.size * 4), scale=self.init_scale,
+                           name=self._name_param("U"))
 
         # Peep-hole connections.
-        self.p = self.init((self.size, self.size * 3), scale=self.init_scale)
+        self.p = self.init((self.size, self.size * 3), scale=self.init_scale,
+                           name=self._name_param("P"))
 
-        self.params = [self.w, self.u, self.b]
+        self.params = [self.w, self.u, self.p, self.b]
 
     def _slice(self, x, n):
             return x[:, n * self.size:(n + 1) * self.size]

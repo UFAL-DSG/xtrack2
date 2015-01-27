@@ -211,12 +211,14 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
         minibatches.append((x, y_seq_id, y_time, y_labels, ))
 
     valid_data = model.prepare_data(xtd_v.sequences, slots)
+    train_data = model.prepare_data(xtd_t.sequences, slots)
 
-    prev_conf_mats = None
+
     for i in range(n_epochs):
         logging.info('Iteration #%d' % i)
         random.shuffle(minibatches)
         avg_loss = 0.0
+
         for mb_id, (x, y_seq_id, y_time, y_labels) in enumerate(minibatches):
             t = time.time()
             loss = model._train(x, y_seq_id, y_time, *y_labels)
@@ -235,11 +237,17 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
             valid_data['y_seq_id'],
             valid_data['y_time']
         )
+        prediction_train = model._predict(
+            train_data['x'],
+            train_data['y_seq_id'],
+            train_data['y_time']
+        )
 
+        train_conf_mats = compute_stats(slots, classes, prediction_train,
+                                       train_data['y_labels'])
 
-        prev_conf_mats = compute_stats(slots, classes, prediction,
-                                       valid_data['y_labels'],
-                                       prev_conf_mats=prev_conf_mats)
+        valid_conf_mats = compute_stats(slots, classes, prediction,
+                                       valid_data['y_labels'])
 
         visualize_prediction(xtd_v, valid_data, prediction)
         avg_loss = avg_loss / len(minibatches)
@@ -251,7 +259,9 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
             p.tab(3)
             p.print_out(slot)
             p.tab(15)
-            p.print_out("%d" % int(prev_conf_mats[slot].accuracy() * 100))
+            p.print_out("%d" % int(valid_conf_mats[slot].accuracy() * 100))
+            p.tab(20)
+            p.print_out("%d" % int(train_conf_mats[slot].accuracy() * 100))
             logging.info(p.render())
 
         _, accuracy = tracker.track()
@@ -285,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
     parser.add_argument('--n_epochs', default=1000, type=int)
-    parser.add_argument('--lr', default=0.2, type=float)
+    parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--gradient_clipping', default=None, type=float)
     #parser.add_argument('--unit_act', )

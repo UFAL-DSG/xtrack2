@@ -52,6 +52,7 @@ class Model(NeuralModel):
         cost_value = cost.output()
 
         updater = updates.RProp(lr=lr)
+        #updater = updates.Momentum(lr=lr)
         model_updates = updater.get_updates(params, cost_value)
 
 
