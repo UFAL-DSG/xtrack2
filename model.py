@@ -24,7 +24,8 @@ class Model(NeuralModel):
         if debug:
             self._input_layer = theano.function([x], input_layer.output())
 
-        lstm_layer = LstmRecurrent(size=n_cells, seq_output=True)
+        lstm_layer = LstmRecurrent(size=n_cells, seq_output=True,
+                                   out_cells=True)
         lstm_layer.connect(input_layer)
 
         cpt = CherryPick()
