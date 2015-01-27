@@ -246,15 +246,15 @@ class RProp(Update):
 
         updates = [
             # Update parameters according to the RProp update rule.
-            (p, T.cast(p - rg * T.sgn(g), 'float32'))
+            (p, p - rg * T.sgn(g))
             for p, g, rg in zip(params, grads, grads_rprop_new)
         ] + [
             # Save current gradient for the next step..
-            (hg, T.cast(g, 'float32')) for hg, g in zip(
+            (hg, g) for hg, g in zip(
                 grads_history, grads)
         ] + [
             # Save the new rprop grads.
-            (rg, T.cast(rg_new, 'float32')) for rg, rg_new in zip(
+            (rg, rg_new) for rg, rg_new in zip(
                 grads_rprop, grads_rprop_new)
         ]
 

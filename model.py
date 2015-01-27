@@ -11,7 +11,7 @@ from passage.model import NeuralModel
 
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens, n_cells,
-                 oclf_n_hidden, oclf_n_layers, lr):
+                 oclf_n_hidden, oclf_n_layers, lr, debug):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -21,6 +21,8 @@ class Model(NeuralModel):
 
         input_layer = Embedding(size=emb_size, n_features=n_input_tokens)
         x = input_layer.input
+        if debug:
+            self._input_layer = theano.function([x], input_layer.output())
 
         lstm_layer = LstmRecurrent(size=n_cells, seq_output=True)
         lstm_layer.connect(input_layer)
@@ -38,7 +40,10 @@ class Model(NeuralModel):
             predictions.append(slot_mlp.output())
 
             slot_objective = CrossEntropyObjective()
-            slot_objective.connect(slot_mlp, y_label[slot])
+            slot_objective.connect(
+                y_hat_layer=slot_mlp,
+                y_true=y_label[slot]
+            )
             costs.append(slot_objective)
         cost = SumOut()
         cost.connect(*costs)

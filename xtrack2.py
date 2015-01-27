@@ -147,7 +147,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          n_epochs, lr, opt_type, gradient_clipping, model_file,
          final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
-         rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden, oclf_n_layers):
+         rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
+         oclf_n_layers, debug):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -176,7 +177,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                       n_input_tokens=n_input_tokens,
                       oclf_n_hidden=oclf_n_hidden,
                       oclf_n_layers=oclf_n_layers,
-                      lr=lr
+                      lr=lr,
+                      debug=debug
         )
         model.save(model_file)
         logging.info('Rebuilding took: %.1f' % (time.time() - t))
@@ -201,6 +203,10 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
         y_seq_id = res['y_seq_id']
         y_time = res['y_time']
         y_labels = res['y_labels']
+
+        if debug:
+            z = model._input_layer(x)
+            import ipdb; ipdb.set_trace()
 
         minibatches.append((x, y_seq_id, y_time, y_labels, ))
 
@@ -290,7 +296,10 @@ if __name__ == '__main__':
     parser.add_argument('--mb_size', default=32, type=int)
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
-    parser.add_argument('--oclf_n_layers', default=0, type=int)
+    parser.add_argument('--oclf_n_layers', default=2, type=int)
+
+    parser.add_argument('--debug', default=False,
+                        action='store_true')
 
     args = parser.parse_args()
     #climate.call(main)

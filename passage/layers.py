@@ -31,15 +31,40 @@ class Layer(object):
         raise NotImplementedError()
 
 
+class MatrixInput(object):
+    def __init__(self, matrix):
+        self.matrix = matrix
+        self.size = matrix.shape[-1]
+
+    def output(self, dropout_active=False):
+        return T.as_tensor(self.matrix)
+
+    def get_params(self):
+        return set()
+
+
+class IdentityInput(object):
+    def __init__(self, val, size):
+        self.val = val
+        self.size = size
+
+    def output(self, dropout_active=False):
+        return self.val
+
+    def get_params(self):
+        return set()
+
+
+
 class Embedding(object):
 
-    def __init__(self, size=128, n_features=256, init='uniform'):
+    def __init__(self, size=128, n_features=256, init='normal'):
         self.init = getattr(inits, init)
         self.size = size
         self.n_features = n_features
         self.input = T.imatrix()
         self.wv = self.init((self.n_features, self.size))
-        self.params = [self.wv]
+        self.params = {self.wv}
 
     def output(self, dropout_active=False):
         return self.wv[self.input]
@@ -51,15 +76,13 @@ class Embedding(object):
 
 class LstmRecurrent(object):
 
-    def __init__(self, size=256, activation='tanh', gate_activation='sigmoid', init='normal', truncate_gradient=-1, seq_output=False, p_drop=0., init_scale=0.1):
-        self.activation_str = activation
-        self.activation = getattr(activations, activation)
-        self.gate_activation = getattr(activations, gate_activation)
+    def __init__(self, size=256, init='normal', truncate_gradient=-1, seq_output=False, p_drop=0., init_scale=0.1, out_cells=False):
         self.init = getattr(inits, init)
         self.init_scale = init_scale
         self.size = size
         self.truncate_gradient = truncate_gradient
         self.seq_output = seq_output
+        self.out_cells = out_cells
         self.p_drop = p_drop
 
     def connect(self, l_in):
@@ -67,42 +90,45 @@ class LstmRecurrent(object):
         self.n_in = l_in.size
 
         self.w = self.init((self.n_in, self.size * 4), scale=self.init_scale)
+        self.b = self.init((self.size * 4, ), scale=self.init_scale)
 
-        self.b_f = self.init((self.size, ), scale=self.init_scale)
-        self.b_i = self.init((self.size, ), scale=self.init_scale)
-        self.b_o = self.init((self.size, ), scale=self.init_scale)
-        self.b_m = self.init((self.size, ), scale=self.init_scale)
+        #self.b_f = self.init((self.size, ), scale=self.init_scale)
+        #self.b_i = self.init((self.size, ), scale=self.init_scale)
+        #self.b_o = self.init((self.size, ), scale=self.init_scale)
+        #self.b_m = self.init((self.size, ), scale=self.init_scale)
 
         self.u = self.init((self.size, self.size * 4), scale=self.init_scale)
 
         # Peep-hole connections.
-        self.p = self.init((self.size, self.size * 4), scale=self.init_scale)
+        self.p = self.init((self.size, self.size * 3), scale=self.init_scale)
 
-        self.params = [self.w, self.u, self.b_i, self.b_f, self.b_o, self.b_m]
+        self.params = [self.w, self.u, self.b]
 
     def _slice(self, x, n):
             return x[:, n * self.size:(n + 1) * self.size]
 
     def step(self, x_t, h_tm1, c_tm1, u, p):
         h_tm1_dot_u = T.dot(h_tm1, u)
-        c_tm1_dot_p = T.dot(c_tm1, p)
+        gates_fiom = x_t + h_tm1_dot_u
 
-        g_f = self._slice(x_t, 0) + self._slice(h_tm1_dot_u, 0) + self.b_f
-        g_i = self._slice(x_t, 1) + self._slice(h_tm1_dot_u, 1) + self.b_i
-        g_o = self._slice(x_t, 2) + self._slice(h_tm1_dot_u, 2) + self.b_o
-        g_m = self._slice(x_t, 3) + self._slice(h_tm1_dot_u, 3) + self.b_m
+        g_f = self._slice(gates_fiom, 0)
+        g_i = self._slice(gates_fiom, 1)
+        g_o = self._slice(gates_fiom, 2)
+        g_m = self._slice(gates_fiom, 3)
+
+        c_tm1_dot_p = T.dot(c_tm1, p)
 
         g_f += self._slice(c_tm1_dot_p, 0)
         g_i += self._slice(c_tm1_dot_p, 1)
         g_o += self._slice(c_tm1_dot_p, 2)
 
-        g_f = self.gate_activation(g_f)
-        g_i = self.gate_activation(g_i)
-        g_o = self.gate_activation(g_o)
-        g_m = self.activation(g_m)
+        g_f = T.nnet.sigmoid(g_f)
+        g_i = T.nnet.sigmoid(g_i)
+        g_o = T.nnet.sigmoid(g_o)
+        g_m = T.tanh(g_m)
 
         c_t = g_f * c_tm1 + g_i * g_m
-        h_t = g_o * self.activation(c_t)
+        h_t = g_o * T.tanh(c_t)
         return h_t, c_t
 
     def output(self, dropout_active=False):
@@ -110,7 +136,7 @@ class LstmRecurrent(object):
         if self.p_drop > 0. and dropout_active:
             X = dropout(X, self.p_drop)
 
-        x_dot_w = T.dot(X, self.w)
+        x_dot_w = T.dot(X, self.w) + self.b
         [out, cells], _ = theano.scan(self.step,
             sequences=[x_dot_w],
             outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)], 
@@ -118,16 +144,23 @@ class LstmRecurrent(object):
             truncate_gradient=self.truncate_gradient
         )
         if self.seq_output:
-            return out
+            if self.out_cells:
+                return cells
+            else:
+                return out
         else:
-            return out[-1]
+            if self.out_cells:
+                return cells[-1]
+            else:
+                return out[-1]
 
     def get_params(self):
-        return set(self.params + self.l_in.get_params())
+        return self.l_in.get_params().union(self.params)
 
 
 class Dense(object):
-    def __init__(self, size=256, activation='rectify', init='orthogonal', p_drop=0.):
+    def __init__(self, size=256, activation='rectify', init='normal',
+                 p_drop=0.):
         self.activation_str = activation
         self.activation = getattr(activations, activation)
         self.init = getattr(inits, init)
@@ -149,6 +182,7 @@ class Dense(object):
         X = self.l_in.output(dropout_active=dropout_active)
         if self.p_drop > 0. and dropout_active:
             X = dropout(X, self.p_drop)
+
         is_tensor3_softmax = X.ndim > 2 and self.activation_str == 'softmax'
 
         shape = X.shape
@@ -207,12 +241,12 @@ class CherryPick(object):
     def connect(self, data, indices, indices2):
         self.data_layer = data
         self.indices = indices
-        self.indice2 = indices2
+        self.indices2 = indices2
         self.size = data.size
 
     def output(self, dropout_active=False):
         out = self.data_layer.output(dropout_active=dropout_active)
-        return out[self.indices, self.indice2]
+        return out[self.indices, self.indices2]
 
     def get_params(self):
         return set(self.data_layer.get_params())
@@ -225,9 +259,10 @@ class CrossEntropyObjective(object):
         self.y_true = y_true
 
     def output(self, dropout_active=False):
+        y_hat_out = self.y_hat_layer.output(dropout_active=dropout_active)
+
         return costs.CategoricalCrossEntropy(self.y_true,
-                                             self.y_hat_layer.output(
-                                                 dropout_active=dropout_active))
+                                             y_hat_out)
 
     def get_params(self):
         return set(self.y_hat_layer.get_params())
