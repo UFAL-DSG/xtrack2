@@ -213,7 +213,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
     valid_data = model.prepare_data(xtd_v.sequences, slots)
     train_data = model.prepare_data(xtd_t.sequences, slots)
 
-
+    best_acc = {slot: 0 for slot in xtd_v.slots + ['joint']}
+    best_acc_train = {slot: 0 for slot in xtd_v.slots + ['joint']}
     for i in range(n_epochs):
         logging.info('Iteration #%d' % i)
         random.shuffle(minibatches)
@@ -259,9 +260,13 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
             p.tab(3)
             p.print_out(slot)
             p.tab(15)
-            p.print_out("%d" % int(valid_conf_mats[slot].accuracy() * 100))
-            p.tab(20)
-            p.print_out("%d" % int(train_conf_mats[slot].accuracy() * 100))
+            acc = int(valid_conf_mats[slot].accuracy() * 100)
+            best_acc[slot] = max(best_acc[slot], acc)
+            p.print_out("%d (%d)" % (acc, best_acc[slot]))
+            p.tab(25)
+            acc = int(train_conf_mats[slot].accuracy() * 100)
+            best_acc_train[slot] = max(best_acc_train[slot], acc)
+            p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
             logging.info(p.render())
 
         _, accuracy = tracker.track()

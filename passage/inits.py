@@ -7,11 +7,11 @@ from utils import sharedX, floatX, intX
 
 
 
-def uniform(shape, scale=0.05):
+def uniform(shape, scale=0.1):
     return sharedX(np.random.uniform(low=-scale, high=scale, size=shape),
                    name=name)
 
-def normal(shape, scale=0.05, name=None):
+def normal(shape, scale=0.1, name=None):
     scale = scale / np.sqrt(shape[0])
     return sharedX(np.random.randn(*shape) * scale, name=name)
 
