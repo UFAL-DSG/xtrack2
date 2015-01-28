@@ -19,12 +19,13 @@ class Model(NeuralModel):
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-        input_layer = Embedding(size=emb_size, n_features=n_input_tokens)
+        input_layer = Embedding(name="emb", size=emb_size,
+                                n_features=n_input_tokens)
         x = input_layer.input
         if debug:
             self._input_layer = theano.function([x], input_layer.output())
 
-        lstm_layer = LstmRecurrent(size=n_cells, seq_output=True,
+        lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
                                    out_cells=True)
         lstm_layer.connect(input_layer)
 
@@ -36,7 +37,8 @@ class Model(NeuralModel):
         for slot in slots:
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden] * oclf_n_layers + [n_classes],
-                           ['tanh'] * oclf_n_layers + ['softmax'])
+                           ['tanh'] * oclf_n_layers + ['softmax'],
+                           name="mlp_%s" % slot)
             slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output())
 
@@ -47,11 +49,12 @@ class Model(NeuralModel):
             )
             costs.append(slot_objective)
         cost = SumOut()
-        cost.connect(*costs)
+        cost.connect(*costs, scale=1.0 / len(slots))
         params = list(cost.get_params())
         cost_value = cost.output()
 
         updater = updates.RProp(lr=lr)
+        #updater = updates.SGD()
         #updater = updates.Momentum(lr=lr)
         model_updates = updater.get_updates(params, cost_value)
 

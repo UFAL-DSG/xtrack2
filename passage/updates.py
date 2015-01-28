@@ -226,14 +226,14 @@ class RProp(Update):
 
             # Save gradients histories for RProp.
             grad_hist = theano.shared(param.get_value() * 0.0 + 1.0,
-                                      name="_opt_%s_hist" % param)
+                                      name="rpop_hist_%s" % param)
             grads_history.append(
                 grad_hist
             )
 
             # Create variables where rprop rates will be stored.
             grad_rprop = theano.shared(param.get_value() * 0.0 + self.lr,
-                                       name="_opt_%s_rprop" % param)
+                                       name="rprop_%s" % param)
             grads_rprop.append(grad_rprop)
 
             # Compute the new RProp coefficients.

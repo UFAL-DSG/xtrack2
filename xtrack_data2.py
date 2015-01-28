@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import os
+import random
 import re
 import h5py
 import numpy as np
@@ -48,7 +49,7 @@ class XTrackData2(object):
     def _init_after_load(self):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
-    def build(self, dialogs, slots, vocab_from):
+    def build(self, dialogs, slots, vocab_from, oov_ins_p):
         self._init(slots, vocab_from)
 
         self.sequences = []
@@ -71,10 +72,13 @@ class XTrackData2(object):
                         data_model.Dialog.ACTOR_SYSTEM:
                     continue
 
-                token_seq.append('#EOS')
+                #token_seq.append('#EOS')
                 for i, token in enumerate(token_seq):
                     token_ndx = self.get_token_ndx(token)
                     seq['data'].append(token_ndx)
+
+                    if random.random() < oov_ins_p:
+                        seq['data'].append(self.get_token_ndx('#OOV'))
 
                 label = {
                     'time': len(seq['data']) - 1,
@@ -154,6 +158,7 @@ class XTrackData2(object):
 
 
 if __name__ == '__main__':
+    random.seed(0)
     from utils import pdb_on_error
     pdb_on_error()
 
@@ -165,6 +170,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_flist_file', required=False)
     parser.add_argument('--vocab_from', type=str, required=False, default=None)
     parser.add_argument('--slots', default='food')
+    parser.add_argument('--oov_ins_p', type=float, required=False, default=0.0)
 
     args = parser.parse_args()
 
@@ -181,7 +187,8 @@ if __name__ == '__main__':
     print slots
 
     xtd = XTrackData2()
-    xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots)
+    xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots,
+              oov_ins_p=args.oov_ins_p)
     xtd.save(args.out_file)
 
     if args.out_flist_file:

@@ -61,14 +61,19 @@ class IdentityInput(object):
 
 
 
-class Embedding(object):
+class Embedding(Layer):
 
-    def __init__(self, size=128, n_features=256, init='normal'):
+    def __init__(self, name=None, size=128, n_features=256, init='normal'):
+        if name:
+            self.name = name
         self.init = getattr(inits, init)
         self.size = size
         self.n_features = n_features
         self.input = T.imatrix()
-        self.wv = self.init((self.n_features, self.size))
+        self.wv = self.init((self.n_features, self.size),
+                            layer_width=self.size,
+                            scale=1.0,
+                            name=self._name_param("emb"))
         self.params = {self.wv}
 
     def output(self, dropout_active=False):
@@ -81,7 +86,10 @@ class Embedding(object):
 
 class LstmRecurrent(Layer):
 
-    def __init__(self, size=256, init='normal', truncate_gradient=-1, seq_output=False, p_drop=0., init_scale=0.1, out_cells=False):
+    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+                 seq_output=False, p_drop=0., init_scale=0.1, out_cells=False):
+        if name:
+            self.name = name
         self.init = getattr(inits, init)
         self.init_scale = init_scale
         self.size = size
@@ -94,21 +102,32 @@ class LstmRecurrent(Layer):
         self.l_in = l_in
         self.n_in = l_in.size
 
-        self.w = self.init((self.n_in, self.size * 4), scale=self.init_scale,
+        # Input connections.
+        self.w = self.init((self.n_in, self.size * 4),
+                           layer_width=self.size,
+                           scale=self.init_scale,
                            name=self._name_param("W"))
-        self.b = self.init((self.size * 4, ), scale=self.init_scale,
+
+        self.b = self.init((self.size * 4, ),
+                           layer_width=self.size,
+                           scale=self.init_scale,
                            name=self._name_param("b"))
 
-        #self.b_f = self.init((self.size, ), scale=self.init_scale)
-        #self.b_i = self.init((self.size, ), scale=self.init_scale)
-        #self.b_o = self.init((self.size, ), scale=self.init_scale)
-        #self.b_m = self.init((self.size, ), scale=self.init_scale)
+        # Initialize forget gates to large values
+        b = self.b.get_value()
+        b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
+        self.b.set_value(b)
 
-        self.u = self.init((self.size, self.size * 4), scale=self.init_scale,
+        # Recurrent connections.
+        self.u = self.init((self.size, self.size * 4),
+                           layer_width=self.size,
+                           scale=self.init_scale,
                            name=self._name_param("U"))
 
         # Peep-hole connections.
-        self.p = self.init((self.size, self.size * 3), scale=self.init_scale,
+        self.p = self.init((self.size, self.size * 3),
+                           layer_width=self.size,
+                           scale=self.init_scale,
                            name=self._name_param("P"))
 
         self.params = [self.w, self.u, self.p, self.b]
@@ -167,9 +186,11 @@ class LstmRecurrent(Layer):
         return self.l_in.get_params().union(self.params)
 
 
-class Dense(object):
-    def __init__(self, size=256, activation='rectify', init='normal',
+class Dense(Layer):
+    def __init__(self, name=None, size=256, activation='rectify', init='normal',
                  p_drop=0.):
+        if name:
+            self.name = name
         self.activation_str = activation
         self.activation = getattr(activations, activation)
         self.init = getattr(inits, init)
@@ -179,12 +200,17 @@ class Dense(object):
     def connect(self, l_in):
         self.l_in = l_in
         self.n_in = l_in.size
-        if 'maxout' in self.activation_str:
-            self.w = self.init((self.n_in, self.size*2))
-            self.b = shared0s((self.size*2))
-        else:
-            self.w = self.init((self.n_in, self.size))
-            self.b = shared0s((self.size))
+
+        self.w = self.init(
+            (self.n_in, self.size),
+            layer_width=self.size,
+            name=self._name_param("w")
+        )
+        self.b = self.init(
+            (self.size, ),
+            layer_width=self.size,
+            name=self._name_param("b")
+        )
         self.params = [self.w, self.b]
 
     def output(self, pre_act=False, dropout_active=False):
@@ -209,14 +235,14 @@ class Dense(object):
         return set(self.params).union(set(self.l_in.get_params()))
 
 
-class MLP(object):
-    def __init__(self, sizes, activations):
+class MLP(Layer):
+    def __init__(self, sizes, activations, name=None):
         layers = []
         for size, activation in zip(sizes, activations):
-            layer = Dense(size=size, activation=activation)
+            layer = Dense(size=size, activation=activation, name=name)
             layers.append(layer)
 
-        self.stack = Stack(layers)
+        self.stack = Stack(layers, name=name)
 
     def connect(self, l_in):
         self.stack.connect(l_in)
@@ -228,8 +254,10 @@ class MLP(object):
         return set(self.stack.get_params())
 
 
-class Stack(object):
-    def __init__(self, layers):
+class Stack(Layer):
+    def __init__(self, layers, name=None):
+        if name:
+            self.name = name
         self.layers = layers
         self.size = layers[-1].size
 
@@ -246,7 +274,7 @@ class Stack(object):
         return set(flatten([layer.get_params() for layer in self.layers]))
 
 
-class CherryPick(object):
+class CherryPick(Layer):
     def connect(self, data, indices, indices2):
         self.data_layer = data
         self.indices = indices
@@ -262,7 +290,7 @@ class CherryPick(object):
 
 
 
-class CrossEntropyObjective(object):
+class CrossEntropyObjective(Layer):
     def connect(self, y_hat_layer, y_true):
         self.y_hat_layer = y_hat_layer
         self.y_true = y_true
@@ -277,16 +305,17 @@ class CrossEntropyObjective(object):
         return set(self.y_hat_layer.get_params())
 
 
-class SumOut(object):
-    def connect(self, *inputs):
+class SumOut(Layer):
+    def connect(self, *inputs, **kwargs):
         self.inputs = inputs
+        self.scale = kwargs.get('scale', 1.0)
 
     def output(self, dropout_active=False):
         res = 0
         for l_in in self.inputs:
             res += l_in.output(dropout_active)
 
-        return res
+        return res * self.scale
 
     def get_params(self):
         return set(flatten([layer.get_params() for layer in self.inputs]))

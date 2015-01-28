@@ -28,13 +28,15 @@ echo "> Converting data to HDF5 format."
 python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
-        --slots food
+        --slots food \
+        --oov_ins_p 0.1
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
         --out_file ${E_ROOT}/${i}.json \
         --vocab_from ${E_ROOT}/train.json \
-        --slots food
+        --slots food \
+        --oov_ins_p 0.0
 done
 
 echo "> Finishing up."

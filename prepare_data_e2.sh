@@ -29,14 +29,16 @@ python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
         --out_flist_file ${E_ROOT}/train.flist \
-        --slots food,area,pricerange,name
+        --slots food,area,pricerange,name \
+        --oov_ins_p 0.1
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
         --out_file ${E_ROOT}/${i}.json \
         --out_flist_file ${E_ROOT}/${i}.flist \
         --vocab_from ${E_ROOT}/train.json \
-        --slots food,area,pricerange,name
+        --slots food,area,pricerange,name \
+        --oov_ins_p 0.0
 done
 
 echo "> Finishing up."

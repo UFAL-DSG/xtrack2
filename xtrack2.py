@@ -47,7 +47,7 @@ def compute_stats(slots, classes, prediction, y, prev_conf_mats=None):
 
 
 def visualize_prediction(xtd, data, prediction):
-    x = data['x'].transpose(1, 0)
+    #x = data['x'].transpose(1, 0)
     pred_ptr = 0
 
     classes_rev = {}
@@ -148,7 +148,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
          rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
-         oclf_n_layers, debug):
+         oclf_n_layers, debug, track_log):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -188,6 +188,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
         logging.info('Loading took: %.1f' % (time.time() - t))
 
     tracker = XTrack2DSTCTracker(xtd_v, model)
+    tracker_train = XTrack2DSTCTracker(xtd_t, model)
 
 
 
@@ -251,6 +252,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                                        valid_data['y_labels'])
 
         visualize_prediction(xtd_v, valid_data, prediction)
+        visualize_prediction(xtd_t, train_data, prediction_train)
         avg_loss = avg_loss / len(minibatches)
         logging.info('Mean loss: %.2f' % avg_loss)
 
@@ -269,7 +271,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
             p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
             logging.info(p.render())
 
-        _, accuracy = tracker.track()
+        _, accuracy = tracker.track(tracking_log_file_name=track_log)
+        tracker_train.track(tracking_log_file_name=track_log + ".train")
         logging.info('Tracking accuracy: %d' % int(accuracy * 100))
 
 
@@ -277,6 +280,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
     model.save(final_model_file)
 
 if __name__ == '__main__':
+    random.seed(0)
 
 
     import argparse
@@ -315,6 +319,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--debug', default=False,
                         action='store_true')
+    parser.add_argument('--track_log', default='rprop', type=str)
 
     args = parser.parse_args()
     #climate.call(main)
