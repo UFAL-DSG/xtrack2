@@ -11,7 +11,7 @@ from passage.model import NeuralModel
 
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
-                 n_cells, lstm_n_layers,
+                 n_cells, lstm_n_layers, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation, lr, debug):
 
         y_seq_id = tt.ivector()
@@ -62,15 +62,23 @@ class Model(NeuralModel):
 
         cost_value = cost.output()
 
-        updater = updates.RProp(lr=lr)
-        model_updates = updater.get_updates(params, cost_value)
+        if opt_type == "rprop":
+            updater = updates.RProp(lr=lr)
+            model_updates = updater.get_updates(params, cost_value)
+        elif opt_type == "sgd":
+            reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.SGD(lr=lr, regularizer=reg)
+        elif opt_type == "rmsprop":
+            reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.RMSprop(lr=lr, regularizer=reg)
+        else:
+            raise Exception("Unknonw opt.")
 
-        sgd_updater = updates.SGD()
-        sgd_model_updates = sgd_updater.get_updates(params, cost_value)
+        model_updates = updater.get_updates(params, cost_value)
 
         train_args = [x, y_seq_id, y_time] + [y_label[slot] for slot in slots]
 
-        logging.info('Preparing RProp train function.')
+        logging.info('Preparing %s train function.' % opt_type)
         t = time.time()
         self._train = theano.function(train_args, cost_value,
                                       updates=model_updates)

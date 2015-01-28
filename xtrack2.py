@@ -68,6 +68,7 @@ def visualize_prediction(xtd, data, prediction):
 
             labeling[label['time']] = (label['slots'], pred_label)
 
+        print " U:",
         for i, word_id in enumerate(dialog['data']):
             print xtd.vocab_rev[word_id],
             if i in labeling:
@@ -75,13 +76,14 @@ def visualize_prediction(xtd, data, prediction):
                 for slot in xtd.slots:
                     lbl, pred_lbl = labeling[i]
                     p = P()
-                    p.print_out(" * ")
+                    p.print_out("    * ")
                     p.print_out(slot)
                     p.tab(15)
                     p.print_out(classes_rev[slot][lbl[slot]])
-                    p.tab(25)
+                    p.tab(32)
                     p.print_out(classes_rev[slot][pred_lbl[slot]])
                     print p.render()
+                print " U:",
         print
 
 
@@ -181,7 +183,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                       oclf_activation=oclf_activation,
                       lr=lr,
                       debug=debug,
-                      lstm_n_layers=lstm_n_layers
+                      lstm_n_layers=lstm_n_layers,
+                      opt_type=opt_type
         )
         model.save(model_file)
         logging.info('Rebuilding took: %.1f' % (time.time() - t))
