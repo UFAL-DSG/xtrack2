@@ -71,6 +71,9 @@ class Model(NeuralModel):
         elif opt_type == "rmsprop":
             reg = updates.Regularizer(maxnorm=5.0)
             updater = updates.RMSprop(lr=lr, regularizer=reg)
+        elif opt_type == "adam":
+            reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.Adam(lr=lr, regularizer=reg)
         else:
             raise Exception("Unknonw opt.")
 
