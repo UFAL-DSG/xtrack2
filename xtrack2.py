@@ -151,7 +151,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
          rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
-         oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers):
+         oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers,
+         p_drop):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -184,7 +185,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                       lr=lr,
                       debug=debug,
                       lstm_n_layers=lstm_n_layers,
-                      opt_type=opt_type
+                      opt_type=opt_type,
+                      p_drop=p_drop
         )
         model.save(model_file)
         logging.info('Rebuilding took: %.1f' % (time.time() - t))
@@ -311,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--emb_size', default=7, type=int)
     parser.add_argument('--n_epochs', default=1000, type=int)
     parser.add_argument('--lr', default=0.1, type=float)
+    parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--gradient_clipping', default=None, type=float)
     #parser.add_argument('--unit_act', )

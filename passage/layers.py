@@ -163,8 +163,11 @@ class LstmRecurrent(Layer):
         X = self.l_in.output(dropout_active=dropout_active)
         if self.p_drop > 0. and dropout_active:
             X = dropout(X, self.p_drop)
+            dropout_corr = 1.0
+        else:
+            dropout_corr = 1.0 - self.p_drop
 
-        x_dot_w = T.dot(X, self.w) + self.b
+        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
         [out, cells], _ = theano.scan(self.step,
             sequences=[x_dot_w],
             outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)], 
@@ -217,6 +220,9 @@ class Dense(Layer):
         X = self.l_in.output(dropout_active=dropout_active)
         if self.p_drop > 0. and dropout_active:
             X = dropout(X, self.p_drop)
+            dropout_corr = 1.
+        else:
+            dropout_corr = 1.0 - self.p_drop
 
         is_tensor3_softmax = X.ndim > 2 and self.activation_str == 'softmax'
 
@@ -224,7 +230,7 @@ class Dense(Layer):
         if is_tensor3_softmax: #reshape for tensor3 softmax
             X = X.reshape((shape[0]*shape[1], self.n_in))
 
-        out =  self.activation(T.dot(X, self.w) + self.b)
+        out =  self.activation(T.dot(X, self.w * dropout_corr) + self.b)
 
         if is_tensor3_softmax: #reshape for tensor3 softmax
             out = out.reshape((shape[0], shape[1], self.size))
@@ -236,11 +242,11 @@ class Dense(Layer):
 
 
 class MLP(Layer):
-    def __init__(self, sizes, activations, name=None):
+    def __init__(self, sizes, activations, name=None, p_drop=0.):
         layers = []
         for layer_id, (size, activation) in enumerate(zip(sizes, activations)):
             layer = Dense(size=size, activation=activation, name="%s_%d" % (
-                name, layer_id, ))
+                name, layer_id, ), p_drop=p_drop)
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)

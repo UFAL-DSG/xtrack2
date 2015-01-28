@@ -12,7 +12,8 @@ from passage.model import NeuralModel
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
                  n_cells, lstm_n_layers, opt_type,
-                 oclf_n_hidden, oclf_n_layers, oclf_activation, lr, debug):
+                 oclf_n_hidden, oclf_n_layers, oclf_activation, lr, debug,
+                 p_drop):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -30,7 +31,7 @@ class Model(NeuralModel):
         prev_layer = input_layer
         for i in range(lstm_n_layers):
             lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
-                                       out_cells=False)
+                                       out_cells=False, p_drop=p_drop)
             lstm_layer.connect(prev_layer)
             prev_layer = lstm_layer
 
@@ -44,9 +45,9 @@ class Model(NeuralModel):
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
-                           name="mlp_%s" % slot)
+                           name="mlp_%s" % slot, p_drop=p_drop)
             slot_mlp.connect(cpt)
-            predictions.append(slot_mlp.output())
+            predictions.append(slot_mlp.output(dropout_active=False))
 
             slot_objective = CrossEntropyObjective()
             slot_objective.connect(
@@ -60,7 +61,7 @@ class Model(NeuralModel):
         n_params = sum(p.get_value().size for p in params)
         logging.info('This model has %d parameters.' % n_params)
 
-        cost_value = cost.output()
+        cost_value = cost.output(dropout_active=True)
 
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr)
@@ -86,13 +87,6 @@ class Model(NeuralModel):
         self._train = theano.function(train_args, cost_value,
                                       updates=model_updates)
         logging.info('Preparation done. Took: %.1f' % (time.time() - t))
-
-        if False:
-            logging.info('Preparing SGD train function.')
-            t = time.time()
-            self._train = theano.function(train_args, cost_value,
-                                          updates=sgd_model_updates)
-            logging.info('Preparation done. Took: %.1f' % (time.time() - t))
 
         logging.info('Preparing predict function.')
         t = time.time()
