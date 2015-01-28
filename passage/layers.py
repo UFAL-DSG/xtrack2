@@ -116,8 +116,6 @@ class LstmRecurrent(Layer):
         # Initialize forget gates to large values.
         b = self.b.get_value()
         b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
-        b[self.size:self.size*2] = np.random.uniform(low=-40.0, high=-50.0,
-                                             size=self.size)
         self.b.set_value(b)
 
         # Recurrent connections.

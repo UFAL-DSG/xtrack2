@@ -58,7 +58,7 @@ class Model(NeuralModel):
         cost.connect(*costs, scale=1.0 / len(slots))
         params = list(cost.get_params())
         n_params = sum(p.get_value().size for p in params)
-        logging.info('This mode has %d parameters.' % n_params)
+        logging.info('This model has %d parameters.' % n_params)
 
         cost_value = cost.output()
 
