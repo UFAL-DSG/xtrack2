@@ -60,11 +60,11 @@ def visualize_prediction(xtd, data, prediction):
 
         labeling = {}
         for label in dialog['labels']:
-            pred_ptr += 1
             pred_label = {}
             for i, slot in enumerate(xtd.slots):
                 pred = prediction[i][pred_ptr]
                 pred_label[slot] = np.argmax(pred)
+            pred_ptr += 1
 
             labeling[label['time']] = (label['slots'], pred_label)
 
