@@ -10,7 +10,8 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size, n_input_tokens, n_cells,
+    def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
+                 n_cells, lstm_n_layers,
                  oclf_n_hidden, oclf_n_layers, lr, debug):
 
         y_seq_id = tt.ivector()
@@ -25,10 +26,15 @@ class Model(NeuralModel):
         if debug:
             self._input_layer = theano.function([x], input_layer.output())
 
-        lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
-                                   out_cells=True)
-        lstm_layer.connect(input_layer)
+        lstm_layer = None
+        prev_layer = input_layer
+        for i in range(lstm_n_layers):
+            lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
+                                       out_cells=False)
+            lstm_layer.connect(prev_layer)
+            prev_layer = lstm_layer
 
+        assert lstm_layer is not None
         cpt = CherryPick()
         cpt.connect(lstm_layer, y_time, y_seq_id)
 
@@ -51,22 +57,31 @@ class Model(NeuralModel):
         cost = SumOut()
         cost.connect(*costs, scale=1.0 / len(slots))
         params = list(cost.get_params())
+        n_params = sum(p.get_value().size for p in params)
+        logging.info('This mode has %d parameters.' % n_params)
+
         cost_value = cost.output()
 
         updater = updates.RProp(lr=lr)
-        #updater = updates.SGD()
-        #updater = updates.Momentum(lr=lr)
         model_updates = updater.get_updates(params, cost_value)
 
+        sgd_updater = updates.SGD()
+        sgd_model_updates = sgd_updater.get_updates(params, cost_value)
 
-        logging.info('Preparing train function.')
+        train_args = [x, y_seq_id, y_time] + [y_label[slot] for slot in slots]
+
+        logging.info('Preparing RProp train function.')
         t = time.time()
-        self._train = theano.function(
-            [x, y_seq_id, y_time]
-            + [y_label[slot] for slot in slots],
-            cost_value, updates=model_updates)
-
+        self._train = theano.function(train_args, cost_value,
+                                      updates=model_updates)
         logging.info('Preparation done. Took: %.1f' % (time.time() - t))
+
+        if False:
+            logging.info('Preparing SGD train function.')
+            t = time.time()
+            self._train = theano.function(train_args, cost_value,
+                                          updates=sgd_model_updates)
+            logging.info('Preparation done. Took: %.1f' % (time.time() - t))
 
         logging.info('Preparing predict function.')
         t = time.time()

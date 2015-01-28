@@ -148,7 +148,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
          rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
-         oclf_n_layers, debug, track_log):
+         oclf_n_layers, debug, track_log, lstm_n_layers):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -178,7 +178,8 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                       oclf_n_hidden=oclf_n_hidden,
                       oclf_n_layers=oclf_n_layers,
                       lr=lr,
-                      debug=debug
+                      debug=debug,
+                      lstm_n_layers=lstm_n_layers
         )
         model.save(model_file)
         logging.info('Rebuilding took: %.1f' % (time.time() - t))
@@ -316,6 +317,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
+    parser.add_argument('--lstm_n_layers', default=1, type=int)
 
     parser.add_argument('--debug', default=False,
                         action='store_true')

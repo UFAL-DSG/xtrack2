@@ -72,13 +72,13 @@ class XTrackData2(object):
                         data_model.Dialog.ACTOR_SYSTEM:
                     continue
 
-                #token_seq.append('#EOS')
                 for i, token in enumerate(token_seq):
                     token_ndx = self.get_token_ndx(token)
                     seq['data'].append(token_ndx)
 
                     if random.random() < oov_ins_p:
                         seq['data'].append(self.get_token_ndx('#OOV'))
+                #seq['data'].append(self.get_token_ndx('#EOS'))
 
                 label = {
                     'time': len(seq['data']) - 1,

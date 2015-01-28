@@ -113,7 +113,7 @@ class LstmRecurrent(Layer):
                            scale=self.init_scale,
                            name=self._name_param("b"))
 
-        # Initialize forget gates to large values
+        # Initialize forget gates to large values.
         b = self.b.get_value()
         b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
         self.b.set_value(b)
@@ -238,8 +238,9 @@ class Dense(Layer):
 class MLP(Layer):
     def __init__(self, sizes, activations, name=None):
         layers = []
-        for size, activation in zip(sizes, activations):
-            layer = Dense(size=size, activation=activation, name=name)
+        for layer_id, (size, activation) in enumerate(zip(sizes, activations)):
+            layer = Dense(size=size, activation=activation, name="%s_%d" % (
+                name, layer_id, ))
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)
