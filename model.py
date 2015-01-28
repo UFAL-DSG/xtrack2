@@ -12,7 +12,7 @@ from passage.model import NeuralModel
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
                  n_cells, lstm_n_layers,
-                 oclf_n_hidden, oclf_n_layers, lr, debug):
+                 oclf_n_hidden, oclf_n_layers, oclf_activation, lr, debug):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -43,7 +43,7 @@ class Model(NeuralModel):
         for slot in slots:
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden] * oclf_n_layers + [n_classes],
-                           ['tanh'] * oclf_n_layers + ['softmax'],
+                           [oclf_activation] * oclf_n_layers + ['softmax'],
                            name="mlp_%s" % slot)
             slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output())

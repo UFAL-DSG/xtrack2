@@ -69,8 +69,9 @@ def visualize_prediction(xtd, data, prediction):
             labeling[label['time']] = (label['slots'], pred_label)
 
         for i, word_id in enumerate(dialog['data']):
-            print xtd.vocab_rev[word_id]
+            print xtd.vocab_rev[word_id],
             if i in labeling:
+                print
                 for slot in xtd.slots:
                     lbl, pred_lbl = labeling[i]
                     p = P()
@@ -148,7 +149,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          final_model_file, mb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
          rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
-         oclf_n_layers, debug, track_log, lstm_n_layers):
+         oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -177,6 +178,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                       n_input_tokens=n_input_tokens,
                       oclf_n_hidden=oclf_n_hidden,
                       oclf_n_layers=oclf_n_layers,
+                      oclf_activation=oclf_activation,
                       lr=lr,
                       debug=debug,
                       lstm_n_layers=lstm_n_layers
@@ -317,6 +319,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
+    parser.add_argument('--oclf_activation', default="tanh", type=str)
     parser.add_argument('--lstm_n_layers', default=1, type=int)
 
     parser.add_argument('--debug', default=False,
