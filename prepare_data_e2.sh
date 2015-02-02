@@ -12,11 +12,13 @@ SLOTS="food,area,pricerange,name:method:req_food,req_area,req_pricerange,req_nam
 
 echo "> Processing training data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
-    --out_dir ${E_ROOT}/train --flist ${DATA_DIRECTORY}/dstc2/scripts/dstc2_train.flist
+    --out_dir ${E_ROOT}/train \
+    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
 
 echo "> Processing validation data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
-    --out_dir ${E_ROOT}/valid --flist ${DATA_DIRECTORY}/dstc2/scripts/dstc2_dev.flist
+    --out_dir ${E_ROOT}/valid \
+    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
 
 #echo "> Processing testing data."
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
