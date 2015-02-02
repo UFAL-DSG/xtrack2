@@ -13,7 +13,7 @@ import numpy as np
 def dropout(X, p=0.):
     if p != 0:
         retain_prob = 1 - p
-        X = X / retain_prob * srng.binomial(X.shape, p=retain_prob, dtype=theano.config.floatX)
+        X = X * srng.binomial(X.shape, p=retain_prob, dtype=theano.config.floatX)
     return X
 
 def theano_one_hot(idx, n):
