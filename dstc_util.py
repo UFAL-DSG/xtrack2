@@ -104,10 +104,11 @@ class Turn(object):
             self.input = Input(
                 turn['input'],
                 labels['goal-labels'],
-                labels['requested-slots']
+                labels['requested-slots'],
+                labels['method-label']
             )
         else:
-            self.input = Input(turn['input'], None)
+            self.input = Input(turn['input'], None, None)
 
         self.output = Output(turn['output'])
 
@@ -137,7 +138,7 @@ class Input(object):
         batch_slu: A list of slu hypothesis from batch processing.
     """
 
-    def __init__(self, input_json, user_goal, requested_slots):
+    def __init__(self, input_json, user_goal, requested_slots, method):
         """Initialises an input object from the external format.
 
         Keyword arguments:
@@ -157,6 +158,7 @@ class Input(object):
 
         self.user_goal = user_goal
         self.requested_slots = requested_slots
+        self.method = method
 
         for fldname, asr_field, slu_field in (
                 ('live', self.live_asr, self.live_slu),

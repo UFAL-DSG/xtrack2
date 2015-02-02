@@ -8,17 +8,15 @@ cd $DIR
 . ./config.sh
 
 E_ROOT=${DATA_DIRECTORY}/xtrack/e2
-MAX_DECODING_STEPS=3
-MAX_LEN=100
-MAX_LABELS_IN_DIALOG=15
+SLOTS="food,area,pricerange,name:method:req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
 
 echo "> Processing training data."
-python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/train \
-    --out_dir ${E_ROOT}/train
+python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
+    --out_dir ${E_ROOT}/train --flist ${DATA_DIRECTORY}/dstc2/data/dstc2_train.flist
 
 echo "> Processing validation data."
-python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/valid \
-    --out_dir ${E_ROOT}/valid
+python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
+    --out_dir ${E_ROOT}/valid --flist ${DATA_DIRECTORY}/dstc2/data/dstc2_dev.flist
 
 #echo "> Processing testing data."
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
@@ -29,7 +27,7 @@ python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
         --out_flist_file ${E_ROOT}/train.flist \
-        --slots food,area,pricerange,name \
+        --slots ${SLOTS} \
         --oov_ins_p 0.1
 for i in valid; do
     python xtrack_data2.py \
@@ -37,7 +35,7 @@ for i in valid; do
         --out_file ${E_ROOT}/${i}.json \
         --out_flist_file ${E_ROOT}/${i}.flist \
         --vocab_from ${E_ROOT}/train.json \
-        --slots food,area,pricerange,name \
+        --slots ${SLOTS} \
         --oov_ins_p 0.0
 done
 

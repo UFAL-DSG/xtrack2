@@ -20,12 +20,13 @@ def tokenize(text):
 
 
 class XTrackData2(object):
-    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots']
+    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups']
 
     null_class = '_null_'
 
-    def _init(self, slots, vocab_from):
+    def _init(self, slots, slot_groups, vocab_from):
         self.slots = slots
+        self.slot_groups = slot_groups
         if vocab_from:
             data = XTrackData2.load(vocab_from)
             self.vocab = data.vocab
@@ -49,8 +50,8 @@ class XTrackData2(object):
     def _init_after_load(self):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
-    def build(self, dialogs, slots, vocab_from, oov_ins_p):
-        self._init(slots, vocab_from)
+    def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p):
+        self._init(slots, slot_groups, vocab_from)
 
         self.sequences = []
 
@@ -84,7 +85,7 @@ class XTrackData2(object):
                     'time': len(seq['data']) - 1,
                     'slots': {}
                 }
-                for slot, val in zip(slots, self.state_to_cls(state, slots)):
+                for slot, val in zip(slots, self.state_to_label(state, slots)):
                     label['slots'][slot] = val
                 seq['labels'].append(label)
 
@@ -102,14 +103,14 @@ class XTrackData2(object):
             else:
                 return self.vocab['#OOV']
 
-    def state_to_cls(self, state, slots):
+    def state_to_label(self, state, slots):
         res = []
         for slot in slots:
-            res.append(self.state_to_cls_for(state, slot))
+            res.append(self.state_to_label_for(state, slot))
 
         return res
 
-    def state_to_cls_for(self, state, slot):
+    def state_to_label_for(self, state, slot):
         if not state:
             return self.classes[slot][self.null_class]
         else:
@@ -183,12 +184,16 @@ if __name__ == '__main__':
                 )
             )
 
-    slots = args.slots.split(',')
-    print slots
+    slot_groups = {}
+    slots = []
+    for i, slot_group in enumerate(args.slots.split(':')):
+        slot_group = slot_group.split(',')
+        slot_groups[i] = slot_group
+        slots.extend(slot_group)
 
     xtd = XTrackData2()
     xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots,
-              oov_ins_p=args.oov_ins_p)
+              slot_groups=slot_groups, oov_ins_p=args.oov_ins_p)
     xtd.save(args.out_file)
 
     if args.out_flist_file:
