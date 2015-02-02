@@ -203,11 +203,11 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
             p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
             logging.info(p.render())
 
-        _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
-        _, accuracy_train = tracker_train.track(
-            tracking_log_file_name=track_log + ".train")
-        logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
-        logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
+    _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
+    _, accuracy_train = tracker_train.track(
+        tracking_log_file_name=track_log + ".train")
+    logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
+    logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
 
 
 def main(experiment_path, out, n_cells, visualize_every, emb_size,
