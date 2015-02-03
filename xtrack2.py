@@ -24,16 +24,13 @@ from xtrack2_dstc_tracker import XTrack2DSTCTracker
 
 
 def compute_stats(slots, slot_selection, classes, prediction, y,
-                  joint_slot_name,
-                  prev_conf_mats=None):
-    if not prev_conf_mats:
-        conf_mats = {}
-        conf_mats[joint_slot_name] = ConfusionMatrix(2)
-        for slot in slots:
-            if slot in slot_selection:
-                conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
-    else:
-        conf_mats = prev_conf_mats
+                  joint_slot_name):
+    conf_mats = {}
+    conf_mats[joint_slot_name] = ConfusionMatrix(2)
+    for slot in slots:
+        if slot in slot_selection:
+            conf_mats[slot] = ConfusionMatrix(len(classes[slot]))
+
 
     joint_correct = np.array([True for _ in prediction[0]])
     joint_all = np.array([True for _ in prediction[0]])
@@ -44,7 +41,7 @@ def compute_stats(slots, slot_selection, classes, prediction, y,
 
             conf_mats[slot].batchAdd(slot_y, slot_y_hat)
 
-            joint_correct &= slot_y == slot_y_hat
+            joint_correct &= (slot_y == slot_y_hat)
 
     conf_mats[joint_slot_name].batchAdd(joint_all, joint_correct)
     return conf_mats
@@ -142,10 +139,7 @@ def init_env(output_dir):
     return output_dir
 
 
-def prepare_minibatches(xtd_t, mb_size, model, slots):
-    seqs = xtd_t.sequences
-    random.shuffle(seqs)
-
+def prepare_minibatches(seqs, mb_size, model, slots):
     minibatches = []
     seqs_mb = iter_data(seqs, size=mb_size)
     for mb in seqs_mb:
@@ -165,7 +159,7 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                class_groups,
                best_acc, best_acc_train, tracker_valid, tracker_train,
                track_log):
-    prediction = model._predict(
+    prediction_valid = model._predict(
         valid_data['x'],
         valid_data['y_seq_id'],
         valid_data['y_time']
@@ -176,7 +170,7 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
         train_data['y_time']
     )
 
-    visualize_prediction(xtd_v, prediction)
+    visualize_prediction(xtd_v, prediction_valid)
     visualize_prediction(xtd_t, prediction_train)
 
     logging.info('Results:')
@@ -184,11 +178,11 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
         joint_slot_name = 'joint_%s' % str(group_name)
         train_conf_mats = compute_stats(slots, slot_selection, classes,
                                         prediction_train,
-                                       train_data['y_labels'], joint_slot_name)
+                                        train_data['y_labels'], joint_slot_name)
 
         valid_conf_mats = compute_stats(slots, slot_selection, classes,
-                                        prediction,
-                                       valid_data['y_labels'], joint_slot_name)
+                                        prediction_valid,
+                                        valid_data['y_labels'], joint_slot_name)
 
         for slot in slot_selection + [joint_slot_name]:
             p = P()
@@ -211,23 +205,22 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
     logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
 
 
-def main(experiment_path, out, n_cells, visualize_every, emb_size,
-         n_epochs, lr, opt_type, gradient_clipping, model_file,
+def main(experiment_path, out, n_cells, emb_size,
+         n_epochs, lr, opt_type, model_file,
          final_model_file, mb_size,
-         eid, n_neg_samples, rebuild_model, desc, rinit_scale,
-         rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
+         eid, rebuild_model, oclf_n_hidden,
          oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers,
          p_drop, init_emb_from):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
     logging.info('ARGV: %s' % str(sys.argv))
+    logging.info('Experiment path: %s' % experiment_path)
 
     train_path = os.path.join(experiment_path, 'train.json')
-    valid_path = os.path.join(experiment_path, 'valid.json')
-    # test_path = os.path.join(experiment_path, 'test.hdf5')
-
     xtd_t = XTrackData2.load(train_path)
+
+    valid_path = os.path.join(experiment_path, 'valid.json')
     xtd_v = XTrackData2.load(valid_path)
 
     slots = xtd_t.slots
@@ -265,9 +258,9 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
     tracker = XTrack2DSTCTracker(xtd_v, model)
     tracker_train = XTrack2DSTCTracker(xtd_t, model)
 
-    minibatches = zip(itertools.count(), prepare_minibatches(xtd_t, mb_size,
-                                                          model,
-                                                    slots))
+    minibatches = prepare_minibatches(xtd_t.sequences, mb_size, model, slots)
+    minibatches = zip(itertools.count(), minibatches)
+    logging.info('We have %d minibatches.' % len(minibatches))
 
     valid_data = model.prepare_data(xtd_v.sequences, slots)
     train_data = model.prepare_data(xtd_t.sequences, slots)
@@ -276,7 +269,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
     best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
     for i in range(n_epochs):
-        logging.info('Iteration #%d' % i)
+        logging.info('Epoch #%d' % i)
         random.shuffle(minibatches)
         avg_loss = 0.0
 
@@ -284,7 +277,9 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
             t = time.time()
             loss = model._train(x, y_seq_id, y_time, *y_labels)
             t = time.time() - t
+
             avg_loss += loss
+
             vlog(' > ',
                  ('minibatch', mb_id, ),
                  ('loss', "%.2f" % loss),
@@ -324,8 +319,6 @@ if __name__ == '__main__':
     parser.add_argument('--final_model_file',
                         default='xtrack_model_final.pickle')
     parser.add_argument('--out', required=True)
-    parser.add_argument('--desc', default='', required=False)
-    parser.add_argument('--visualize_every', default=60, type=int)
 
     # XTrack params.
     parser.add_argument('--n_cells', default=5, type=int)
@@ -334,13 +327,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
-    parser.add_argument('--gradient_clipping', default=None, type=float)
-    #parser.add_argument('--unit_act', )
-    parser.add_argument('--n_neg_samples', default=2, type=int)
-    parser.add_argument('--rinit_scale', default=0.1, type=float)
-    parser.add_argument('--rinit_scale_emb', default=1.0, type=float)
-    parser.add_argument('--init_scale_gates_bias', default=0.0, type=float)
-    parser.add_argument('--mb_size', default=32, type=int)
+    parser.add_argument('--mb_size', default=16, type=int)
     parser.add_argument('--init_emb_from', default=None, type=str)
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)

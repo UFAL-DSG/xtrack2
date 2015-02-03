@@ -8,7 +8,7 @@ cd $DIR
 . ./config.sh
 
 E_ROOT=${DATA_DIRECTORY}/xtrack/e2
-SLOTS="food,area,pricerange,name"
+SLOTS="food,area,pricerange,name:method:req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
 
 echo "> Processing training data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
