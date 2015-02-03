@@ -7,7 +7,7 @@ cd $DIR
 
 . ./config.sh
 
-E_ROOT=${DATA_DIRECTORY}/xtrack/e2
+E_ROOT=${DATA_DIRECTORY}/xtrack/e2_goals
 SLOTS="food,area,pricerange,name"
 
 echo "> Processing training data."

@@ -10,7 +10,7 @@ mkdir -p ${EXPERIMENT_OUT}
 cfg_cnt=0
 while read cfg; do
     cfg_cnt=$((cfg_cnt+1))
-    for i in 1 2 3 4 5; do
+    for i in 1 2 3; do
         eid=${EXPERIMENT_NAME}_cfg${cfg_cnt}_${i}
         echo Submitting $eid
 
@@ -22,7 +22,7 @@ while read cfg; do
         #RUN_CMD="cat"
 
         $RUN_CMD << ENDOFSCRIPT
-        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py data/xtrack/e2/ --out out/${eid} --rebuild_model --model_file out/${eid}.model --n_epochs 100 ${cfg}
+        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py --out out/${eid} --rebuild_model --model_file out/${eid}.model ${cfg}
 ENDOFSCRIPT
     done
 done < $1

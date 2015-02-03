@@ -20,7 +20,7 @@ def flatten(l):
 class NeuralModel(object):
     def save(self, f_name):
         val = sys.getrecursionlimit()
-        sys.setrecursionlimit(10000)
+        sys.setrecursionlimit(100000)
         with open(f_name, 'w') as f_out:
             cPickle.dump(self, f_out, -1)
 
