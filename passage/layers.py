@@ -96,6 +96,69 @@ class Embedding(Layer):
         return emb
 
 
+class Recurrent(Layer):
+    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+                 seq_output=False, p_drop=0., init_scale=0.1):
+        self.size = size
+        self.init = getattr(inits, init)
+        self.name = name
+        self.truncate_gradient = truncate_gradient
+        self.seq_output = seq_output
+        self.p_drop = p_drop
+        self.init_scale = init_scale
+
+    def connect(self, l_in):
+        self.l_in = l_in
+        self.n_in = l_in.size
+
+        self.w = self.init((self.n_in, self.size),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("W"))
+
+        self.u = self.init((self.size, self.size),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("U"))
+
+        self.b = self.init((self.size, ),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("b"))
+
+        self.params = [self.w, self.u]
+
+    def output(self, dropout_active=False):
+        X = self.l_in.output(dropout_active=dropout_active)
+        if self.p_drop > 0. and dropout_active:
+            X = dropout(X, self.p_drop)
+            dropout_corr = 1.0
+        else:
+            dropout_corr = 1.0 - self.p_drop
+
+        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
+        [out, cells], _ = theano.scan(self.step,
+            sequences=[x_dot_w],
+            outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)],
+            non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
+            truncate_gradient=self.truncate_gradient
+        )
+        if self.seq_output:
+            if self.out_cells:
+                return cells
+            else:
+                return out
+        else:
+            if self.out_cells:
+                return cells[-1]
+            else:
+                return out[-1]
+
+    def get_params(self):
+        return self.l_in.get_params().union(self.params)
+
+
+
 class LstmRecurrent(Layer):
 
     def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
@@ -137,37 +200,46 @@ class LstmRecurrent(Layer):
                            name=self._name_param("U"))
 
         # Peep-hole connections.
-        self.p = self.init((self.size, self.size * 3),
+        self.p_vec_f = self.init((self.size, ),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("P"))
+        self.p_vec_i = self.init((self.size, ),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("P"))
+        self.p_vec_o = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
                            name=self._name_param("P"))
 
-        self.params = [self.w, self.u, self.p, self.b]
+        #self.p = T.stack(T.diag(self.p_vec_f), T.diag(self.p_vec_i), T.diag(
+        #    self.p_vec_o))
+
+
+        self.params = [self.w, self.u, self.b]
+        self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
 
     def _slice(self, x, n):
             return x[:, n * self.size:(n + 1) * self.size]
 
-    def step(self, x_t, h_tm1, c_tm1, u, p):
+    def step(self, x_t, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o):
         h_tm1_dot_u = T.dot(h_tm1, u)
         gates_fiom = x_t + h_tm1_dot_u
 
-        g_f = self._slice(gates_fiom, 0)
-        g_i = self._slice(gates_fiom, 1)
-        g_o = self._slice(gates_fiom, 2)
+        g_f = self._slice(gates_fiom, 0) + c_tm1 * p_vec_f
+        g_i = self._slice(gates_fiom, 1) + c_tm1 * p_vec_i
         g_m = self._slice(gates_fiom, 3)
-
-        c_tm1_dot_p = T.dot(c_tm1, p)
-
-        g_f += self._slice(c_tm1_dot_p, 0)
-        g_i += self._slice(c_tm1_dot_p, 1)
-        g_o += self._slice(c_tm1_dot_p, 2)
 
         g_f = T.nnet.sigmoid(g_f)
         g_i = T.nnet.sigmoid(g_i)
-        g_o = T.nnet.sigmoid(g_o)
         g_m = T.tanh(g_m)
 
         c_t = g_f * c_tm1 + g_i * g_m
+
+        g_o = self._slice(gates_fiom, 2) + c_t * p_vec_o
+        g_o = T.nnet.sigmoid(g_o)
+
         h_t = g_o * T.tanh(c_t)
         return h_t, c_t
 
@@ -183,7 +255,7 @@ class LstmRecurrent(Layer):
         [out, cells], _ = theano.scan(self.step,
             sequences=[x_dot_w],
             outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)], 
-            non_sequences=[self.u, self.p],
+            non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
             truncate_gradient=self.truncate_gradient
         )
         if self.seq_output:
