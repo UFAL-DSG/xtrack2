@@ -34,12 +34,9 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots, requestable_slots):
                                                  else None)
             for slot in requestable_slots:
                 if slot in turn.input.requested_slots:
-                    val = 'yes'
-                else:
-                    val = None
-                state['req_%s' % slot] = val
-            out_dialog.add_message(turn.transcription, state,
-                                   Dialog.ACTOR_USER)
+                    state['req_%s' % slot] = 'yes'
+
+            out_dialog.add_message(turn.transcription, state, Dialog.ACTOR_USER)
             last_state = turn.input.user_goal
 
         with open(os.path.join(out_dir, "%d.json" % i), "w") as f_out:

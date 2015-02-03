@@ -13,7 +13,7 @@ class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
                  n_cells, lstm_n_layers, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation, lr, debug,
-                 p_drop):
+                 p_drop, init_emb_from, vocab):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -23,9 +23,9 @@ class Model(NeuralModel):
 
         input_layer = Embedding(name="emb", size=emb_size,
                                 n_features=n_input_tokens)
-        x = input_layer.input
-        if debug:
-            self._input_layer = theano.function([x], input_layer.output())
+        if init_emb_from:
+            input_layer.init_from(init_emb_from, vocab)
+        self.input_emb = input_layer.wv
 
         lstm_layer = None
         prev_layer = input_layer
@@ -80,6 +80,10 @@ class Model(NeuralModel):
 
         model_updates = updater.get_updates(params, cost_value)
 
+        x = input_layer.input
+        if debug:
+            self._input_layer = theano.function([x], input_layer.output())
+
         train_args = [x, y_seq_id, y_time] + [y_label[slot] for slot in slots]
 
         logging.info('Preparing %s train function.' % opt_type)
@@ -98,6 +102,9 @@ class Model(NeuralModel):
 
     def init_loaded(self):
         pass
+
+    def init_word_embeddings(self, w):
+        self.input_emb.set_value(w)
 
     def prepare_data(self, seqs, slots):
         x = []
@@ -121,3 +128,7 @@ class Model(NeuralModel):
             'y_time': y_time,
             'y_labels': y_labels,
         }
+
+
+
+

@@ -4,26 +4,33 @@ import numpy as np
 
 from utils import shared0s, floatX
 
+
 def clip_norm(g, c, n):
     if c > 0:
         g = T.switch(T.ge(n, c), g*c/n, g)
     return g
 
+
 def clip_norms(gs, c):
     norm = T.sqrt(sum([T.sum(g**2) for g in gs]))
     return [clip_norm(g, c, norm) for g in gs]
 
+
+def max_norm(p, maxnorm):
+    if maxnorm > 0:
+        norms = T.sqrt(T.sum(T.sqr(p)))
+        desired = T.clip(norms, 0, maxnorm)
+        p = p * (desired/ (1e-7 + norms))
+    return p
+
 class Regularizer(object):
 
     def __init__(self, l1=0., l2=0., maxnorm=0.):
-        self.__dict__.update(locals())
+        self.l1 = l1
+        self.l2 = l2
+        self.maxnorm = maxnorm
 
-    def max_norm(self, p, maxnorm):
-        if maxnorm > 0:
-            norms = T.sqrt(T.sum(T.sqr(p), axis=0))
-            desired = T.clip(norms, 0, maxnorm)
-            p = p * (desired/ (1e-7 + norms))
-        return p
+
 
     def gradient_regularize(self, p, g):
         g += p * self.l2
@@ -31,14 +38,15 @@ class Regularizer(object):
         return g
 
     def weight_regularize(self, p):
-        p = self.max_norm(p, self.maxnorm)
+        p = max_norm(p, self.maxnorm)
         return p
 
 
 class Update(object):
 
     def __init__(self, regularizer=Regularizer(), clipnorm=0.):
-        self.__dict__.update(locals())
+        self.regularizer = regularizer
+        self.clipnorm = clipnorm
 
     def get_updates(self, params, cost):
         raise NotImplementedError
@@ -48,13 +56,13 @@ class SGD(Update):
 
     def __init__(self, lr=0.01, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
 
     def get_updates(self, params, cost):
         updates = []
         grads = T.grad(cost, params)
         grads = clip_norms(grads, self.clipnorm)
-        for p,g in zip(params,grads):
+        for p, g in zip(params, grads):
             g = self.regularizer.gradient_regularize(p, g)
             updated_p = p - self.lr * g
             updated_p = self.regularizer.weight_regularize(updated_p)
@@ -66,7 +74,8 @@ class Momentum(Update):
 
     def __init__(self, lr=0.01, momentum=0.9, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.momentum = momentum
 
     def get_updates(self, params, cost):
         updates = []
@@ -88,7 +97,8 @@ class NAG(Update):
 
     def __init__(self, lr=0.01, momentum=0.9, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.momentum = momentum
 
     def get_updates(self, params, cost):
         updates = []
@@ -109,7 +119,9 @@ class RMSprop(Update):
 
     def __init__(self, lr=0.001, rho=0.9, epsilon=1e-6, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.rho = rho
+        self.epsilon = epsilon
 
     def get_updates(self, params, cost):
         updates = []
@@ -130,7 +142,10 @@ class Adam(Update):
 
     def __init__(self, lr=0.0002, b1=0.1, b2=0.001, e=1e-8, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.b1 = b1
+        self.b2 = b2
+        self.e = e
 
     def get_updates(self, params, cost):
         updates = []
@@ -160,7 +175,8 @@ class Adagrad(Update):
 
     def __init__(self, lr=0.01, epsilon=1e-6, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.epsilon = epsilon
 
     def get_updates(self, params, cost):
         updates = []
@@ -181,7 +197,9 @@ class Adadelta(Update):
 
     def __init__(self, lr=0.5, rho=0.95, epsilon=1e-6, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.rho = rho
+        self.epsilon = epsilon
 
     def get_updates(self, params, cost):
         updates = []
@@ -207,7 +225,9 @@ class Adadelta(Update):
 class RProp(Update):
     def __init__(self, lr=0.1, plus=1.4, minus=0.5, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
-        self.__dict__.update(locals())
+        self.lr = lr
+        self.plus = plus
+        self.minus = minus
 
     def get_updates(self, params, cost):
         grads_rprop = []

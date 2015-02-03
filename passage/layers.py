@@ -82,6 +82,18 @@ class Embedding(Layer):
     def get_params(self):
         return self.params
 
+    def init_from(self, f_name, vocab):
+        emb = self.wv.get_value()
+        import gzip
+        with gzip.GzipFile(f_name) as f_in:
+            for ln in f_in:
+                ln = ln.strip().split()
+                word = ln[0]
+                if word in vocab:
+                    word_id = vocab[word]
+                    emb[word_id,:] = map(float, ln[1:])
+
+        return emb
 
 
 class LstmRecurrent(Layer):

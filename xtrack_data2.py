@@ -50,7 +50,8 @@ class XTrackData2(object):
     def _init_after_load(self):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
-    def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p):
+    def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p,
+              include_system_utterances):
         self._init(slots, slot_groups, vocab_from)
 
         self.sequences = []
@@ -68,10 +69,15 @@ class XTrackData2(object):
                                          dialog.actors):
                 token_seq = list(tokenize(msg.lower()))
 
-                # We do not like empty messages or system messages now.
-                if len(token_seq) == 0 or actor == \
-                        data_model.Dialog.ACTOR_SYSTEM:
-                    continue
+                if not include_system_utterances:
+                    if len(token_seq) == 0 or actor == \
+                            data_model.Dialog.ACTOR_SYSTEM:
+                        continue
+                else:
+                    if actor == data_model.Dialog.ACTOR_SYSTEM:
+                        token_seq.insert(0, '#SYS')
+                    else:
+                        token_seq.insert(0, '#USR')
 
                 for i, token in enumerate(token_seq):
                     token_ndx = self.get_token_ndx(token)
@@ -81,13 +87,14 @@ class XTrackData2(object):
                         seq['data'].append(self.get_token_ndx('#OOV'))
                 #seq['data'].append(self.get_token_ndx('#EOS'))
 
-                label = {
-                    'time': len(seq['data']) - 1,
-                    'slots': {}
-                }
-                for slot, val in zip(slots, self.state_to_label(state, slots)):
-                    label['slots'][slot] = val
-                seq['labels'].append(label)
+                if actor == data_model.Dialog.ACTOR_USER:
+                    label = {
+                        'time': len(seq['data']) - 1,
+                        'slots': {}
+                    }
+                    for slot, val in zip(slots, self.state_to_label(state, slots)):
+                        label['slots'][slot] = val
+                    seq['labels'].append(label)
 
             if len(seq['data']) > 0:
                 self.sequences.append(seq)
@@ -172,6 +179,8 @@ if __name__ == '__main__':
     parser.add_argument('--vocab_from', type=str, required=False, default=None)
     parser.add_argument('--slots', default='food')
     parser.add_argument('--oov_ins_p', type=float, required=False, default=0.0)
+    parser.add_argument('--include_system_utterances', action='store_true',
+                        default=False)
 
     args = parser.parse_args()
 
@@ -193,7 +202,8 @@ if __name__ == '__main__':
 
     xtd = XTrackData2()
     xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots,
-              slot_groups=slot_groups, oov_ins_p=args.oov_ins_p)
+              slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
+              include_system_utterances=args.include_system_utterances)
     xtd.save(args.out_file)
 
     if args.out_flist_file:

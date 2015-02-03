@@ -72,7 +72,7 @@ def visualize_prediction(xtd, prediction):
 
             labeling[label['time']] = (label['slots'], pred_label)
 
-        print " U:",
+        print " T:",
         for i, word_id in enumerate(dialog['data']):
             print xtd.vocab_rev[word_id],
             if i in labeling:
@@ -82,13 +82,14 @@ def visualize_prediction(xtd, prediction):
                     p = P()
                     p.print_out("    * ")
                     p.print_out(slot)
-                    p.tab(15)
+                    p.tab(20)
                     p.print_out(classes_rev[slot][lbl[slot]])
-                    p.tab(32)
+                    p.tab(40)
                     p.print_out(classes_rev[slot][pred_lbl[slot]])
                     print p.render()
                 print " U:",
         print
+
 
 
 def vlog(txt, *args, **kwargs):
@@ -216,7 +217,7 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
          eid, n_neg_samples, rebuild_model, desc, rinit_scale,
          rinit_scale_emb, init_scale_gates_bias, oclf_n_hidden,
          oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers,
-         p_drop):
+         p_drop, init_emb_from):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -249,8 +250,11 @@ def main(experiment_path, out, n_cells, visualize_every, emb_size,
                       debug=debug,
                       lstm_n_layers=lstm_n_layers,
                       opt_type=opt_type,
-                      p_drop=p_drop
+                      p_drop=p_drop,
+                      init_emb_from=init_emb_from,
+                      vocab=xtd_t.vocab
         )
+
         model.save(model_file)
         logging.info('Rebuilding took: %.1f' % (time.time() - t))
     else:
@@ -337,6 +341,7 @@ if __name__ == '__main__':
     parser.add_argument('--rinit_scale_emb', default=1.0, type=float)
     parser.add_argument('--init_scale_gates_bias', default=0.0, type=float)
     parser.add_argument('--mb_size', default=32, type=int)
+    parser.add_argument('--init_emb_from', default=None, type=str)
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
@@ -346,6 +351,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', default=False,
                         action='store_true')
     parser.add_argument('--track_log', default='rprop', type=str)
+
 
     args = parser.parse_args()
     #climate.call(main)
