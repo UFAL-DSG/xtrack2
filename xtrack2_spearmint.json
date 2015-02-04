@@ -47,5 +47,13 @@
             "max-concurrent"    : 100,
             "max-finished-jobs" : 10000
         }
+    },
+    "tasks": {
+        "xtrack2" : {
+            "type"       : "OBJECTIVE",
+            "likelihood" : "GAUSSIAN",
+            "main-file"       : "xtrack2_spearmint.py",
+            "resources"  : ["cluster"]
+        }
     }
 }
