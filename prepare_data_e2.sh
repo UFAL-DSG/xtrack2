@@ -30,7 +30,8 @@ python xtrack_data2.py \
         --out_file ${E_ROOT}/train.json \
         --out_flist_file ${E_ROOT}/train.flist \
         --slots ${SLOTS} \
-        --oov_ins_p 0.1
+        --oov_ins_p 0.1 \
+        --include_system_utterances
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
@@ -38,7 +39,8 @@ for i in valid; do
         --out_flist_file ${E_ROOT}/${i}.flist \
         --vocab_from ${E_ROOT}/train.json \
         --slots ${SLOTS} \
-        --oov_ins_p 0.0
+        --oov_ins_p 0.0 \
+        --include_system_utterances
 done
 
 echo "> Finishing up."

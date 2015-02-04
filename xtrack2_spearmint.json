@@ -42,7 +42,7 @@
     "resources" : {
         "cluster" : {
             "scheduler"         : "SGE",
-            "max-concurrent"    : 100,
+            "max-concurrent"    : 2,
             "max-finished-jobs" : 10000
         }
     },

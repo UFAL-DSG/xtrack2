@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EXPERIMENT_NAME=$(basename "$1")
-SMP=${SMP:-4}
+SMP=${SMP:-2}
 MEM_PER_WORKER=${MEM_PER_WORKER:-4}
 
 EXPERIMENT_OUT=exp/results/${EXPERIMENT_NAME}
