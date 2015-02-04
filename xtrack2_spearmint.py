@@ -9,7 +9,7 @@ def main(job_id, params):
 
     param_list = []
     for param, val in params.iteritems():
-        param_list.append('--%s' % param)
+        param_list.append('--%s' % param[0])
         param_list.append(str(val))
 
     import xtrack2
