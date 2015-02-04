@@ -50,10 +50,11 @@ class Update(object):
     def get_updates(self, params, cost):
         raise NotImplementedError
 
-    def get_update_ratio(self, updates):
+    def get_update_ratio(self, params, updates):
         res = 0.0
         for p, np in updates:
-            res += (np - p).norm(2) / p.norm(2)
+            if p in params:
+                res += (np - p).norm(2) / p.norm(2)
         res = res / len(updates)
         return res
 

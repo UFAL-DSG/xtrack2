@@ -85,7 +85,7 @@ class Model(NeuralModel):
             self._input_layer = theano.function([x], input_layer.output())
 
         train_args = [x, y_seq_id, y_time] + [y_label[slot] for slot in slots]
-        update_ratio = updater.get_update_ratio(model_updates)
+        update_ratio = updater.get_update_ratio(params, model_updates)
 
         logging.info('Preparing %s train function.' % opt_type)
         t = time.time()
