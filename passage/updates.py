@@ -30,11 +30,10 @@ class Regularizer(object):
         self.l2 = l2
         self.maxnorm = maxnorm
 
-
-
     def gradient_regularize(self, p, g):
-        g += p * self.l2
-        g += T.sgn(p) * self.l1
+        if self.l1 > 0 or self.l2 > 0:
+            g += p * self.l2
+            g += T.sgn(p) * self.l1
         return g
 
     def weight_regularize(self, p):
@@ -50,6 +49,13 @@ class Update(object):
 
     def get_updates(self, params, cost):
         raise NotImplementedError
+
+    def get_update_ratio(self, updates):
+        res = 0.0
+        for p, np in updates:
+            res += (np - p).norm(2) / p.norm(2)
+        res = res / len(updates)
+        return res
 
 
 class SGD(Update):
@@ -67,6 +73,7 @@ class SGD(Update):
             updated_p = p - self.lr * g
             updated_p = self.regularizer.weight_regularize(updated_p)
             updates.append((p, updated_p))
+
         return updates
 
 

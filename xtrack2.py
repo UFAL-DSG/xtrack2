@@ -275,7 +275,7 @@ def main(experiment_path, out, n_cells, emb_size,
 
         for mb_id, (x, y_seq_id, y_time, y_labels) in minibatches:
             t = time.time()
-            loss = model._train(x, y_seq_id, y_time, *y_labels)
+            (loss, update_ratio) = model._train(x, y_seq_id, y_time, *y_labels)
             t = time.time() - t
 
             avg_loss += loss
@@ -283,6 +283,7 @@ def main(experiment_path, out, n_cells, emb_size,
             vlog(' > ',
                  ('minibatch', mb_id, ),
                  ('loss', "%.2f" % loss),
+                 ('ratio', "%.5f" % update_ratio),
                  ('time', "%.1f" % t),
                  ('xsize', str(x.shape)),
                  ('ysize', len(y_seq_id)),

@@ -56,7 +56,7 @@ class Model(NeuralModel):
             )
             costs.append(slot_objective)
         cost = SumOut()
-        cost.connect(*costs, scale=1.0 / len(slots))
+        cost.connect(*costs)  #, scale=1.0 / len(slots))
         params = list(cost.get_params())
         n_params = sum(p.get_value().size for p in params)
         logging.info('This model has %d parameters.' % n_params)
@@ -67,14 +67,14 @@ class Model(NeuralModel):
             updater = updates.RProp(lr=lr)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
-            reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.SGD(lr=lr, regularizer=reg)
+            #reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.SGD(lr=lr, clipnorm=5.0)
         elif opt_type == "rmsprop":
-            reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.RMSprop(lr=lr, regularizer=reg)
+            #reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.RMSprop(lr=lr)  #, regularizer=reg)
         elif opt_type == "adam":
-            reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.Adam(lr=lr, regularizer=reg)
+            #reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.Adam(lr=lr)  #, regularizer=reg)
         else:
             raise Exception("Unknonw opt.")
 
@@ -85,10 +85,11 @@ class Model(NeuralModel):
             self._input_layer = theano.function([x], input_layer.output())
 
         train_args = [x, y_seq_id, y_time] + [y_label[slot] for slot in slots]
+        update_ratio = updater.get_update_ratio(model_updates)
 
         logging.info('Preparing %s train function.' % opt_type)
         t = time.time()
-        self._train = theano.function(train_args, cost_value,
+        self._train = theano.function(train_args, [cost_value, update_ratio],
                                       updates=model_updates)
         logging.info('Preparation done. Took: %.1f' % (time.time() - t))
 
