@@ -307,10 +307,8 @@ def main(experiment_path, out, n_cells, emb_size,
     logging.info('Saving final model to: %s' % final_model_file)
     model.save(final_model_file)
 
-if __name__ == '__main__':
-    random.seed(0)
 
-
+def build_argument_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -344,6 +342,14 @@ if __name__ == '__main__':
     parser.add_argument('--debug', default=False,
                         action='store_true')
     parser.add_argument('--track_log', default='rprop', type=str)
+
+    return parser
+
+if __name__ == '__main__':
+    random.seed(0)
+
+
+    parser = build_argument_parser()
 
 
     args = parser.parse_args()
