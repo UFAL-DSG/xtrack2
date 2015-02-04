@@ -3,14 +3,22 @@
     "experiment-name" : "xtrack2spear",
     "variables" : {
         "n_cells" : {
-            "type" : "ENUM",
+            "type" : "int",
             "size" : 1,
-            "options": ["10", "15"]
+            "min": 5,
+            "max": 400
+        },
+        "n_epochs" : {
+            "type": "int",
+            "size": 1,
+            "min": 100,
+            "max": 500
         },
         "emb_size" : {
-            "type" : "ENUM",
+            "type" : "int",
             "size" : 1,
-            "options": ["7", "10"]
+            "min": 5,
+            "max": 50
         },
         "opt_type" : {
             "type" : "ENUM",
