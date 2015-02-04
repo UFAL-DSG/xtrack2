@@ -1,0 +1,2 @@
+--n_epochs 200 --oclf_activation tanh
+--n_epochs 200 --oclf_activation rectify

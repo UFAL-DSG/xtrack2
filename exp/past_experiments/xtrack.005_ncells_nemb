@@ -1,0 +1,28 @@
+--n_epochs 200 --n_cells 3
+--n_epochs 200 --n_cells 5
+--n_epochs 200 --n_cells 10
+--n_epochs 200 --n_cells 20
+--n_epochs 200 --n_cells 40
+--n_epochs 200 --n_cells 80
+--n_epochs 200 --n_cells 100
+--n_epochs 200 --n_cells 3 --emb_size 10
+--n_epochs 200 --n_cells 5 --emb_size 10
+--n_epochs 200 --n_cells 10 --emb_size 10
+--n_epochs 200 --n_cells 20 --emb_size 10
+--n_epochs 200 --n_cells 40 --emb_size 10
+--n_epochs 200 --n_cells 80 --emb_size 10
+--n_epochs 200 --n_cells 100 --emb_size 10
+--n_epochs 200 --n_cells 3 --emb_size 20
+--n_epochs 200 --n_cells 5 --emb_size 20
+--n_epochs 200 --n_cells 10 --emb_size 20
+--n_epochs 200 --n_cells 20 --emb_size 20
+--n_epochs 200 --n_cells 40 --emb_size 20
+--n_epochs 200 --n_cells 80 --emb_size 20
+--n_epochs 200 --n_cells 100 --emb_size 20
+--n_epochs 200 --n_cells 3 --emb_size 40
+--n_epochs 200 --n_cells 5 --emb_size 40
+--n_epochs 200 --n_cells 10 --emb_size 40
+--n_epochs 200 --n_cells 20 --emb_size 40
+--n_epochs 200 --n_cells 40 --emb_size 40
+--n_epochs 200 --n_cells 80 --emb_size 40
+--n_epochs 200 --n_cells 100 --emb_size 40

@@ -1,0 +1,5 @@
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.11 --opt_type sgd --n_cells 5
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.11 --opt_type sgd --n_cells 7
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.11 --opt_type sgd --n_cells 10
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.11 --opt_type sgd --n_cells 20
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.11 --opt_type sgd --n_cells 40

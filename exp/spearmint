@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo "cd /home/zilka/proj/xtrack2; exp/spearmint_exec"
+RUN_CMD="qrsh -hard -l mem_free=1G,act_mem_free=1G,h_vmem=1G -pe smp 1 -N xtrack2_sh"
+$RUN_CMD 

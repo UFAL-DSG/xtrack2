@@ -1,0 +1,8 @@
+--mb_size 16 --lr 0.2 --opt_type sgd
+--mb_size 16 --lr 0.15 --opt_type sgd
+--mb_size 16 --lr 0.11 --opt_type sgd
+--mb_size 16 --lr 0.05 --opt_type sgd
+--mb_size 16 --lr 0.01 --opt_type adam
+--mb_size 16 --lr 0.005 --opt_type adam
+--mb_size 16 --lr 0.002 --opt_type adam
+--mb_size 16 --lr 0.001 --opt_type adam

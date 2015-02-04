@@ -1,0 +1,8 @@
+data/xtrack/e2_goals --mb_size 16 --lr 0.11 --opt_type sgd --n_epochs 10000
+data/xtrack/e2_goals --mb_size 16 --lr 0.002 --opt_type adam --n_epochs 10000
+data/xtrack/e2_food --mb_size 16 --lr 0.11 --opt_type sgd --n_epochs 10000
+data/xtrack/e2_food --mb_size 16 --lr 0.002 --opt_type adam --n_epochs 10000
+data/xtrack/e2_goals --mb_size 16 --lr 0.11 --opt_type sgd --n_epochs 10000 --n_cells 10
+data/xtrack/e2_goals --mb_size 16 --lr 0.002 --opt_type adam --n_epochs 10000 --n_cells 10
+data/xtrack/e2_food --mb_size 16 --lr 0.11 --opt_type sgd --n_epochs 10000 --n_cells 10
+data/xtrack/e2_food --mb_size 16 --lr 0.002 --opt_type adam --n_epochs 10000 --n_cells 10

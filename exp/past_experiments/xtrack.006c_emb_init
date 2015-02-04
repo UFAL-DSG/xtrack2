@@ -1,0 +1,2 @@
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.1 --opt_type sgd --p_drop 0.0 --emb_size 50 --init_emb_from data/glove.6B.50d.txt.gz
+data/xtrack/e2_goals/ --mb_size 16 --lr 0.1 --opt_type sgd --p_drop 0.0 --emb_size 50
