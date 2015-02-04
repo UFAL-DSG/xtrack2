@@ -1,8 +1,6 @@
 {
     "language"        : "PYTHON",
-    "main-file"       : "xtrack2_spearmint.py",
     "experiment-name" : "xtrack2spear",
-    "likelihood"      : "GAUSSIAN",
     "variables" : {
         "n_cells" : {
             "type" : "ENUM",
