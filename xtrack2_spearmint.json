@@ -1,0 +1,30 @@
+{
+    "language"        : "PYTHON",
+    "main-file"       : "xtrack2_spearmint.py",
+    "experiment-name" : "xtrack2spear",
+    "likelihood"      : "GAUSSIAN",
+    "variables" : {
+        "x" : {
+            "type" : "FLOAT",
+            "size" : 1,
+            "min"  : -5,
+            "max"  : 10
+        },
+        "y" : {
+            "type" : "FLOAT",
+            "size" : 1,
+            "min"  : 0,
+            "max"  : 15
+        }
+    },
+    "database": {
+        "address": "10.10.24.131"
+    },
+    "resources" : {
+        "cluster" : {
+            "scheduler"         : "SGE",
+            "max-concurrent"    : 5,
+            "max-finished-jobs" : 10
+        }
+    }
+}
