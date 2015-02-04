@@ -204,6 +204,8 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
     logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
     logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
 
+    return accuracy
+
 
 def main(experiment_path, out, n_cells, emb_size,
          n_epochs, lr, opt_type, model_file,
@@ -268,6 +270,7 @@ def main(experiment_path, out, n_cells, emb_size,
     joint_slots = ['joint_%s' % str(grp) for grp in class_groups.keys()]
     best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
+    best_tracking_acc = 0.0
     for i in range(n_epochs):
         logging.info('Epoch #%d' % i)
         random.shuffle(minibatches)
@@ -291,12 +294,14 @@ def main(experiment_path, out, n_cells, emb_size,
         avg_loss = avg_loss / len(minibatches)
         logging.info('Mean loss: %.2f' % avg_loss)
 
-        eval_model(model=model, train_data=train_data, valid_data=valid_data,
+        tracking_acc = eval_model(model=model, train_data=train_data,
+                       valid_data=valid_data,
                    class_groups=class_groups, slots=slots, classes=classes,
                    xtd_t=xtd_t, xtd_v=xtd_v,
                    best_acc=best_acc, best_acc_train=best_acc_train,
                    tracker_train=tracker_train, tracker_valid=tracker,
                    track_log=track_log)
+        best_tracking_acc = max(tracking_acc, best_tracking_acc)
 
 
     logging.info('Saving final model to: %s' % final_model_file)

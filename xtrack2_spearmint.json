@@ -4,17 +4,38 @@
     "experiment-name" : "xtrack2spear",
     "likelihood"      : "GAUSSIAN",
     "variables" : {
-        "x" : {
-            "type" : "FLOAT",
+        "n_cells" : {
+            "type" : "ENUM",
             "size" : 1,
-            "min"  : -5,
-            "max"  : 10
+            "options": ["10", "15"]
         },
-        "y" : {
-            "type" : "FLOAT",
+        "emb_size" : {
+            "type" : "ENUM",
             "size" : 1,
-            "min"  : 0,
-            "max"  : 15
+            "options": ["7", "10"]
+        },
+        "opt_type" : {
+            "type" : "ENUM",
+            "size" : 1,
+            "options": ["sgd", "adam"]
+        },
+        "lr" : {
+            "type" : "float",
+            "size" : 1,
+            "min": 0.001,
+            "max": 10
+        },
+        "p_drop" : {
+            "type" : "float",
+            "size" : 1,
+            "min": 0.0,
+            "max": 0.8
+        },
+        "mb_size" : {
+            "type" : "int",
+            "size" : 1,
+            "min": 1,
+            "max": 128
         }
     },
     "database": {
@@ -23,8 +44,8 @@
     "resources" : {
         "cluster" : {
             "scheduler"         : "SGE",
-            "max-concurrent"    : 5,
-            "max-finished-jobs" : 10
+            "max-concurrent"    : 100,
+            "max-finished-jobs" : 10000
         }
     }
 }
