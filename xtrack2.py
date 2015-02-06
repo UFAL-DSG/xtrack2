@@ -307,6 +307,8 @@ def main(experiment_path, out, n_cells, emb_size,
     logging.info('Saving final model to: %s' % final_model_file)
     model.save(final_model_file)
 
+    return best_tracking_acc
+
 
 def build_argument_parser():
     import argparse
