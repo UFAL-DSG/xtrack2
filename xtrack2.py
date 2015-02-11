@@ -146,11 +146,13 @@ def prepare_minibatches(seqs, mb_size, model, slots):
         res = model.prepare_data(mb, slots)
 
         x = res['x']
+        x_score = res['x_score']
+        x_actor = res['x_actor']
         y_seq_id = res['y_seq_id']
         y_time = res['y_time']
         y_labels = res['y_labels']
 
-        minibatches.append((x, y_seq_id, y_time, y_labels, ))
+        minibatches.append((x, x_score, x_actor, y_seq_id, y_time, y_labels, ))
 
     return minibatches
 
@@ -161,11 +163,15 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                track_log):
     prediction_valid = model._predict(
         valid_data['x'],
+        valid_data['x_score'],
+        valid_data['x_actor'],
         valid_data['y_seq_id'],
         valid_data['y_time']
     )
     prediction_train = model._predict(
         train_data['x'],
+        train_data['x_score'],
+        train_data['x_actor'],
         train_data['y_seq_id'],
         train_data['y_time']
     )
@@ -276,9 +282,11 @@ def main(experiment_path, out, n_cells, emb_size,
         random.shuffle(minibatches)
         avg_loss = 0.0
 
-        for mb_id, (x, y_seq_id, y_time, y_labels) in minibatches:
+        for mb_id, (x, x_score, x_actor, y_seq_id, y_time, y_labels) in \
+                minibatches:
             t = time.time()
-            (loss, update_ratio) = model._train(x, y_seq_id, y_time, *y_labels)
+            (loss, update_ratio) = model._train(x, x_score, x_actor,
+                                                y_seq_id, y_time, *y_labels)
             t = time.time() - t
 
             avg_loss += loss

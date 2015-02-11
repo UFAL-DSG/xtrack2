@@ -7,19 +7,21 @@ cd $DIR
 
 . ./config.sh
 
-E_ROOT=${DATA_DIRECTORY}/xtrack/e2_food
+E_ROOT=${DATA_DIRECTORY}/xtrack/e2_food_transcript
 #SLOTS=food,req_food,method
 SLOTS=food
 
 echo "> Processing training data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
     --out_dir ${E_ROOT}/train \
-    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
+    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist \
+    --user_utt transcription
 
 echo "> Processing validation data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
     --out_dir ${E_ROOT}/valid \
-    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
+    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist \
+    --user_utt transcription
 
 #echo "> Processing testing data."
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
@@ -31,7 +33,6 @@ python xtrack_data2.py \
         --out_file ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.1 \
-        --n_best_order 5,4,3,2,1 \
         --include_system_utterances
 for i in valid; do
     python xtrack_data2.py \
@@ -40,7 +41,6 @@ for i in valid; do
         --vocab_from ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
-        --n_best_order 5,4,3,2,1 \
         --include_system_utterances
 done
 
@@ -48,3 +48,4 @@ echo "> Finishing up."
 cp prepare_data_e2.sh ${E_ROOT}
 
 date > ${E_ROOT}/timestamp.txt
+

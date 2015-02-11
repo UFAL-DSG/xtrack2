@@ -20,7 +20,8 @@ def tokenize(text):
 
 
 class XTrackData2(object):
-    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups']
+    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups',
+                     'stats']
 
     null_class = '_null_'
 
@@ -32,6 +33,7 @@ class XTrackData2(object):
             self.vocab = data.vocab
             self.classes = data.classes
             self.vocab_fixed = True
+            self.stats = data.stats
         else:
             self.vocab = {
                 "#NOTHING": 0,
@@ -44,14 +46,55 @@ class XTrackData2(object):
                 self.classes[slot] = {self.null_class: 0}
 
             self.vocab_fixed = False
+            self.stats = None
 
         self._init_after_load()
 
     def _init_after_load(self):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
+    def _process_msg(self, msg, msg_score, state, actor, seq, oov_ins_p,
+                     n_best_order):
+        token_seq = list(tokenize(msg.lower()))
+
+        #if actor == data_model.Dialog.ACTOR_SYSTEM:
+        #    token_seq.insert(0, '#SYS')
+        #else:
+        #    token_seq.insert(0, '#USR')
+
+        for i, token in enumerate(token_seq):
+            token_ndx = self.get_token_ndx(token)
+            seq['data'].append(token_ndx)
+            seq['data_score'].append(msg_score)
+            seq['data_actor'].append(actor)
+
+            if random.random() < oov_ins_p:
+                seq['data'].append(self.get_token_ndx('#OOV'))
+                seq['data_score'].append(msg_score)
+                seq['data_actor'].append(actor)
+        #seq['data'].append(self.get_token_ndx('#EOS'))
+
+
+
+    def _process_msgs(self, msgs, state, actor, seq, oov_ins_p, n_best_order):
+        for msg_id in n_best_order:
+            if msg_id < len(msgs):
+                msg, msg_score = msgs[msg_id]
+
+                msg_score = np.exp(msg_score)
+                self._process_msg(msg, msg_score, state, actor, seq, oov_ins_p, n_best_order)
+
+        if actor == data_model.Dialog.ACTOR_USER:
+            label = {
+                'time': len(seq['data']) - 1,
+                'slots': {}
+            }
+            for slot, val in zip(slots, self.state_to_label(state, slots)):
+                label['slots'][slot] = val
+            seq['labels'].append(label)
+
     def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p,
-              include_system_utterances):
+              include_system_utterances, n_best_order, score_mean):
         self._init(slots, slot_groups, vocab_from)
 
         self.sequences = []
@@ -61,43 +104,59 @@ class XTrackData2(object):
                 'id': dialog.session_id,
                 'source_dir': dialog.object_id,
                 'data': [],
+                'data_score': [],
+                'data_actor': [],
                 'labels': []
             }
 
-            for msg, state, actor in zip(dialog.messages,
+            for msgs, state, actor in zip(dialog.messages,
                                          dialog.states,
                                          dialog.actors):
-                token_seq = list(tokenize(msg.lower()))
-
-                if not include_system_utterances:
-                    if len(token_seq) == 0 or actor == \
-                            data_model.Dialog.ACTOR_SYSTEM:
-                        continue
+                actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
+                if not include_system_utterances and actor_is_system:
+                    continue
                 else:
-                    if actor == data_model.Dialog.ACTOR_SYSTEM:
-                        token_seq.insert(0, '#SYS')
+                    if actor_is_system:
+                        msg_n_best_order = [0]
                     else:
-                        token_seq.insert(0, '#USR')
-
-                for i, token in enumerate(token_seq):
-                    token_ndx = self.get_token_ndx(token)
-                    seq['data'].append(token_ndx)
-
-                    if random.random() < oov_ins_p:
-                        seq['data'].append(self.get_token_ndx('#OOV'))
-                #seq['data'].append(self.get_token_ndx('#EOS'))
-
-                if actor == data_model.Dialog.ACTOR_USER:
-                    label = {
-                        'time': len(seq['data']) - 1,
-                        'slots': {}
-                    }
-                    for slot, val in zip(slots, self.state_to_label(state, slots)):
-                        label['slots'][slot] = val
-                    seq['labels'].append(label)
+                        msg_n_best_order = n_best_order
+                    self._process_msgs(msgs, state, actor, seq, oov_ins_p,
+                                       msg_n_best_order)
 
             if len(seq['data']) > 0:
                 self.sequences.append(seq)
+
+        if not self.stats:
+            print '>> Computing stats.'
+            self._compute_stats('data_score')
+
+        print '>> Normalizing.'
+        self._normalize('data_score')
+
+    def _compute_stats(self, *vars):
+        score = {var: [] for var in vars}
+        for seq in self.sequences:
+            for var in vars:
+                score[var].extend(seq[var])
+
+        self.stats = {}
+        for var in vars:
+            mean = np.mean(score[var])
+            stddev = np.std(score[var])
+            self.stats[var] = {
+                'mean': mean,
+                'stddev': stddev
+            }
+
+    def _normalize(self, *vars):
+        for seq in self.sequences:
+            for var in vars:
+                score = np.array(seq[var])
+                score -= self.stats[var]['mean']
+                score /= self.stats[var]['stddev']
+                seq[var] = list(score)
+
+
 
     def get_token_ndx(self, token):
         if token in self.vocab:
@@ -181,6 +240,8 @@ if __name__ == '__main__':
     parser.add_argument('--oov_ins_p', type=float, required=False, default=0.0)
     parser.add_argument('--include_system_utterances', action='store_true',
                         default=False)
+    parser.add_argument('--n_best_order', default="0")
+    parser.add_argument('--score_mean', default=0.0, type=float)
 
     args = parser.parse_args()
 
@@ -200,10 +261,13 @@ if __name__ == '__main__':
         slot_groups[i] = slot_group
         slots.extend(slot_group)
 
+    n_best_order = map(int, args.n_best_order.split(','))
+
     xtd = XTrackData2()
     xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots,
               slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
-              include_system_utterances=args.include_system_utterances)
+              include_system_utterances=args.include_system_utterances,
+              n_best_order=n_best_order, score_mean=args.score_mean)
     xtd.save(args.out_file)
 
     if args.out_flist_file:

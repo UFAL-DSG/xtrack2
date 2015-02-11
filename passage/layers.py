@@ -60,6 +60,20 @@ class IdentityInput(object):
         return set()
 
 
+class ZipLayer(object):
+    def __init__(self, concat_axis, *layers):
+        self.layers = layers
+        self.concat_axis = concat_axis
+        self.size = sum(layer.size for layer in layers)
+
+    def output(self, dropout_active=False):
+        outs = [layer.output(dropout_active=dropout_active)
+                for layer in self.layers]
+        return T.concatenate(outs, axis=self.concat_axis)
+
+    def get_params(self):
+        return set(flatten([layer.get_params() for layer in self.layers]))
+
 
 class Embedding(Layer):
 
@@ -71,7 +85,7 @@ class Embedding(Layer):
         self.n_features = n_features
         self.input = T.imatrix()
         self.wv = self.init((self.n_features, self.size),
-                            layer_width=self.size,
+                            layer_width=1.0,
                             scale=1.0,
                             name=self._name_param("emb"))
         self.params = {self.wv}

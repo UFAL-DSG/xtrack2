@@ -21,14 +21,20 @@ class Model(NeuralModel):
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-        input_layer = Embedding(name="emb", size=emb_size,
+        input_token_layer = Embedding(name="emb", size=emb_size,
                                 n_features=n_input_tokens)
         if init_emb_from:
-            input_layer.init_from(init_emb_from, vocab)
-        self.input_emb = input_layer.wv
+            input_token_layer.init_from(init_emb_from, vocab)
+        self.input_emb = input_token_layer.wv
+
+        input_actor_layer = Embedding(name="actor_emb", size=2,
+                                n_features=2)
+
+        x_score = tt.tensor3()
+        input_score_layer = IdentityInput(x_score, 1)
 
         lstm_layer = None
-        prev_layer = input_layer
+        prev_layer = ZipLayer(2, input_token_layer, input_score_layer, input_actor_layer)
         for i in range(lstm_n_layers):
             lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
                                        out_cells=False, p_drop=p_drop)
@@ -74,17 +80,17 @@ class Model(NeuralModel):
             updater = updates.RMSprop(lr=lr)  #, regularizer=reg)
         elif opt_type == "adam":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.Adam(lr=lr)  #, regularizer=reg)
+            updater = updates.Adam(lr=lr, b1=0.01, b2=0.01)  #, regularizer=reg)
         else:
             raise Exception("Unknonw opt.")
 
         model_updates = updater.get_updates(params, cost_value)
 
-        x = input_layer.input
-        if debug:
-            self._input_layer = theano.function([x], input_layer.output())
+        x = input_token_layer.input
+        x_actor = input_actor_layer.input
 
-        train_args = [x, y_seq_id, y_time] + [y_label[slot] for slot in slots]
+        train_args = [x, x_score, x_actor, y_seq_id, y_time]
+        train_args += [y_label[slot] for slot in slots]
         update_ratio = updater.get_update_ratio(params, model_updates)
 
         logging.info('Preparing %s train function.' % opt_type)
@@ -96,7 +102,7 @@ class Model(NeuralModel):
         logging.info('Preparing predict function.')
         t = time.time()
         self._predict = theano.function(
-            [x, y_seq_id, y_time],
+            [x, x_score, x_actor, y_seq_id, y_time],
             predictions
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
@@ -109,11 +115,15 @@ class Model(NeuralModel):
 
     def prepare_data(self, seqs, slots):
         x = []
+        x_score = []
+        x_actor = []
         y_seq_id = []
         y_time = []
         y_labels = [[] for slot in slots]
         for item in seqs:
             x.append(item['data'])
+            x_score.append(item['data_score'])
+            x_actor.append(item['data_actor'])
             for label in item['labels']:
                 y_seq_id.append(len(x) - 1)
                 y_time.append(label['time'])
@@ -122,9 +132,14 @@ class Model(NeuralModel):
                     y_labels[i].append(label['slots'][slot])
 
         x = padded(x).transpose(1, 0)
+        x_score = padded(x_score).transpose(1, 0)
+        x_actor = padded(x_actor).transpose(1, 0)
+
 
         return {
             'x': x,
+            'x_score': np.array(x_score, dtype=np.float32)[:,:,np.newaxis],
+            'x_actor': x_actor,
             'y_seq_id': y_seq_id,
             'y_time': y_time,
             'y_labels': y_labels,
