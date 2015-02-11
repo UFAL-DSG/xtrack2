@@ -70,14 +70,15 @@ def test_cherrypick():
 if __name__ == '__main__':
     #test_mlp()
     #test_cherrypick()
-    v1 = tt.shared(np.random.randn(3))
-    v2 = tt.shared(np.random.randn(3))
-    v3 = tt.shared(np.random.randn(3))
+    v1 = tt.shared(np.random.randn(10, 5, 3))
+    v2 = tt.shared(np.random.randn(10, 5, 1))
 
-    x = tt.matrix()
+    a = tt.concatenate([v1, v2], axis=2)
 
-    f = theano.function([x], v1 * x + v2 * x + v3 * x)
-    print f([[1, 2, 3]])
+    f = theano.function([], a)
+    print f()
+    print v1.get_value()
+    print v2.get_value()
     exit(0)
 
 
