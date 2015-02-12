@@ -15,6 +15,11 @@ def normal(shape, layer_width, scale=0.1, name=None):
     scale = scale / np.sqrt(layer_width)
     return sharedX(np.random.randn(*shape) * scale, name=name)
 
+
+def normal_relu(shape, layer_width, scale=0.1, name=None):
+    scale = np.sqrt(2.0 / layer_width)
+    return sharedX(np.random.randn(*shape) * scale, name=name)
+
 """
 def orthogonal(shape, scale=1.1):
     " benanne lasagne ortho init (faster than qr approach)"

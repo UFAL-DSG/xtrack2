@@ -12,7 +12,7 @@ from passage.model import NeuralModel
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
                  n_cells, lstm_n_layers, opt_type,
-                 oclf_n_hidden, oclf_n_layers, oclf_activation, lr, debug,
+                 oclf_n_hidden, oclf_n_layers, oclf_activation, debug,
                  p_drop, init_emb_from, vocab):
 
         y_seq_id = tt.ivector()
@@ -34,7 +34,17 @@ class Model(NeuralModel):
         input_score_layer = IdentityInput(x_score, 1)
 
         lstm_layer = None
-        prev_layer = ZipLayer(2, input_token_layer, input_score_layer, input_actor_layer)
+        zip_layer = ZipLayer(2, input_token_layer, input_score_layer,
+                           input_actor_layer)
+
+        self._zipped = theano.function([input_token_layer.input, x_score,
+                                        input_actor_layer.input], zip_layer.output())
+
+        n_it_layers = 3
+        input_transform = MLP([32] * n_it_layers, ['rectify'] * n_it_layers)
+        input_transform.connect(zip_layer)
+
+        prev_layer = input_transform
         for i in range(lstm_n_layers):
             lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
                                        out_cells=False, p_drop=p_drop)
@@ -69,6 +79,7 @@ class Model(NeuralModel):
 
         cost_value = cost.output(dropout_active=True)
 
+        lr = tt.scalar('lr')
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr)
             model_updates = updater.get_updates(params, cost_value)
@@ -89,7 +100,7 @@ class Model(NeuralModel):
         x = input_token_layer.input
         x_actor = input_actor_layer.input
 
-        train_args = [x, x_score, x_actor, y_seq_id, y_time]
+        train_args = [lr, x, x_score, x_actor, y_seq_id, y_time]
         train_args += [y_label[slot] for slot in slots]
         update_ratio = updater.get_update_ratio(params, model_updates)
 
@@ -131,10 +142,10 @@ class Model(NeuralModel):
                 for i, slot in enumerate(slots):
                     y_labels[i].append(label['slots'][slot])
 
-        x = padded(x).transpose(1, 0)
-        x_score = padded(x_score).transpose(1, 0)
-        x_actor = padded(x_actor).transpose(1, 0)
+        x = padded(x, is_int=True).transpose(1, 0)
 
+        x_score = padded(x_score).transpose(1, 0)
+        x_actor = padded(x_actor, is_int=True).transpose(1, 0)
 
         return {
             'x': x,
