@@ -187,6 +187,9 @@ class LstmRecurrent(Layer):
         self.out_cells = out_cells
         self.p_drop = p_drop
 
+        self.gate_act = activations.sigmoid
+        self.modul_act = activations.tanh
+
     def connect(self, l_in):
         self.l_in = l_in
         self.n_in = l_in.size
@@ -245,14 +248,14 @@ class LstmRecurrent(Layer):
         g_i = self._slice(gates_fiom, 1) + c_tm1 * p_vec_i
         g_m = self._slice(gates_fiom, 3)
 
-        g_f = T.nnet.sigmoid(g_f)
-        g_i = T.nnet.sigmoid(g_i)
-        g_m = T.tanh(g_m)
+        g_f = self.gate_act(g_f)
+        g_i = self.gate_act(g_i)
+        g_m = self.modul_act(g_m)
 
         c_t = g_f * c_tm1 + g_i * g_m
 
         g_o = self._slice(gates_fiom, 2) + c_t * p_vec_o
-        g_o = T.nnet.sigmoid(g_o)
+        g_o = self.gate_act(g_o)
 
         h_t = g_o * T.tanh(c_t)
         return h_t, c_t
@@ -288,7 +291,7 @@ class LstmRecurrent(Layer):
 
 
 class Dense(Layer):
-    def __init__(self, name=None, size=256, activation='rectify', init='normal',
+    def __init__(self, name=None, size=256, activation='rectify', init='normal_relu',
                  p_drop=0.):
         if name:
             self.name = name
@@ -348,6 +351,7 @@ class MLP(Layer):
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)
+        self.size = layers[-1].size
 
     def connect(self, l_in):
         self.stack.connect(l_in)

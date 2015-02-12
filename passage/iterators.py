@@ -4,7 +4,7 @@ from collections import Counter
 
 from utils import floatX, intX, shuffle, iter_data
 
-def padded(seqs, pad_back=True):
+def padded(seqs, pad_back=True, is_int=False):
     lens = map(len, seqs)
     max_len = max(lens)
     seqs_padded = []
@@ -15,7 +15,11 @@ def padded(seqs, pad_back=True):
         else:
             seq = [0] * n_pad + seq
         seqs_padded.append(seq)
-    return intX(seqs_padded)
+
+    if is_int:
+        return intX(seqs_padded)
+    else:
+        return floatX(seqs_padded)
 
 
 class Padded(object):

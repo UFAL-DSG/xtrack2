@@ -247,7 +247,6 @@ def main(experiment_path, out, n_cells, emb_size,
                       oclf_n_hidden=oclf_n_hidden,
                       oclf_n_layers=oclf_n_layers,
                       oclf_activation=oclf_activation,
-                      lr=lr,
                       debug=debug,
                       lstm_n_layers=lstm_n_layers,
                       opt_type=opt_type,
@@ -277,6 +276,7 @@ def main(experiment_path, out, n_cells, emb_size,
     best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_tracking_acc = 0.0
+    n_valid_not_increased = 0
     for i in range(n_epochs):
         logging.info('Epoch #%d' % i)
         random.shuffle(minibatches)
@@ -285,20 +285,21 @@ def main(experiment_path, out, n_cells, emb_size,
         for mb_id, (x, x_score, x_actor, y_seq_id, y_time, y_labels) in \
                 minibatches:
             t = time.time()
-            (loss, update_ratio) = model._train(x, x_score, x_actor,
+            (loss, update_ratio) = model._train(lr, x, x_score, x_actor,
                                                 y_seq_id, y_time, *y_labels)
             t = time.time() - t
 
             avg_loss += loss
 
-            vlog(' > ',
-                 ('minibatch', mb_id, ),
-                 ('loss', "%.2f" % loss),
-                 ('ratio', "%.5f" % update_ratio),
-                 ('time', "%.1f" % t),
-                 ('xsize', str(x.shape)),
-                 ('ysize', len(y_seq_id)),
-                 separator=" ",)
+            if random.random() < 5.0 / len(minibatches):
+                vlog(' > ',
+                     ('minibatch', mb_id, ),
+                     ('loss', "%.2f" % loss),
+                     ('ratio', "%.5f" % update_ratio),
+                     ('time', "%.1f" % t),
+                     ('xsize', str(x.shape)),
+                     ('ysize', len(y_seq_id)),
+                     separator=" ",)
         avg_loss = avg_loss / len(minibatches)
         logging.info('Mean loss: %.2f' % avg_loss)
 
@@ -309,7 +310,15 @@ def main(experiment_path, out, n_cells, emb_size,
                    best_acc=best_acc, best_acc_train=best_acc_train,
                    tracker_train=tracker_train, tracker_valid=tracker,
                    track_log=track_log)
-        best_tracking_acc = max(tracking_acc, best_tracking_acc)
+        if tracking_acc > best_tracking_acc:
+            best_tracking_acc = tracking_acc
+            n_valid_not_increased = 0
+        else:
+            n_valid_not_increased += 1
+
+        if n_valid_not_increased > 10:
+            lr *= 0.9
+            logging.info('New learning rate: %.10f' % lr)
 
 
     logging.info('Saving final model to: %s' % final_model_file)
@@ -346,7 +355,7 @@ def build_argument_parser():
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
-    parser.add_argument('--oclf_activation', default="tanh", type=str)
+    parser.add_argument('--oclf_activation', default="rectify", type=str)
     parser.add_argument('--lstm_n_layers', default=1, type=int)
 
     parser.add_argument('--debug', default=False,

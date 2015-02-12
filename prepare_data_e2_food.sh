@@ -30,9 +30,8 @@ python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
         --slots ${SLOTS} \
-        --oov_ins_p 0.1 \
-        --n_best_order 5,4,3,2,1 \
-        --include_system_utterances
+        --oov_ins_p 0.05 \
+        --n_best_order 1,2,3,4,5
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
@@ -40,8 +39,7 @@ for i in valid; do
         --vocab_from ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
-        --n_best_order 5,4,3,2,1 \
-        --include_system_utterances
+        --n_best_order 1,2,3,4,5
 done
 
 echo "> Finishing up."
