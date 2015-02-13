@@ -46,7 +46,7 @@ class Model(NeuralModel):
             input_transform = MLP([input_n_hidden  ] * input_n_layers,
                                   [input_activation] * input_n_layers,
                                   p_drop=p_drop)
-            input_transform.connect(zip_layer)
+            input_transform.connect(prev_layer)
             prev_layer = input_transform
 
         for i in range(lstm_n_layers):
@@ -98,7 +98,7 @@ class Model(NeuralModel):
             updater = updates.RProp(lr=lr)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
-            updater = updates.SGD(lr=lr, clipnorm=15.0)
+            updater = updates.SGD(lr=lr, clipnorm=5.0)
         elif opt_type == "rmsprop":
             #reg = updates.Regularizer(maxnorm=5.0)
             updater = updates.RMSprop(lr=lr)  #, regularizer=reg)

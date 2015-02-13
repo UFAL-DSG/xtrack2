@@ -54,8 +54,10 @@ class XTrackData2(object):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
     def _process_msg(self, msg, msg_score, state, actor, seq, oov_ins_p,
-                     n_best_order):
+                     n_best_order, f_dump_text):
         token_seq = list(tokenize(msg.lower()))
+        if token_seq:
+            f_dump_text.write(" ".join(token_seq) + '\n')
         #token_seq = list(reversed(token_seq))
 
         #if actor == data_model.Dialog.ACTOR_SYSTEM:
@@ -77,13 +79,15 @@ class XTrackData2(object):
 
 
 
-    def _process_msgs(self, msgs, state, actor, seq, oov_ins_p, n_best_order):
+    def _process_msgs(self, msgs, state, actor, seq, oov_ins_p, n_best_order,
+                      f_dump_text):
         for msg_id in n_best_order:
             if msg_id < len(msgs):
                 msg, msg_score = msgs[msg_id]
 
                 msg_score = np.exp(msg_score)
-                self._process_msg(msg, msg_score, state, actor, seq, oov_ins_p, n_best_order)
+                self._process_msg(msg, msg_score, state, actor, seq,
+                                  oov_ins_p, n_best_order, f_dump_text)
 
         if actor == data_model.Dialog.ACTOR_USER:
             label = {
@@ -95,10 +99,12 @@ class XTrackData2(object):
             seq['labels'].append(label)
 
     def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p,
-              include_system_utterances, n_best_order, score_mean):
+              include_system_utterances, n_best_order, score_mean, dump_text):
         self._init(slots, slot_groups, vocab_from)
 
         self.sequences = []
+
+        f_dump_text = open(dump_text, 'w')
 
         for dialog_ndx, dialog in enumerate(dialogs):
             seq = {
@@ -127,7 +133,7 @@ class XTrackData2(object):
                     seq['data_score'].append(1.0)
                     seq['data_actor'].append(actor)
                     self._process_msgs(msgs, state, actor, seq, oov_ins_p,
-                                       msg_n_best_order)
+                                       msg_n_best_order, f_dump_text)
 
             if len(seq['data']) > 0:
                 self.sequences.append(seq)
@@ -137,7 +143,7 @@ class XTrackData2(object):
             self._compute_stats('data_score')
 
         print '>> Normalizing.'
-        #self._normalize('data_score')
+        self._normalize('data_score')
 
     def _compute_stats(self, *vars):
         score = {var: [] for var in vars}
@@ -249,6 +255,7 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('--n_best_order', default="0")
     parser.add_argument('--score_mean', default=0.0, type=float)
+    parser.add_argument('--dump_text', default='/dev/null')
 
     args = parser.parse_args()
 
@@ -274,7 +281,8 @@ if __name__ == '__main__':
     xtd.build(dialogs=dialogs, vocab_from=args.vocab_from, slots=slots,
               slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
               include_system_utterances=args.include_system_utterances,
-              n_best_order=n_best_order, score_mean=args.score_mean)
+              n_best_order=n_best_order, score_mean=args.score_mean,
+              dump_text=args.dump_text)
     xtd.save(args.out_file)
 
     if args.out_flist_file:

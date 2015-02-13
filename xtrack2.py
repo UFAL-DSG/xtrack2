@@ -350,22 +350,23 @@ def build_argument_parser():
     parser.add_argument('--out', required=True)
 
     # XTrack params.
-    parser.add_argument('--n_cells', default=5, type=int)
-    parser.add_argument('--emb_size', default=7, type=int)
     parser.add_argument('--n_epochs', default=1000, type=int)
     parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--mb_size', default=16, type=int)
+
+    parser.add_argument('--n_cells', default=5, type=int)
+    parser.add_argument('--emb_size', default=7, type=int)
     parser.add_argument('--init_emb_from', default=None, type=str)
 
     parser.add_argument('--input_n_hidden', default=32, type=int)
-    parser.add_argument('--input_n_layers', default=2, type=int)
-    parser.add_argument('--input_activation', default="rectify", type=str)
+    parser.add_argument('--input_n_layers', default=0, type=int)
+    parser.add_argument('--input_activation', default="sigmoid", type=str)
 
-    parser.add_argument('--oclf_n_hidden', default=32, type=int)
+    parser.add_argument('--oclf_n_hidden', default=128, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
-    parser.add_argument('--oclf_activation', default="rectify", type=str)
+    parser.add_argument('--oclf_activation', default="sigmoid", type=str)
 
     parser.add_argument('--lstm_n_layers', default=1, type=int)
 
