@@ -32,7 +32,8 @@ python xtrack_data2.py \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
         --include_system_utterances \
-        --n_best_order 1
+        --n_best_order 1 \
+        --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
