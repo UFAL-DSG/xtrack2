@@ -30,7 +30,8 @@ python xtrack_data2.py \
         --out_file ${E_ROOT}/train.json \
         --out_flist_file ${E_ROOT}/train.flist \
         --slots ${SLOTS} \
-        --oov_ins_p 0.1 \
+        --oov_ins_p 0.05 \
+        --n_best_order 1,2,3,4,5 \
         --include_system_utterances
 for i in valid; do
     python xtrack_data2.py \
@@ -40,6 +41,7 @@ for i in valid; do
         --vocab_from ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
+        --n_best_order 1,2,3,4,5 \
         --include_system_utterances
 done
 

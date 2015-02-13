@@ -1,3 +1,10 @@
 #!/bin/bash
+echo "Do you want to delete the old cache data from out/spearmint.*? Say 'y'"
+read ANSWER
+if [ "$ANSWER" == "y" ]; then
+    echo "OK"
+    rm -rf out/spearmint.*
+fi
+
 SPEAR_PATH=/home/zilka/proj/Spearmint
 DRMAA_LIBRARY_PATH=/SGE/lib/lx-amd64/libdrmaa.so PYTHONPATH=${SPEAR_PATH} python ${SPEAR_PATH}/spearmint/main.py --config xtrack2_spearmint.json /home/zilka/proj/xtrack2/

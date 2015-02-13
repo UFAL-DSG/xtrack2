@@ -6,42 +6,42 @@
             "type" : "int",
             "size" : 1,
             "min": 5,
-            "max": 400
+            "max": 30
         },
         "n_epochs" : {
             "type": "int",
             "size": 1,
-            "min": 100,
-            "max": 500
+            "min": 200,
+            "max": 200
         },
         "emb_size" : {
             "type" : "int",
             "size" : 1,
             "min": 5,
-            "max": 50
+            "max": 20
         },
         "opt_type" : {
             "type" : "ENUM",
             "size" : 1,
-            "options": ["sgd", "adam"]
+            "options": ["sgd"]
         },
         "lr" : {
             "type" : "float",
             "size" : 1,
-            "min": 0.001,
-            "max": 10
+            "min": 0.01,
+            "max": 0.3
         },
         "p_drop" : {
             "type" : "float",
             "size" : 1,
             "min": 0.0,
-            "max": 0.8
+            "max": 0.5
         },
         "mb_size" : {
             "type" : "int",
             "size" : 1,
             "min": 1,
-            "max": 128
+            "max": 20
         }
     },
     "database": {
@@ -50,13 +50,13 @@
     "resources" : {
         "cluster" : {
             "scheduler"         : "SGE",
-            "max-concurrent"    : 2,
+            "max-concurrent"    : 500,
             "max-finished-jobs" : 10000
         }
     },
     "tasks": {
         "xtrack2" : {
-            "type"       : "OBJECTIVE",
+            "type": "OBJECTIVE",
             "likelihood" : "GAUSSIAN",
             "main-file"       : "xtrack2_spearmint.py",
             "resources"  : ["cluster"]
