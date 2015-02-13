@@ -82,7 +82,7 @@ class XTrackData2(object):
             if msg_id < len(msgs):
                 msg, msg_score = msgs[msg_id]
 
-                #msg_score = np.exp(msg_score)
+                msg_score = np.exp(msg_score)
                 self._process_msg(msg, msg_score, state, actor, seq, oov_ins_p, n_best_order)
 
         if actor == data_model.Dialog.ACTOR_USER:
@@ -118,9 +118,14 @@ class XTrackData2(object):
                     continue
                 else:
                     if actor_is_system:
+                        seq['data'].append(self.get_token_ndx('#SYS'))
                         msg_n_best_order = [0]
                     else:
                         msg_n_best_order = n_best_order
+                        seq['data'].append(self.get_token_ndx('#USR'))
+
+                    seq['data_score'].append(1.0)
+                    seq['data_actor'].append(actor)
                     self._process_msgs(msgs, state, actor, seq, oov_ins_p,
                                        msg_n_best_order)
 
@@ -132,7 +137,7 @@ class XTrackData2(object):
             self._compute_stats('data_score')
 
         print '>> Normalizing.'
-        self._normalize('data_score')
+        #self._normalize('data_score')
 
     def _compute_stats(self, *vars):
         score = {var: [] for var in vars}

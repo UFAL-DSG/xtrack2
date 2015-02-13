@@ -10,10 +10,55 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size, n_input_tokens,
-                 n_cells, lstm_n_layers, opt_type,
-                 oclf_n_hidden, oclf_n_layers, oclf_activation, debug,
-                 p_drop, init_emb_from, vocab):
+    def __init__(self, slots, slot_classes, emb_size, n_input_tokens, n_cells,
+                 lstm_n_layers, opt_type, oclf_n_hidden, oclf_n_layers,
+                 oclf_activation, debug, p_drop, init_emb_from, vocab,
+                 input_n_layers, input_n_hidden, input_activation):
+
+        input_token_layer = Embedding(name="emb",
+                                      size=emb_size,
+                                      n_features=n_input_tokens)
+        if init_emb_from:
+            input_token_layer.init_from(init_emb_from, vocab)
+        self.input_emb = input_token_layer.wv
+
+        input_actor_layer = Embedding(name="actor_emb",
+                                      size=2,
+                                      n_features=2)
+
+        x_score = tt.tensor3()
+        input_score_layer = IdentityInput(x_score, 1)
+
+        lstm_layer = None
+        zip_layer = ZipLayer(concat_axis=2,
+                             layers=[
+                                 input_token_layer,
+                                 input_score_layer,
+                                 input_actor_layer
+                             ])
+        prev_layer = zip_layer
+
+        #self._zipped = theano.function([input_token_layer.input, x_score,
+        #                                input_actor_layer.input],
+        # zip_layer.output())
+
+        if input_n_layers > 0:
+            input_transform = MLP([input_n_hidden  ] * input_n_layers,
+                                  [input_activation] * input_n_layers,
+                                  p_drop=p_drop)
+            input_transform.connect(zip_layer)
+            prev_layer = input_transform
+
+        for i in range(lstm_n_layers):
+            lstm_layer = LstmRecurrent(name="lstm",
+                                       size=n_cells,
+                                       seq_output=True,
+                                       out_cells=False,
+                                       p_drop=p_drop)
+            lstm_layer.connect(prev_layer)
+            prev_layer = lstm_layer
+
+        assert lstm_layer is not None
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -21,37 +66,6 @@ class Model(NeuralModel):
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-        input_token_layer = Embedding(name="emb", size=emb_size,
-                                n_features=n_input_tokens)
-        if init_emb_from:
-            input_token_layer.init_from(init_emb_from, vocab)
-        self.input_emb = input_token_layer.wv
-
-        input_actor_layer = Embedding(name="actor_emb", size=2,
-                                n_features=2)
-
-        x_score = tt.tensor3()
-        input_score_layer = IdentityInput(x_score, 1)
-
-        lstm_layer = None
-        zip_layer = ZipLayer(2, input_token_layer, input_score_layer,
-                           input_actor_layer)
-
-        self._zipped = theano.function([input_token_layer.input, x_score,
-                                        input_actor_layer.input], zip_layer.output())
-
-        n_it_layers = 3
-        input_transform = MLP([32] * n_it_layers, ['rectify'] * n_it_layers)
-        input_transform.connect(zip_layer)
-
-        prev_layer = input_transform
-        for i in range(lstm_n_layers):
-            lstm_layer = LstmRecurrent(name="lstm", size=n_cells, seq_output=True,
-                                       out_cells=False, p_drop=p_drop)
-            lstm_layer.connect(prev_layer)
-            prev_layer = lstm_layer
-
-        assert lstm_layer is not None
         cpt = CherryPick()
         cpt.connect(lstm_layer, y_time, y_seq_id)
 
@@ -59,7 +73,7 @@ class Model(NeuralModel):
         predictions = []
         for slot in slots:
             n_classes = len(slot_classes[slot])
-            slot_mlp = MLP([oclf_n_hidden] * oclf_n_layers + [n_classes],
+            slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
                            name="mlp_%s" % slot, p_drop=p_drop)
             slot_mlp.connect(cpt)
@@ -84,8 +98,7 @@ class Model(NeuralModel):
             updater = updates.RProp(lr=lr)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
-            #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.SGD(lr=lr, clipnorm=5.0)
+            updater = updates.SGD(lr=lr, clipnorm=15.0)
         elif opt_type == "rmsprop":
             #reg = updates.Regularizer(maxnorm=5.0)
             updater = updates.RMSprop(lr=lr)  #, regularizer=reg)
@@ -149,7 +162,7 @@ class Model(NeuralModel):
 
         return {
             'x': x,
-            'x_score': np.array(x_score, dtype=np.float32)[:,:,np.newaxis],
+            'x_score': np.array(x_score, dtype=np.float32)[:,:, np.newaxis],
             'x_actor': x_actor,
             'y_seq_id': y_seq_id,
             'y_time': y_time,
