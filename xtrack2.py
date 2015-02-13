@@ -283,8 +283,14 @@ def main(experiment_path, out, n_cells, emb_size,
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_tracking_acc = 0.0
     n_valid_not_increased = 0
+    et = None
     for i in range(n_epochs):
-        logging.info('Epoch #%d' % i)
+        if et is not None:
+            epoch_time = time.time() - et
+        else:
+            epoch_time = -1.0
+        logging.info('Epoch #%d (last epoch took %.1fs' % (i, epoch_time, ))
+        et = time.time()
         random.shuffle(minibatches)
         avg_loss = 0.0
 
