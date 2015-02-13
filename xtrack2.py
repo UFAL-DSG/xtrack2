@@ -271,10 +271,6 @@ def main(experiment_path, out, n_cells, emb_size,
     tracker = XTrack2DSTCTracker(xtd_v, model)
     tracker_train = XTrack2DSTCTracker(xtd_t, model)
 
-    minibatches = prepare_minibatches(xtd_t.sequences, mb_size, model, slots)
-    minibatches = zip(itertools.count(), minibatches)
-    logging.info('We have %d minibatches.' % len(minibatches))
-
     valid_data = model.prepare_data(xtd_v.sequences, slots)
     train_data = model.prepare_data(xtd_t.sequences, slots)
 
@@ -284,12 +280,18 @@ def main(experiment_path, out, n_cells, emb_size,
     best_tracking_acc = 0.0
     n_valid_not_increased = 0
     et = None
+    seqs = list(xtd_t.sequences)
     for i in range(n_epochs):
         if et is not None:
             epoch_time = time.time() - et
         else:
             epoch_time = -1.0
         logging.info('Epoch #%d (last epoch took %.1fs' % (i, epoch_time, ))
+
+        random.shuffle(seqs)
+        minibatches = prepare_minibatches(seqs, mb_size, model, slots)
+        minibatches = zip(itertools.count(), minibatches)
+        logging.info('We have %d minibatches.' % len(minibatches))
         et = time.time()
         random.shuffle(minibatches)
         avg_loss = 0.0
