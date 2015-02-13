@@ -61,15 +61,20 @@ class IdentityInput(object):
 
 
 class ZipLayer(object):
-    def __init__(self, concat_axis, *layers):
+    def __init__(self, concat_axis, layers):
         self.layers = layers
         self.concat_axis = concat_axis
-        self.size = sum(layer.size for layer in layers)
+        self.size = sum(layer.size for layer in layers) # - layers[1].size
 
     def output(self, dropout_active=False):
         outs = [layer.output(dropout_active=dropout_active)
                 for layer in self.layers]
+
         return T.concatenate(outs, axis=self.concat_axis)
+        #return T.concatenate([outs[0] * T.repeat(outs[1], self.layers[0].size,
+        #                                         axis=2),
+        #                      outs[2]],
+        #                     axis=self.concat_axis)
 
     def get_params(self):
         return set(flatten([layer.get_params() for layer in self.layers]))
@@ -291,7 +296,7 @@ class LstmRecurrent(Layer):
 
 
 class Dense(Layer):
-    def __init__(self, name=None, size=256, activation='rectify', init='normal_relu',
+    def __init__(self, name=None, size=256, activation='sigmoid', init='normal',
                  p_drop=0.):
         if name:
             self.name = name

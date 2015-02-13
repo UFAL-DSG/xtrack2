@@ -12,7 +12,7 @@ theano.config.floatX = 'float32'
 #theano.config.allow_gc=False
 #theano.scan.allow_gc=False
 #theano.config.profile=True
-#theano.config.mode = 'FAST_COMPILE'
+#-=#theano.config.mode = 'FAST_COMPILE'
 theano.config.mode = 'FAST_RUN'
 
 from passage.iterators import (padded, SortedPadded)
@@ -70,8 +70,10 @@ def visualize_prediction(xtd, prediction):
             labeling[label['time']] = (label['slots'], pred_label)
 
         print " T:",
-        for i, word_id in enumerate(dialog['data']):
-            print xtd.vocab_rev[word_id],
+        for i, word_id, score in zip(itertools.count(),
+                                     dialog['data'],
+                                     dialog['data_score']):
+            print xtd.vocab_rev[word_id], "(%.2f)" % score,
             if i in labeling:
                 print
                 for slot in xtd.slots:
@@ -218,7 +220,8 @@ def main(experiment_path, out, n_cells, emb_size,
          final_model_file, mb_size,
          eid, rebuild_model, oclf_n_hidden,
          oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers,
-         p_drop, init_emb_from):
+         p_drop, init_emb_from, input_n_layers, input_n_hidden,
+         input_activation):
     out = init_env(out)
 
     logging.info('XTrack has been started.')
@@ -252,7 +255,10 @@ def main(experiment_path, out, n_cells, emb_size,
                       opt_type=opt_type,
                       p_drop=p_drop,
                       init_emb_from=init_emb_from,
-                      vocab=xtd_t.vocab
+                      vocab=xtd_t.vocab,
+                      input_n_layers=input_n_layers,
+                      input_n_hidden=input_n_hidden,
+                      input_activation=input_activation
         )
 
         model.save(model_file)
@@ -291,7 +297,7 @@ def main(experiment_path, out, n_cells, emb_size,
 
             avg_loss += loss
 
-            if random.random() < 5.0 / len(minibatches):
+            if True: #random.random() < 5.0 / len(minibatches):
                 vlog(' > ',
                      ('minibatch', mb_id, ),
                      ('loss', "%.2f" % loss),
@@ -353,9 +359,14 @@ def build_argument_parser():
     parser.add_argument('--mb_size', default=16, type=int)
     parser.add_argument('--init_emb_from', default=None, type=str)
 
+    parser.add_argument('--input_n_hidden', default=32, type=int)
+    parser.add_argument('--input_n_layers', default=2, type=int)
+    parser.add_argument('--input_activation', default="rectify", type=str)
+
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
     parser.add_argument('--oclf_activation', default="rectify", type=str)
+
     parser.add_argument('--lstm_n_layers', default=1, type=int)
 
     parser.add_argument('--debug', default=False,
