@@ -165,8 +165,8 @@ class XTrackData2(object):
             for var in vars:
                 score = np.array(seq[var])
                 score -= self.stats[var]['mean']
-                if self.stats[var]['stddev'] > 0:
-                    score /= self.stats[var]['stddev']
+
+                score /= self.stats[var]['stddev'] + 0.001
                 seq[var] = list(score)
 
 
