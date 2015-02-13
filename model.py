@@ -22,6 +22,9 @@ class Model(NeuralModel):
             input_token_layer.init_from(init_emb_from, vocab)
         self.input_emb = input_token_layer.wv
 
+        prev_layer = input_token_layer
+
+        """
         input_actor_layer = Embedding(name="actor_emb",
                                       size=2,
                                       n_features=2)
@@ -36,7 +39,7 @@ class Model(NeuralModel):
                                  input_score_layer,
                                  input_actor_layer
                              ])
-        prev_layer = zip_layer
+        prev_layer = zip_layer"""
 
         #self._zipped = theano.function([input_token_layer.input, x_score,
         #                                input_actor_layer.input],
@@ -49,6 +52,7 @@ class Model(NeuralModel):
             input_transform.connect(prev_layer)
             prev_layer = input_transform
 
+        lstm_layer = None
         for i in range(lstm_n_layers):
             lstm_layer = LstmRecurrent(name="lstm",
                                        size=n_cells,
@@ -111,9 +115,10 @@ class Model(NeuralModel):
         model_updates = updater.get_updates(params, cost_value)
 
         x = input_token_layer.input
-        x_actor = input_actor_layer.input
+        #x_actor = input_actor_layer.input
 
-        train_args = [lr, x, x_score, x_actor, y_seq_id, y_time]
+        #train_args = [lr, x, x_score, x_actor, y_seq_id, y_time]
+        train_args = [lr, x, y_seq_id, y_time]
         train_args += [y_label[slot] for slot in slots]
         update_ratio = updater.get_update_ratio(params, model_updates)
 
@@ -126,7 +131,7 @@ class Model(NeuralModel):
         logging.info('Preparing predict function.')
         t = time.time()
         self._predict = theano.function(
-            [x, x_score, x_actor, y_seq_id, y_time],
+            [x, y_seq_id, y_time],
             predictions
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))

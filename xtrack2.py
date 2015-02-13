@@ -165,15 +165,15 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                track_log):
     prediction_valid = model._predict(
         valid_data['x'],
-        valid_data['x_score'],
-        valid_data['x_actor'],
+        #valid_data['x_score'],
+        #valid_data['x_actor'],
         valid_data['y_seq_id'],
         valid_data['y_time']
     )
     prediction_train = model._predict(
         train_data['x'],
-        train_data['x_score'],
-        train_data['x_actor'],
+        #train_data['x_score'],
+        #train_data['x_actor'],
         train_data['y_seq_id'],
         train_data['y_time']
     )
@@ -291,13 +291,13 @@ def main(experiment_path, out, n_cells, emb_size,
         for mb_id, (x, x_score, x_actor, y_seq_id, y_time, y_labels) in \
                 minibatches:
             t = time.time()
-            (loss, update_ratio) = model._train(lr, x, x_score, x_actor,
-                                                y_seq_id, y_time, *y_labels)
+            (loss, update_ratio) = model._train(lr, x, y_seq_id, y_time, *y_labels)
             t = time.time() - t
 
             avg_loss += loss
 
-            if True: #random.random() < 5.0 / len(minibatches):
+            if random.random() < 5.0 / len(minibatches) or mb_id in (0, 1, 2,
+                                                                     3):
                 vlog(' > ',
                      ('minibatch', mb_id, ),
                      ('loss', "%.2f" % loss),

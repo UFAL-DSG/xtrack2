@@ -122,7 +122,12 @@ class XTrack2DSTCTracker(object):
         y_seq_id = data['y_seq_id']
         y_time = data['y_time']
 
-        pred = self.model._predict(x, x_score, x_actor, y_seq_id, y_time)
+        pred = self.model._predict(
+            x,
+            #x_score,
+            #x_actor,
+            y_seq_id,
+            y_time)
         pred_ptr = 0
 
         accuracy = 0
