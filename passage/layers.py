@@ -296,7 +296,7 @@ class LstmRecurrent(Layer):
 
 
 class Dense(Layer):
-    def __init__(self, name=None, size=256, activation='sigmoid', init='normal',
+    def __init__(self, name=None, size=256, activation='rectify', init='normal',
                  p_drop=0.):
         if name:
             self.name = name

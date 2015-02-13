@@ -364,9 +364,9 @@ def build_argument_parser():
     parser.add_argument('--input_n_layers', default=0, type=int)
     parser.add_argument('--input_activation', default="sigmoid", type=str)
 
-    parser.add_argument('--oclf_n_hidden', default=128, type=int)
+    parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=2, type=int)
-    parser.add_argument('--oclf_activation', default="sigmoid", type=str)
+    parser.add_argument('--oclf_activation', default="tanh", type=str)
 
     parser.add_argument('--lstm_n_layers', default=1, type=int)
 
