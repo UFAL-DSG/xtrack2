@@ -78,6 +78,15 @@ class XTrackData2(object):
         #seq['data'].append(self.get_token_ndx('#EOS'))
 
 
+        label = {
+            'time': len(seq['data']) - 1,
+            'slots': {}
+        }
+        for slot, val in zip(slots, self.state_to_label(state, slots)):
+            label['slots'][slot] = val
+        seq['labels'].append(label)
+
+
 
     def _process_msgs(self, msgs, state, actor, seq, oov_ins_p, n_best_order,
                       f_dump_text):
@@ -89,17 +98,20 @@ class XTrackData2(object):
                 self._process_msg(msg, msg_score, state, actor, seq,
                                   oov_ins_p, n_best_order, f_dump_text)
 
-        if actor == data_model.Dialog.ACTOR_USER:
-            label = {
-                'time': len(seq['data']) - 1,
-                'slots': {}
-            }
-            for slot, val in zip(slots, self.state_to_label(state, slots)):
-                label['slots'][slot] = val
-            seq['labels'].append(label)
+    def _sample_paths(self, n, dialog, allowed_ndxs):
+        res = []
+        for i in range(n):
+            path = []
+            for msgs in dialog:
+                path.append(random.choice([i for i in allowed_ndxs
+                                           if i < len(msgs)]))
+            res.append(path)
+
+        return res
 
     def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p,
-              include_system_utterances, n_best_order, score_mean, dump_text):
+              include_system_utterances, n_nbest_samples, n_best_order, \
+                                                      score_mean, dump_text):
         self._init(slots, slot_groups, vocab_from)
 
         self.sequences = []
@@ -107,36 +119,44 @@ class XTrackData2(object):
         f_dump_text = open(dump_text, 'w')
 
         for dialog_ndx, dialog in enumerate(dialogs):
-            seq = {
-                'id': dialog.session_id,
-                'source_dir': dialog.object_id,
-                'data': [],
-                'data_score': [],
-                'data_actor': [],
-                'labels': []
-            }
+            for path_id in range(n_nbest_samples):
+                seq = {
+                    'id': dialog.session_id,
+                    'source_dir': dialog.object_id,
+                    'data': [],
+                    'data_score': [],
+                    'data_actor': [],
+                    'labels': []
+                }
+                for msgs, state, actor in zip(dialog.messages,
+                                              dialog.states,
+                                              dialog.actors):
+                    actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
 
-            for msgs, state, actor in zip(dialog.messages,
-                                         dialog.states,
-                                         dialog.actors):
-                actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
-                if not include_system_utterances and actor_is_system:
-                    continue
-                else:
                     if actor_is_system:
-                        seq['data'].append(self.get_token_ndx('#SYS'))
-                        msg_n_best_order = [0]
+                        msg_id = 0
                     else:
-                        msg_n_best_order = n_best_order
-                        seq['data'].append(self.get_token_ndx('#USR'))
+                        msg_id = random.choice(n_best_order)
+                    msg, msg_score = msgs[msg_id]
 
-                    seq['data_score'].append(1.0)
-                    seq['data_actor'].append(actor)
-                    self._process_msgs(msgs, state, actor, seq, oov_ins_p,
-                                       msg_n_best_order, f_dump_text)
+                    if not include_system_utterances and actor_is_system:
+                        continue
+                    else:
+                        if actor_is_system:
+                            seq['data'].append(self.get_token_ndx('#SYS'))
+                            msg_n_best_order = [0]
+                        else:
+                            msg_n_best_order = n_best_order
+                            seq['data'].append(self.get_token_ndx('#USR'))
 
-            if len(seq['data']) > 0:
-                self.sequences.append(seq)
+                        seq['data_score'].append(1.0)
+                        seq['data_actor'].append(actor)
+
+                        self._process_msg(msg, msg_score, state, actor, seq,
+                                          oov_ins_p, n_best_order, f_dump_text)
+
+                if len(seq['data']) > 0:
+                    self.sequences.append(seq)
 
         if not self.stats:
             print '>> Computing stats.'
@@ -163,13 +183,10 @@ class XTrackData2(object):
     def _normalize(self, *vars):
         for seq in self.sequences:
             for var in vars:
-                score = np.array(seq[var])
-                score -= self.stats[var]['mean']
-
-                score /= self.stats[var]['stddev'] + 0.001
-                seq[var] = list(score)
-
-
+                res = seq[var]
+                for i in xrange(len(res)):
+                    res[i] -= self.stats[var]['mean']
+                    res[i] /= self.stats[var]['stddev'] + 0.001
 
     def get_token_ndx(self, token):
         if token in self.vocab:
@@ -254,6 +271,7 @@ if __name__ == '__main__':
     parser.add_argument('--include_system_utterances', action='store_true',
                         default=False)
     parser.add_argument('--n_best_order', default="0")
+    parser.add_argument('--n_nbest_samples', default=10, type=int)
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
 
@@ -282,9 +300,12 @@ if __name__ == '__main__':
               slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
               include_system_utterances=args.include_system_utterances,
               n_best_order=n_best_order, score_mean=args.score_mean,
-              dump_text=args.dump_text)
+              dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples)
+
+    print '> Saving.'
     xtd.save(args.out_file)
 
+    print '> Saving flist.'
     if args.out_flist_file:
         flist = []
         for dialog in xtd.sequences:

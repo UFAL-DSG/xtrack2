@@ -11,15 +11,17 @@ E_ROOT=${DATA_DIRECTORY}/xtrack/e2_food
 #SLOTS=food,req_food,method
 SLOTS=food
 
-echo "> Processing training data."
-python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
-    --out_dir ${E_ROOT}/train \
-    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
+if [ "$1" != "skip" ]; then
+    echo "> Processing training data."
+    python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
+        --out_dir ${E_ROOT}/train \
+        --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
 
-echo "> Processing validation data."
-python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
-    --out_dir ${E_ROOT}/valid \
-    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
+    echo "> Processing validation data."
+    python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
+        --out_dir ${E_ROOT}/valid \
+        --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
+fi
 
 #echo "> Processing testing data."
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
@@ -32,7 +34,7 @@ python xtrack_data2.py \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
         --include_system_utterances \
-        --n_best_order 1 \
+        --n_best_order 0,1,2,3,4,5 \
         --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do
     python xtrack_data2.py \

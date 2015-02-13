@@ -90,7 +90,7 @@ class Embedding(Layer):
         self.n_features = n_features
         self.input = T.imatrix()
         self.wv = self.init((self.n_features, self.size),
-                            layer_width=1.0,
+                            layer_width=self.size,
                             scale=1.0,
                             name=self._name_param("emb"))
         self.params = {self.wv}
