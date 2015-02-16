@@ -143,16 +143,6 @@ class XTrackData2(object):
                     if not include_system_utterances and actor_is_system:
                         continue
                     else:
-                        if actor_is_system:
-                            #seq['data'].append(self.get_token_ndx('#SYS'))
-                            msg_n_best_order = [0]
-                        else:
-                            msg_n_best_order = n_best_order
-                            #seq['data'].append(self.get_token_ndx('#USR'))
-
-                        #seq['data_score'].append(1.0)
-                        #seq['data_actor'].append(actor)
-
                         self._process_msg(msg, msg_score, state, actor, seq,
                                           oov_ins_p, n_best_order, f_dump_text)
 

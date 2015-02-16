@@ -283,6 +283,12 @@ def main(experiment_path, out, n_cells, emb_size,
     n_valid_not_increased = 0
     et = None
     seqs = list(xtd_t.sequences)
+    random.shuffle(seqs)
+    minibatches = prepare_minibatches(seqs, mb_size, model, slots)
+    minibatches = zip(itertools.count(), minibatches)
+    logging.info('We have %d minibatches.' % len(minibatches))
+    random.shuffle(minibatches)
+
     for i in range(n_epochs):
         if et is not None:
             epoch_time = time.time() - et
@@ -290,12 +296,7 @@ def main(experiment_path, out, n_cells, emb_size,
             epoch_time = -1.0
         logging.info('Epoch #%d (last epoch took %.1fs)' % (i, epoch_time, ))
 
-        random.shuffle(seqs)
-        minibatches = prepare_minibatches(seqs, mb_size, model, slots)
-        minibatches = zip(itertools.count(), minibatches)
-        logging.info('We have %d minibatches.' % len(minibatches))
         et = time.time()
-        random.shuffle(minibatches)
         avg_loss = 0.0
 
         for mb_id, (x, x_score, x_actor, y_seq_id, y_time, y_labels) in \
@@ -312,7 +313,7 @@ def main(experiment_path, out, n_cells, emb_size,
                      ('minibatch', mb_id, ),
                      ('loss', "%.2f" % loss),
                      ('ratio', "%.5f" % update_ratio),
-                     ('time', "%.1f" % t),
+                     ('time', "%.5f" % t),
                      ('xsize', str(x.shape)),
                      ('ysize', len(y_seq_id)),
                      separator=" ",)
