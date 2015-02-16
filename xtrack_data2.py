@@ -11,7 +11,7 @@ import data_model
 
 
 
-word_re = re.compile(r'([A-Za-z]+)')
+word_re = re.compile(r'([A-Za-z0-9]+)')
 
 
 def tokenize(text):
@@ -82,7 +82,8 @@ class XTrackData2(object):
             'time': len(seq['data']) - 1,
             'slots': {}
         }
-        for slot, val in zip(slots, self.state_to_label(state, slots)):
+        for slot, val in zip(self.slots, self.state_to_label(state,
+                                                             self.slots)):
             label['slots'][slot] = val
         seq['labels'].append(label)
 
@@ -110,8 +111,8 @@ class XTrackData2(object):
         return res
 
     def build(self, dialogs, slots, slot_groups, vocab_from, oov_ins_p,
-              include_system_utterances, n_nbest_samples, n_best_order, \
-                                                      score_mean, dump_text):
+              include_system_utterances, n_nbest_samples, n_best_order,
+              score_mean, dump_text):
         self._init(slots, slot_groups, vocab_from)
 
         self.sequences = []
@@ -143,14 +144,14 @@ class XTrackData2(object):
                         continue
                     else:
                         if actor_is_system:
-                            seq['data'].append(self.get_token_ndx('#SYS'))
+                            #seq['data'].append(self.get_token_ndx('#SYS'))
                             msg_n_best_order = [0]
                         else:
                             msg_n_best_order = n_best_order
-                            seq['data'].append(self.get_token_ndx('#USR'))
+                            #seq['data'].append(self.get_token_ndx('#USR'))
 
-                        seq['data_score'].append(1.0)
-                        seq['data_actor'].append(actor)
+                        #seq['data_score'].append(1.0)
+                        #seq['data_actor'].append(actor)
 
                         self._process_msg(msg, msg_score, state, actor, seq,
                                           oov_ins_p, n_best_order, f_dump_text)

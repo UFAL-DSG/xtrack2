@@ -1,42 +1,47 @@
 import argparse
 import os
+import random
 
 from data_model import Dialog
 from xtrack_data2 import XTrackData2
 
 
-def build(out_file, max_dialog_len=10, max_decoding_steps=3,
-          max_labels_in_dialog=2, n_minibatches=1):
+def build(out_file, vocab_from=None):
+    vocab_size = 10
 
+    vocab = [str(i) for i in range(vocab_size)]
     dialogs = []
-    d = Dialog(str(len(dialogs)))
-    d.add_message('hi', None, Dialog.ACTOR_SYSTEM)
-    d.add_message('chinese food please not indian and close',
-                  {'food': 'chinese', 'area': 'close'},
-                  Dialog.ACTOR_USER)
-    dialogs.append(d)
-    d = Dialog(str(len(dialogs)))
-    d.add_message('hi', None, Dialog.ACTOR_SYSTEM)
-    d.add_message('need far indian restaurant',
-                  {'food': 'indian', 'area': 'far'},
-                  Dialog.ACTOR_USER)
-    dialogs.append(d)
-    d = Dialog(str(len(dialogs)))
-    d.add_message('hi', None, Dialog.ACTOR_SYSTEM)
-    d.add_message('close czech please',
-                  {'food': 'czech', 'area': 'close'},
-                  Dialog.ACTOR_USER)
-    dialogs.append(d)
-    d = Dialog(str(len(dialogs)))
-    d.add_message('hi', None, Dialog.ACTOR_SYSTEM)
-    d.add_message('american food',
-                  {'food': 'american', 'area': None},
-                  Dialog.ACTOR_USER)
-    dialogs.append(d)
+    #d.add_message('hi', None, Dialog.ACTOR_SYSTEM)
+    for d_id in range(1000):
+        d = Dialog(str(d_id), str(d_id))
+        for m in range(5):
+            txt = []
+            for t in range(random.randint(1, 15)):
+                word = random.choice(vocab)
+                txt.append(word)
 
+            ndx = random.randint(1, len(txt))
+            txt.insert(ndx, 'X')
 
+            goal = txt[ndx - 1]
+            #goal = goal[:-1]
+
+            #if random.random() < 0.001:
+            #print ' '.join(txt), '--', goal
+
+            d.add_message([(" ".join(txt), 0.0)],
+                      {'food': goal},
+                      Dialog.ACTOR_USER)
+        dialogs.append(d)
+
+    print '> Data built.'
     xt = XTrackData2()
-    xt.build(dialogs, slots=['food', 'area'], vocab_from=None)
+    xt.build(dialogs, slots=['food'], slot_groups={0: ['food']},
+             vocab_from=vocab_from,
+             oov_ins_p=0.0,
+             include_system_utterances=False, n_nbest_samples=1, n_best_order=[0],
+             score_mean=0.0, dump_text='/dev/null')
+    print '> Saving.'
     xt.save(out_file)
 
 
@@ -45,8 +50,9 @@ if __name__ == '__main__':
     parser.add_argument('--out_file',
                         required=True,
                         help="Output file.")
+    parser.add_argument('--vocab_from', default=None)
     args = parser.parse_args()
 
-    build(args.out_file)
+    build(**vars(args))
 
 

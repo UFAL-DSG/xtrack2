@@ -73,7 +73,7 @@ def visualize_prediction(xtd, prediction):
         for i, word_id, score in zip(itertools.count(),
                                      dialog['data'],
                                      dialog['data_score']):
-            print xtd.vocab_rev[word_id], "(%.2f)" % score,
+            print xtd.vocab_rev[word_id], #"(%.2f)" % score,
             if i in labeling:
                 print
                 for slot in xtd.slots:
@@ -206,13 +206,13 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
             p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
             logging.info(p.render())
 
-    _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
-    _, accuracy_train = tracker_train.track(
-        tracking_log_file_name=track_log + ".train")
-    logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
-    logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
+    #_, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
+    #_, accuracy_train = tracker_train.track(
+    #    tracking_log_file_name=track_log + ".train")
+    #logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
+    #logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
 
-    return accuracy
+    return 0.0 #accuracy
 
 
 def main(experiment_path, out, n_cells, emb_size,
@@ -220,6 +220,7 @@ def main(experiment_path, out, n_cells, emb_size,
          final_model_file, mb_size,
          eid, rebuild_model, oclf_n_hidden,
          oclf_n_layers, oclf_activation, debug, track_log, lstm_n_layers,
+         lstm_no_peepholes,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation):
     out = init_env(out)
@@ -252,6 +253,7 @@ def main(experiment_path, out, n_cells, emb_size,
                       oclf_activation=oclf_activation,
                       debug=debug,
                       lstm_n_layers=lstm_n_layers,
+                      lstm_no_peepholes=lstm_no_peepholes,
                       opt_type=opt_type,
                       p_drop=p_drop,
                       init_emb_from=init_emb_from,
@@ -286,7 +288,7 @@ def main(experiment_path, out, n_cells, emb_size,
             epoch_time = time.time() - et
         else:
             epoch_time = -1.0
-        logging.info('Epoch #%d (last epoch took %.1fs' % (i, epoch_time, ))
+        logging.info('Epoch #%d (last epoch took %.1fs)' % (i, epoch_time, ))
 
         random.shuffle(seqs)
         minibatches = prepare_minibatches(seqs, mb_size, model, slots)
@@ -330,9 +332,9 @@ def main(experiment_path, out, n_cells, emb_size,
         else:
             n_valid_not_increased += 1
 
-        if n_valid_not_increased > 10:
-            lr *= 0.9
-            logging.info('New learning rate: %.10f' % lr)
+        #if n_valid_not_increased > 10:
+        #    lr *= 0.9
+        #    logging.info('New learning rate: %.10f' % lr)
 
 
     logging.info('Saving final model to: %s' % final_model_file)
@@ -377,6 +379,9 @@ def build_argument_parser():
     parser.add_argument('--oclf_activation', default="tanh", type=str)
 
     parser.add_argument('--lstm_n_layers', default=1, type=int)
+    parser.add_argument('--lstm_no_peepholes', default=False,
+                        action='store_true')
+
 
     parser.add_argument('--debug', default=False,
                         action='store_true')

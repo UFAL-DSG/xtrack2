@@ -156,22 +156,20 @@ class Recurrent(Layer):
             dropout_corr = 1.0 - self.p_drop
 
         x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
-        [out, cells], _ = theano.scan(self.step,
+        out, _ = theano.scan(self.step,
             sequences=[x_dot_w],
-            outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)],
-            non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
+            outputs_info=[T.alloc(0., X.shape[1], self.size)],
+            non_sequences=[self.u],
             truncate_gradient=self.truncate_gradient
         )
         if self.seq_output:
-            if self.out_cells:
-                return cells
-            else:
-                return out
+            return out
         else:
-            if self.out_cells:
-                return cells[-1]
-            else:
-                return out[-1]
+            return out[-1]
+
+    def step(self, x_t, h_tm1, u):
+        h_t = activations.tanh(x_t + T.dot(h_tm1, u))
+        return h_t
 
     def get_params(self):
         return self.l_in.get_params().union(self.params)
@@ -181,7 +179,8 @@ class Recurrent(Layer):
 class LstmRecurrent(Layer):
 
     def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
-                 seq_output=False, p_drop=0., init_scale=0.1, out_cells=False):
+                 seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
+                 peepholes=False):
         if name:
             self.name = name
         self.init = getattr(inits, init)
@@ -191,6 +190,7 @@ class LstmRecurrent(Layer):
         self.seq_output = seq_output
         self.out_cells = out_cells
         self.p_drop = p_drop
+        self.peepholes = peepholes
 
         self.gate_act = activations.sigmoid
         self.modul_act = activations.tanh
@@ -240,7 +240,8 @@ class LstmRecurrent(Layer):
 
 
         self.params = [self.w, self.u, self.b]
-        self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
+        if self.peepholes:
+            self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
 
     def _slice(self, x, n):
             return x[:, n * self.size:(n + 1) * self.size]
@@ -249,9 +250,13 @@ class LstmRecurrent(Layer):
         h_tm1_dot_u = T.dot(h_tm1, u)
         gates_fiom = x_t + h_tm1_dot_u
 
-        g_f = self._slice(gates_fiom, 0) + c_tm1 * p_vec_f
-        g_i = self._slice(gates_fiom, 1) + c_tm1 * p_vec_i
+        g_f = self._slice(gates_fiom, 0)
+        g_i = self._slice(gates_fiom, 1)
         g_m = self._slice(gates_fiom, 3)
+
+        if self.peepholes:
+            g_f += c_tm1 * p_vec_f
+            g_i += c_tm1 * p_vec_i
 
         g_f = self.gate_act(g_f)
         g_i = self.gate_act(g_i)
@@ -259,7 +264,11 @@ class LstmRecurrent(Layer):
 
         c_t = g_f * c_tm1 + g_i * g_m
 
-        g_o = self._slice(gates_fiom, 2) + c_t * p_vec_o
+        g_o = self._slice(gates_fiom, 2)
+
+        if self.peepholes:
+            g_o += c_t * p_vec_o
+
         g_o = self.gate_act(g_o)
 
         h_t = g_o * T.tanh(c_t)

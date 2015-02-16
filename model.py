@@ -11,8 +11,9 @@ from passage.model import NeuralModel
 
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, n_input_tokens, n_cells,
-                 lstm_n_layers, opt_type, oclf_n_hidden, oclf_n_layers,
-                 oclf_activation, debug, p_drop, init_emb_from, vocab,
+                 lstm_n_layers, lstm_no_peepholes, opt_type, oclf_n_hidden,
+                 oclf_n_layers, oclf_activation, debug, p_drop,
+                 init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation):
 
         input_token_layer = Embedding(name="emb",
@@ -58,7 +59,12 @@ class Model(NeuralModel):
                                        size=n_cells,
                                        seq_output=True,
                                        out_cells=False,
+                                       peepholes=not lstm_no_peepholes,
                                        p_drop=p_drop)
+            #lstm_layer = Recurrent(name="lstm",
+            #                           size=n_cells,
+            #                           seq_output=True,
+            #                           p_drop=p_drop)
             lstm_layer.connect(prev_layer)
             prev_layer = lstm_layer
 
