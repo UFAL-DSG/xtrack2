@@ -197,24 +197,25 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
         valid_data['y_seq_id'],
         valid_data['y_time']
     )
-    prediction_train = model._predict(
-        train_data['x'],
-        train_data['x_score'],
-        train_data['x_switch'],
-        #train_data['x_actor'],
-        train_data['y_seq_id'],
-        train_data['y_time']
-    )
+    #prediction_train = model._predict(
+    #    train_data['x'],
+    #    train_data['x_score'],
+    #    train_data['x_switch'],
+    #    #train_data['x_actor'],
+    #    train_data['y_seq_id'],
+    #    train_data['y_time']
+    #)
 
     visualize_prediction(xtd_v, prediction_valid)
-    visualize_prediction(xtd_t, prediction_train)
+    #visualize_prediction(xtd_t, prediction_train)
 
     logging.info('Results:')
     for group_name, slot_selection in class_groups.iteritems():
         joint_slot_name = 'joint_%s' % str(group_name)
-        train_conf_mats = compute_stats(slots, slot_selection, classes,
-                                        prediction_train,
-                                        train_data['y_labels'], joint_slot_name)
+        #train_conf_mats = compute_stats(slots, slot_selection, classes,
+        #                                prediction_train,
+        #                                train_data['y_labels'],
+        # joint_slot_name)
 
         valid_conf_mats = compute_stats(slots, slot_selection, classes,
                                         prediction_valid,
@@ -227,15 +228,15 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
             p.tab(15)
             acc = int(valid_conf_mats[slot].accuracy() * 100)
             best_acc[slot] = max(best_acc[slot], acc)
-            p.print_out("%d (%d)" % (acc, best_acc[slot]))
-            p.tab(25)
-            acc = int(train_conf_mats[slot].accuracy() * 100)
-            best_acc_train[slot] = max(best_acc_train[slot], acc)
-            p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
-            logging.info(p.render())
+            p.print_out("%d (best %d)" % (acc, best_acc[slot]))
+            p.tab(30)
+            #acc = int(train_conf_mats[slot].accuracy() * 100)
+            #best_acc_train[slot] = max(best_acc_train[slot], acc)
+            #p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
+            #logging.info(p.render())
 
             cmat = valid_conf_mats[slot].mat
-            cmat_train = train_conf_mats[slot].mat
+            #cmat_train = train_conf_mats[slot].mat
             if slot != joint_slot_name:
                 slot_classes = classes[slot]
             else:
@@ -250,14 +251,13 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                                                      int(p),
                                                      int(r),
                                                      total_i))
-                p, r, total_i = compute_prt(cmat_train, i)
-                pp.tab(43)
-                pp.print_out("%10s P(%3d) R(%3d) Total(%4d)" % (cls_name[:10],
-                                                     int(p),
-                                                     int(r),
-                                                     total_i))
-
-                logging.info(pp.render())
+                #p, r, total_i = compute_prt(cmat_train, i)
+                #pp.tab(43)
+                #pp.print_out("%10s P(%3d) R(%3d) Total(%4d)" % (cls_name[:10],
+                #                                     int(p),
+                #                                     int(r),
+                #                                     total_i))
+                #logging.info(pp.render())
 
 
     _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)

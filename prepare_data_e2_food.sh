@@ -34,7 +34,7 @@ python xtrack_data2.py \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
         --n_best_order 0,1,2,3,4,5 \
-        --n_nbest_samples 1 \
+        --n_nbest_samples 10 \
         --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do
     python xtrack_data2.py \
