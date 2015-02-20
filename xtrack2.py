@@ -416,6 +416,17 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             if tracking_acc > best_tracking_acc:
                 best_tracking_acc = tracking_acc
 
+            valid_loss = model._loss(
+                valid_data['x'],
+                valid_data['x_score'],
+                valid_data['x_switch'],
+                #valid_data['x_actor'],
+                valid_data['y_seq_id'],
+                valid_data['y_time'],
+                *valid_data['y_labels']
+            )
+            logging.info('Valid loss:         %10.2f' % valid_loss)
+
             stats = TrainingStats()
 
 

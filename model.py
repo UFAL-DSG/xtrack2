@@ -133,10 +133,11 @@ class Model(NeuralModel):
 
         model_updates = updater.get_updates(params, cost_value)
 
-        train_args = [lr, x]
-        train_args += [x_score, x_switch]
-        train_args += [y_seq_id, y_time]
-        train_args += [y_label[slot] for slot in slots]
+        input_args = [x]
+        input_args += [x_score, x_switch]
+        input_args += [y_seq_id, y_time]
+        input_args += [y_label[slot] for slot in slots]
+        train_args = [lr] + input_args
         update_ratio = updater.get_update_ratio(params, model_updates)
 
         logging.info('Preparing %s train function.' % opt_type)
@@ -144,6 +145,7 @@ class Model(NeuralModel):
         self._train = theano.function(train_args, [cost_value, update_ratio],
                                       updates=model_updates)
         logging.info('Preparation done. Took: %.1f' % (time.time() - t))
+        self._loss = theano.function(input_args, cost_value)
 
         logging.info('Preparing predict function.')
         t = time.time()
