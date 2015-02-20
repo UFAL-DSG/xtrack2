@@ -229,11 +229,11 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
             acc = int(valid_conf_mats[slot].accuracy() * 100)
             best_acc[slot] = max(best_acc[slot], acc)
             p.print_out("%d (best %d)" % (acc, best_acc[slot]))
-            p.tab(30)
+            #p.tab(30)
             #acc = int(train_conf_mats[slot].accuracy() * 100)
             #best_acc_train[slot] = max(best_acc_train[slot], acc)
             #p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
-            #logging.info(p.render())
+            logging.info(p.render())
 
             cmat = valid_conf_mats[slot].mat
             #cmat_train = train_conf_mats[slot].mat
@@ -257,7 +257,7 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                 #                                     int(p),
                 #                                     int(r),
                 #                                     total_i))
-                #logging.info(pp.render())
+                logging.info(pp.render())
 
 
     _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
