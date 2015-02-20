@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import time
 
 
@@ -152,3 +153,8 @@ class ConfusionMatrix:
         return res
     def getMat(self):
         return self.mat
+
+
+def inline_print(string):
+    sys.stderr.write('\r\t%s' % (string))
+    sys.stderr.flush()

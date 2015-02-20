@@ -68,12 +68,26 @@ def test_cherrypick():
 
 
 if __name__ == '__main__':
+    x = tt.shared(np.array([1, 2, 3]))
+    b = tt.iscalar()
+    y = tt.repeat(x.dimshuffle('x', 0), b, 0)
+    f = theano.function([b], y)
+    print f(5)
+    exit(0)
+
+    x = tt.shared(np.diag([1, 1, 1, 1, 1]))
+    y = x[:, -1]
+    y = tt.switch(tt.eq(y, 1), y * 10, 3)
+    f = theano.function([], [x, y])
+    print f()
+    exit(0)
     #test_mlp()
     #test_cherrypick()
     v1 = tt.shared(np.random.randn(10, 5, 3))
     v2 = tt.shared(np.random.randn(10, 5, 1))
 
     a = tt.concatenate([v1, v2], axis=2)
+
 
     f = theano.function([], a)
     print f()

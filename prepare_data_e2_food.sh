@@ -34,13 +34,13 @@ python xtrack_data2.py \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
         --n_best_order 0,1,2,3,4,5 \
-        --n_nbest_samples 10 \
+        --n_nbest_samples 1 \
         --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
         --out_file ${E_ROOT}/${i}.json \
-        --vocab_from ${E_ROOT}/train.json \
+        --based_on ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
         --n_best_order 1 \

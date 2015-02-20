@@ -118,13 +118,15 @@ class XTrack2DSTCTracker(object):
         data = self.model.prepare_data(self.data.sequences, self.data.slots)
         x = data['x']
         x_score = data['x_score']
+        x_switch = data['x_switch']
         x_actor = data['x_actor']
         y_seq_id = data['y_seq_id']
         y_time = data['y_time']
 
         pred = self.model._predict(
             x,
-            #x_score,
+            x_score,
+            x_switch,
             #x_actor,
             y_seq_id,
             y_time)
@@ -194,7 +196,7 @@ def main(dataset_name, data_file, output_file, model_file):
     tracker_output = {
         'wall-time': t,
         'dataset': dataset_name,
-        'sessions': result
+        'sessions': resultr
     }
 
     logging.info('Writing to: %s' % output_file)

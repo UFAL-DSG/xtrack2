@@ -70,7 +70,8 @@ class ZipLayer(object):
         outs = [layer.output(dropout_active=dropout_active)
                 for layer in self.layers]
 
-        return T.concatenate(outs, axis=self.concat_axis)
+        res = T.concatenate(outs, axis=self.concat_axis)
+        return T.cast(res, dtype=theano.config.floatX)
         #return T.concatenate([outs[0] * T.repeat(outs[1], self.layers[0].size,
         #                                         axis=2),
         #                      outs[2]],
@@ -82,24 +83,44 @@ class ZipLayer(object):
 
 class Embedding(Layer):
 
-    def __init__(self, name=None, size=128, n_features=256, init='normal'):
+    def __init__(self, name=None, size=128, n_features=256, init='normal',
+                 static=False, input=None):
         if name:
             self.name = name
         self.init = getattr(inits, init)
         self.size = size
         self.n_features = n_features
-        self.input = T.imatrix()
+        self.input = input
         self.wv = self.init((self.n_features, self.size),
                             layer_width=self.size,
                             scale=1.0,
                             name=self._name_param("emb"))
-        self.params = {self.wv}
+        if static:
+            self.params = set()
+        else:
+            self.params = {self.wv}
+        self.static = static
 
     def output(self, dropout_active=False):
         return self.wv[self.input]
 
     def get_params(self):
         return self.params
+
+    def init_from_dict(self, emb_dict):
+        emb = self.wv.get_value()
+        for k, v in emb_dict.iteritems():
+            i = int(k)
+            emb[i,:] = v
+
+        # Normalize.
+        emb_mean = emb.mean(axis=0)
+        emb_std = emb.std(axis=0)
+        emb = (emb - emb_mean) / (emb_std + 1e-7)
+
+        assert not (emb == np.nan).any()
+
+        self.wv.set_value(emb)
 
     def init_from(self, f_name, vocab):
         emb = self.wv.get_value()
@@ -112,7 +133,7 @@ class Embedding(Layer):
                     word_id = vocab[word]
                     emb[word_id,:] = map(float, ln[1:])
 
-        return emb
+        self.wv.set_value(emb)
 
 
 class Recurrent(Layer):
@@ -168,7 +189,7 @@ class Recurrent(Layer):
             return out[-1]
 
     def step(self, x_t, h_tm1, u):
-        h_t = activations.tanh(x_t + T.dot(h_tm1, u))
+        h_t = activations.rectify(x_t + T.dot(h_tm1, u))
         return h_t
 
     def get_params(self):
@@ -235,11 +256,19 @@ class LstmRecurrent(Layer):
                            scale=self.init_scale,
                            name=self._name_param("P"))
 
+        self.init_c = self.init((self.size, ),
+                                layer_width=self.size,
+                                name=self._name_param("init_c"))
+        self.init_h = self.init((self.size, ),
+                                layer_width=self.size,
+                                name=self._name_param("init_h"))
+
         #self.p = T.stack(T.diag(self.p_vec_f), T.diag(self.p_vec_i), T.diag(
         #    self.p_vec_o))
 
 
         self.params = [self.w, self.u, self.b]
+        #self.params += [self.init_c, self.init_h]
         if self.peepholes:
             self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
 
@@ -285,7 +314,14 @@ class LstmRecurrent(Layer):
         x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
         [out, cells], _ = theano.scan(self.step,
             sequences=[x_dot_w],
-            outputs_info=[T.alloc(0., X.shape[1], self.size), T.alloc(0., X.shape[1], self.size)], 
+            outputs_info=[
+                T.alloc(0., X.shape[1], self.size),
+                T.alloc(0.,X.shape[1], self.size)
+            ],
+            #outputs_info=[
+            #    T.repeat(self.init_c.dimshuffle('x', 0), X.shape[1], axis=0),
+            #    T.repeat(self.init_h.dimshuffle('x', 0), X.shape[1], axis=0),
+            #],
             non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
             truncate_gradient=self.truncate_gradient
         )
@@ -302,6 +338,79 @@ class LstmRecurrent(Layer):
 
     def get_params(self):
         return self.l_in.get_params().union(self.params)
+
+
+class BayLstmRecurrent(LstmRecurrent):
+    def connect(self, l_in):
+        super(BayLstmRecurrent, self).connect(l_in)
+
+        self.p_w = inits.sharedX(float(np.random.randn(1)))
+        self.p_b = inits.sharedX(float(np.random.randn(1)))
+
+        self.params += [self.p_w, self.p_b]
+
+    def step(self,
+             x_t, x_prob_t, x_switch_t,
+             h_tm1, c_tm1, ch_tm1,
+             u, p_vec_f, p_vec_i, p_vec_o):
+
+        h_t, c_t = super(BayLstmRecurrent, self).step(x_t, h_tm1, c_tm1, u,
+                                                  p_vec_f,
+                                           p_vec_i, p_vec_o)
+
+        #x_switch_t = T.printing.Print('prob')(x_switch_t)
+        x_prob_t = x_prob_t * self.p_w + self.p_b
+        x_prob_t = x_prob_t.dimshuffle(0, 'x')
+        c_t = T.switch(
+            T.eq(x_switch_t, 1.0).dimshuffle(0, 'x'),
+            x_prob_t * c_t + (1.0 - x_prob_t) * ch_tm1,
+            c_t)
+        ch_t = T.switch(
+            T.eq(x_switch_t, 1.0).dimshuffle(0, 'x'),
+            c_t,
+            ch_tm1)
+
+        return h_t, c_t, ch_t
+
+    def output(self, dropout_active=False):
+        X = self.l_in.output(dropout_active=dropout_active)
+        # X: (time, seq, emb)
+        #X = T.printing.Print('X')(X)
+
+        if self.p_drop > 0. and dropout_active:
+            X = dropout(X, self.p_drop)
+            dropout_corr = 1.0
+        else:
+            dropout_corr = 1.0 - self.p_drop
+
+        Xprob = X[:, :, -1]
+        Xswitch = X[:, :, -2]
+        X = T.set_subtensor(X[:, :, -1], 0)
+        X = T.set_subtensor(X[:, :, -2], 0)
+
+        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
+        [out, cells, _], _ = theano.scan(self.step,
+            sequences=[x_dot_w, Xprob, Xswitch],
+            outputs_info=[
+                T.alloc(0., X.shape[1], self.size),
+                T.alloc(0., X.shape[1], self.size),
+                T.alloc(0., X.shape[1], self.size)
+            ],
+            non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
+            truncate_gradient=self.truncate_gradient
+        )
+
+        if self.seq_output:
+            if self.out_cells:
+                return cells
+            else:
+                return out
+        else:
+            if self.out_cells:
+                return cells[-1]
+            else:
+                return out[-1]
+
 
 
 class Dense(Layer):
