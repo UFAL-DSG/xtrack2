@@ -6,8 +6,22 @@ import dstc_util
 from data_model import Dialog
 
 
+def _stringify_act(acts):
+    res = []
+    for act in acts:
+        if len(act.slots) > 0:
+            for slot_name, slot_value in act.slots:
+                res.append("%s_%s" % (act.act, slot_name))
+                res.append(slot_value.replace(' ', '_'))
+        else:
+            res.append("%s_" % act.act)
+
+    return " ".join(res)
+
+
 def import_dstc(data_dir, out_dir, flist, constraint_slots,
-                requestable_slots, n_best_sample_paths, n_best_range):
+                requestable_slots, n_best_sample_paths, n_best_range,
+                use_stringified_system_acts):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -28,7 +42,11 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
         out_dialog = Dialog(dialog_dir, dialog.session_id)
         last_state = None
         for turn in dialog.turns:
-            out_dialog.add_message([(turn.output.transcript, 0.0)],
+            if use_stringified_system_acts:
+                msg = _stringify_act(turn.output.dialog_acts)
+            else:
+                msg = turn.output.transcript
+            out_dialog.add_message([(msg, 0.0)],
                                    last_state,
                                    Dialog.ACTOR_SYSTEM)
             state = dict(turn.input.user_goal)
@@ -72,6 +90,8 @@ if __name__ == '__main__':
     parser.add_argument('--requestable_slots', default='food,area,pricerange,'
                                                        'name,addr,phone,'
                                                        'postcode,signature')
+    parser.add_argument('--use_stringified_system_acts', action='store_true',
+                        default=False)
     # Note: Avg # of ASR hyps/turn is 10.
     parser.add_argument('--n_best_sample_paths', type=int, default=5)
     parser.add_argument('--n_best_range', type=int, default=3)

@@ -15,11 +15,13 @@ if [ "$1" != "skip" ]; then
     echo "> Processing training data."
     python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
         --out_dir ${E_ROOT}/train \
+        --use_stringified_system_acts \
         --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
 
     echo "> Processing validation data."
     python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
         --out_dir ${E_ROOT}/valid \
+        --use_stringified_system_acts \
         --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
 fi
 
@@ -35,6 +37,8 @@ python xtrack_data2.py \
         --oov_ins_p 0.05 \
         --n_best_order 0,1,2,3,4,5 \
         --n_nbest_samples 10 \
+        --split_dialogs \
+        --include_system_utterances \
         --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do
     python xtrack_data2.py \
@@ -43,6 +47,7 @@ for i in valid; do
         --based_on ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
+        --include_system_utterances \
         --n_best_order 1 \
         --n_nbest_samples 1
 done

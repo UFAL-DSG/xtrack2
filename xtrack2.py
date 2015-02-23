@@ -367,8 +367,10 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
     example_cntr = 0
     timestep_cntr = 0
     stats = TrainingStats()
+    mb_histogram = defaultdict(int)
     while True:
         mb_id, mb_data = random.choice(minibatches)
+        mb_histogram[mb_id] += 1
         #if et is not None:
         #    epoch_time = time.time() - et
         #else:
@@ -401,6 +403,10 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             logging.info('Mean loss:         %10.2f' % stats.mean('loss'))
             logging.info('Mean update ratio: %10.6f' % stats.mean('update_ratio'))
             logging.info('Mean time:         %10.4f' % stats.mean('time'))
+            mb_hist_min = min(mb_histogram.values())
+            mb_hist_max = max(mb_histogram.values())
+            logging.info('MB histogram: min(%d) max(%d)' % (
+                mb_hist_min, mb_hist_max))
 
 
 

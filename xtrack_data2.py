@@ -11,7 +11,7 @@ import data_model
 
 
 
-word_re = re.compile(r'([A-Za-z0-9]+)')
+word_re = re.compile(r'([A-Za-z0-9_]+)')
 
 
 def tokenize(text):
@@ -62,8 +62,23 @@ class XTrackData2(object):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
     def _process_msg(self, msg, msg_score, state, actor, seq, oov_ins_p,
-                     n_best_order, f_dump_text):
-        token_seq = list(tokenize(msg.lower()))
+                     n_best_order, f_dump_text, replace_entities):
+        msg = msg.lower()
+        if replace_entities:
+            for slot in self.slots:
+                for cls_name in self.classes[slot]:
+                    msg = msg.replace(cls_name, cls_name.replace(' ', '_'))
+
+
+        token_seq = list(tokenize(msg))
+        if actor == data_model.Dialog.ACTOR_SYSTEM:
+            token_seq = ["@%s" % token for token in token_seq]
+
+        if not token_seq:
+            token_seq = ['#NOTHING']
+
+        msg_score = np.power(msg_score, 1.0 / len(token_seq))
+
         if token_seq:
             f_dump_text.write(" ".join(token_seq) + '\n')
         #token_seq = list(reversed(token_seq))
@@ -72,7 +87,7 @@ class XTrackData2(object):
         #    token_seq.insert(0, '#SYS')
         #else:
         #    token_seq.insert(0, '#USR')
-        token_seq.append('#SWITCH')
+        #token_seq.append('#SWITCH')
 
         for i, token in enumerate(token_seq):
             token_ndx = self.get_token_ndx(token)
@@ -91,15 +106,16 @@ class XTrackData2(object):
                 seq['data_switch'].append(0)
         #seq['data'].append(self.get_token_ndx('#EOS'))
 
+        if actor == data_model.Dialog.ACTOR_USER:
+            label = {
+                'time': len(seq['data']) - 1,
+                'slots': {}
+            }
+            for slot, val in zip(self.slots, self.state_to_label(state,
+                                                                 self.slots)):
+                label['slots'][slot] = val
+            seq['labels'].append(label)
 
-        label = {
-            'time': len(seq['data']) - 1,
-            'slots': {}
-        }
-        for slot, val in zip(self.slots, self.state_to_label(state,
-                                                             self.slots)):
-            label['slots'][slot] = val
-        seq['labels'].append(label)
 
     def _sample_paths(self, n, dialog, allowed_ndxs):
         res = []
@@ -112,9 +128,24 @@ class XTrackData2(object):
 
         return res
 
+    def _split_dialog(self, seq):
+        seqs = []
+        for i, label in enumerate(seq['labels']):
+            t = label['time']
+            new_seq = {}
+            new_seq['id'] = seq['id'] + "@%d" % i
+            new_seq['source_dir'] = seq['source_dir']
+            new_seq['labels'] = [label]
+            for key in ['data', 'data_score', 'data_actor', 'data_switch']:
+                new_seq[key] = seq[key][:t + 1]
+
+            seqs.append(new_seq)
+
+        return seqs
+
     def build(self, dialogs, slots, slot_groups, based_on, oov_ins_p,
               include_system_utterances, n_nbest_samples, n_best_order,
-              score_mean, dump_text):
+              score_mean, split_dialogs, dump_text, replace_entities):
         self._init(slots, slot_groups, based_on)
 
         self.sequences = []
@@ -132,6 +163,7 @@ class XTrackData2(object):
                     'data_switch': [],
                     'labels': []
                 }
+                seq_data_keys = [key for key in seq if key.startswith('data')]
                 for msgs, state, actor in zip(dialog.messages,
                                               dialog.states,
                                               dialog.actors):
@@ -149,17 +181,25 @@ class XTrackData2(object):
                         #msg_score = max(msg_score, -100)
                         msg_score = np.exp(msg_score)
                         self._process_msg(msg, msg_score, state, actor, seq,
-                                          oov_ins_p, n_best_order, f_dump_text)
+                                          oov_ins_p, n_best_order,
+                                          f_dump_text, replace_entities)
 
+                # Sanity check that all data elements are equal size.
+                data_lens = [len(seq[key]) for key in seq_data_keys]
+                assert data_lens[1:] == data_lens[:-1]
                 if len(seq['data']) > 0:
-                    self.sequences.append(seq)
+
+                    if not split_dialogs:
+                        self.sequences.append(seq)
+                    else:
+                        self.sequences.extend(self._split_dialog(seq))
 
         if not self.stats:
             print '>> Computing stats.'
             self._compute_stats('data_score')
 
         #print '>> Normalizing.'
-        #self._normalize('data_score')
+        self._normalize('data_score')
 
         if not self.based_on:
             self._build_token_features()
@@ -284,6 +324,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_nbest_samples', default=10, type=int)
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
+    parser.add_argument('--split_dialogs', action='store_true', default=False)
+    parser.add_argument('--replace_entities', action='store_true',
+                        default=False)
 
     args = parser.parse_args()
 
@@ -310,7 +353,9 @@ if __name__ == '__main__':
               slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
               include_system_utterances=args.include_system_utterances,
               n_best_order=n_best_order, score_mean=args.score_mean,
-              dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples)
+              dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
+              split_dialogs=args.split_dialogs,
+              replace_entities=args.replace_entities)
 
     print '> Saving.'
     xtd.save(args.out_file)

@@ -118,16 +118,17 @@ class Model(NeuralModel):
 
         lr = tt.scalar('lr')
         if opt_type == "rprop":
-            updater = updates.RProp(lr=lr)
+            updater = updates.RProp(lr=lr, clipnorm=5.0)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
             updater = updates.SGD(lr=lr, clipnorm=5.0)
         elif opt_type == "rmsprop":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.RMSprop(lr=lr)  #, regularizer=reg)
+            updater = updates.RMSprop(lr=lr, clipnorm=5.0)  #, regularizer=reg)
         elif opt_type == "adam":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.Adam(lr=lr, b1=0.01, b2=0.01)  #, regularizer=reg)
+            updater = updates.Adam(lr=lr, b1=0.01, b2=0.01, clipnorm=5.0)  #,
+            # regularizer=reg)
         else:
             raise Exception("Unknonw opt.")
 
