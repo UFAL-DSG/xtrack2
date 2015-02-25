@@ -78,8 +78,7 @@ class XTrackData2(object):
 
         token_seq = list(tokenize(msg))
         if actor == data_model.Dialog.ACTOR_SYSTEM:
-            token_seq = ['#SYS'] + ["%s" % token for token in token_seq] + [
-                '#SYSEND']
+            token_seq = ["%s" % token for token in token_seq]
 
         if not token_seq:
             token_seq = ['#NOTHING']
@@ -103,7 +102,7 @@ class XTrackData2(object):
             seq['data'].append(token_ndx)
             seq['data_score'].append(msg_score)
             seq['data_actor'].append(actor)
-            if token == '#SWITCH':
+            if actor == data_model.Dialog.ACTOR_SYSTEM:
                 seq['data_switch'].append(1)
             else:
                 seq['data_switch'].append(0)
@@ -179,7 +178,7 @@ class XTrackData2(object):
                 seq_data_keys = [key for key in seq if key.startswith('data')]
                 for msgs, state, actor in zip(dialog.messages,
                                               dialog.states,
-                                              dialog.actors)[:6]:
+                                              dialog.actors):
                     actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
 
                     if actor_is_system:
@@ -198,6 +197,7 @@ class XTrackData2(object):
                                           oov_ins_p, n_best_order,
                                           f_dump_text, replace_entities, true_msg)
 
+
                 # Sanity check that all data elements are equal size.
                 data_lens = [len(seq[key]) for key in seq_data_keys]
                 assert data_lens[1:] == data_lens[:-1]
@@ -211,10 +211,10 @@ class XTrackData2(object):
 
         if not self.stats:
             logging.info('Computing stats.')
-            self._compute_stats('data_score')
+            self._compute_stats('data_score', 'data_switch')
 
         logging.info('Normalizing.')
-        self._normalize('data_score')
+        self._normalize('data_score', 'data_switch')
 
         if not self.based_on:
             logging.info('Building token features.')
@@ -226,8 +226,8 @@ class XTrackData2(object):
             features = []
             for slot in self.slots:
                 features.append(int(word in slot.split()))
-                ftr_val = 0
                 for cls in self.classes[slot]:
+                    ftr_val = 0
                     for cls_part in cls.split():
                         if cls_part[0] == '@':
                             cls_part = cls_part[1:]
@@ -235,7 +235,7 @@ class XTrackData2(object):
                             ftr_val = 1
                             break
 
-                features.append(ftr_val)
+                    features.append(ftr_val)
             self.token_features[word_id] = features
 
 

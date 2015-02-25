@@ -129,7 +129,8 @@ class Model(NeuralModel):
         n_params = sum(p.get_value().size for p in params)
         logging.info('This model has %d parameters.' % n_params)
 
-        cost_value = cost.output(dropout_active=True)
+        cost_value = cost.output(dropout_active=False)
+        assert p_drop == 0.0
 
         lr = tt.scalar('lr')
         if opt_type == "rprop":

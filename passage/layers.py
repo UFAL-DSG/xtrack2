@@ -116,7 +116,7 @@ class Embedding(Layer):
         # Normalize.
         emb_mean = emb.mean(axis=0)
         emb_std = emb.std(axis=0)
-        #emb = (emb - emb_mean) / (emb_std + 1e-7)
+        emb = (emb - emb_mean) / (emb_std + 1e-7)
 
         assert not (emb == np.nan).any()
 

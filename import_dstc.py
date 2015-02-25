@@ -11,8 +11,9 @@ def _stringify_act(acts):
     for act in acts:
         if len(act.slots) > 0:
             for slot_name, slot_value in act.slots:
-                res.append("%s_%s" % (act.act, slot_name))
-                res.append(slot_value.replace(' ', '_'))
+                res.append(act.act)
+                res.append(slot_name)
+                res.append(slot_value)
         else:
             res.append("%s_" % act.act)
 

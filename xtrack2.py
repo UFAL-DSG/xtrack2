@@ -405,6 +405,9 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             mb_to_go = list(mb_ids)
             epoch += 1
 
+            if n_epochs > 0 and n_epochs < epoch:
+                break
+
         mb_ndx = random.choice(mb_to_go)
         mb_to_go.remove(mb_ndx)
 
@@ -551,7 +554,7 @@ def build_argument_parser():
     parser.add_argument('--out', required=True)
 
     # XTrack params.
-    parser.add_argument('--n_epochs', default=1000, type=int)
+    parser.add_argument('--n_epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
