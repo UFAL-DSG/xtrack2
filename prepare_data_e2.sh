@@ -31,17 +31,18 @@ python xtrack_data2.py \
         --out_flist_file ${E_ROOT}/train.flist \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
-        --n_best_order 1,2,3,4,5 \
+        --split_dialogs \
+        --n_best_order 1 \
         --include_system_utterances
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
         --out_file ${E_ROOT}/${i}.json \
         --out_flist_file ${E_ROOT}/${i}.flist \
-        --vocab_from ${E_ROOT}/train.json \
+        --based_on ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
-        --n_best_order 1,2,3,4,5 \
+        --n_best_order 1 \
         --include_system_utterances
 done
 

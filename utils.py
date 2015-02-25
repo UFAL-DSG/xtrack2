@@ -158,3 +158,20 @@ class ConfusionMatrix:
 def inline_print(string):
     sys.stderr.write('\r\t%s' % (string))
     sys.stderr.flush()
+
+
+def init_logging(logger_name='XTrack'):
+    import logging
+    # Setup logging.
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.DEBUG)
+
+    logging_format = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    formatter = logging.Formatter(logging_format)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    logging.root = logger

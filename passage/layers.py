@@ -116,7 +116,7 @@ class Embedding(Layer):
         # Normalize.
         emb_mean = emb.mean(axis=0)
         emb_std = emb.std(axis=0)
-        emb = (emb - emb_mean) / (emb_std + 1e-7)
+        #emb = (emb - emb_mean) / (emb_std + 1e-7)
 
         assert not (emb == np.nan).any()
 
@@ -234,6 +234,7 @@ class LstmRecurrent(Layer):
         # Initialize forget gates to large values.
         b = self.b.get_value()
         b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
+        b[self.size:] = 0.0
         self.b.set_value(b)
 
         # Recurrent connections.
@@ -268,7 +269,7 @@ class LstmRecurrent(Layer):
 
 
         self.params = [self.w, self.u, self.b]
-        #self.params += [self.init_c, self.init_h]
+        self.params += [self.init_c, self.init_h]
         if self.peepholes:
             self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
 
@@ -314,14 +315,14 @@ class LstmRecurrent(Layer):
         x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
         [out, cells], _ = theano.scan(self.step,
             sequences=[x_dot_w],
-            outputs_info=[
-                T.alloc(0., X.shape[1], self.size),
-                T.alloc(0.,X.shape[1], self.size)
-            ],
             #outputs_info=[
-            #    T.repeat(self.init_c.dimshuffle('x', 0), X.shape[1], axis=0),
-            #    T.repeat(self.init_h.dimshuffle('x', 0), X.shape[1], axis=0),
+            #    T.alloc(0., X.shape[1], self.size),
+            #    T.alloc(0.,X.shape[1], self.size)
             #],
+            outputs_info=[
+                T.repeat(self.init_c.dimshuffle('x', 0), X.shape[1], axis=0),
+                T.repeat(self.init_h.dimshuffle('x', 0), X.shape[1], axis=0),
+            ],
             non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
             truncate_gradient=self.truncate_gradient
         )

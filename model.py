@@ -18,6 +18,9 @@ class Model(NeuralModel):
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features):
+        self.vocab = vocab
+        self.slots = slots
+        self.slot_classes = slot_classes
 
         x = T.imatrix()
 
@@ -27,6 +30,9 @@ class Model(NeuralModel):
                                       input=x)
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
+            logging.info('Initializing embeddings from: %s' % init_emb_from)
+        else:
+            logging.info('Initializing embedding randomly.')
         self.input_emb = input_token_layer.wv
 
         prev_layer = input_token_layer
@@ -61,8 +67,16 @@ class Model(NeuralModel):
             input_transform.connect(prev_layer)
             prev_layer = input_transform
 
+        logging.info('There are %d input layers.' % input_n_layers)
+
+        if debug:
+            self._lstm_input = theano.function([x, x_score, x_switch],
+                                               prev_layer.output())
+
         lstm_layer = None
         for i in range(rnn_n_layers):
+            logging.info('Creating RNN layer: %s with %d neurons.' % (
+                rnn_type, n_cells))
             if rnn_type == 'lstm':
                 lstm_layer = LstmRecurrent(name="lstm",
                                        size=n_cells,
@@ -95,6 +109,7 @@ class Model(NeuralModel):
         costs = []
         predictions = []
         for slot in slots:
+            logging.info('Building output classifier for %s.' % slot)
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],

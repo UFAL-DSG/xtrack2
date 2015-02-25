@@ -67,11 +67,40 @@ def test_cherrypick():
     print f([0, 7, 9], [0, 1, 2])
 
 
+def test_verify_exprgrad():
+    from theano import tensor
+    import numpy
+    x = tt.scalar()
+    f = theano.function([x], x)
+    #def f(x):
+    #    return x
+
+    x_val = numpy.asarray([0.1, 0.2])
+
+    rng = numpy.random.RandomState(42)
+
+    print 'going'
+    print tensor.verify_grad(f, [x_val], rng=rng)
+
+
+
 if __name__ == '__main__':
+    test_verify_exprgrad()
+    exit(0)
+    import theano.gradient
+    x = tt.scalar()
+    f = theano.function([x], x)
+    #print theano.gradient.numeric_grad(f, [0.0])
+    theano.gradient.verify_grad(f, [[np.asarray(0.0)]], rng=np.random)
+    exit(0)
+
+
     x = tt.shared(np.array([1, 2, 3]))
     b = tt.iscalar()
     y = tt.repeat(x.dimshuffle('x', 0), b, 0)
+
     f = theano.function([b], y)
+
     print f(5)
     exit(0)
 

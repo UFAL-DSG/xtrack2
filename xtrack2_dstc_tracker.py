@@ -84,12 +84,17 @@ class XTrack2DSTCTracker(object):
 
         raw_goal_labels = {slot: np.argmax(pred[i])
                        for i, slot in enumerate(self.data.slots)}
+        raw_goal_labels = {slot: val if pred[i][val] > 0.0 else 0 for i, (slot,
+                                                                   val) in
+                           enumerate(raw_goal_labels.iteritems())}
         goal_labels = {slot: self.classes_rev[slot][val]
                        for slot, val in raw_goal_labels.iteritems()}
 
-        self.track_log.write("  LBL:  %s\n" % str(self._label_id_to_str(label)))
-        self.track_log.write("  PRED: %s\n" % str(self._label_id_to_str(
-            raw_goal_labels)))
+        lbl = self._label_id_to_str(label)
+        pred = self._label_id_to_str(raw_goal_labels)
+        for slot in self.data.slots:
+            self.track_log.write("  %s lbl(%s) pred(%s)\n" % (slot,
+                                                              lbl[slot], pred[slot]))
 
         goals_correct = True
         for i, slot in enumerate(self.data.slots):
@@ -145,12 +150,19 @@ class XTrack2DSTCTracker(object):
             self.track_log.write("\n")
             turns = []
             last_pos = 0
+            state_component_mentioned = False
             for lbl in dialog['labels']:
-                for word_id in dialog['data'][last_pos:lbl['time'] + 1]:
+                words = dialog['data'][last_pos:lbl['time'] + 1]
+                word_probs = dialog['data_score'][last_pos:lbl['time'] + 1]
+                last_word_p = None
+                for word_p, word_id in zip(word_probs, words):
+                    if word_p != last_word_p:
+                        self.track_log.write('\n%.2f ' % word_p)
+                        last_word_p = word_p
                     self.track_log.write("%s " % self.data.vocab_rev[word_id])
                 self.track_log.write("\n")
                 last_pos = lbl['time'] + 1
-                self.track_log.write("**\n")
+
                 out, goals_correct = self.build_output(
                     [pred[i][pred_ptr] for i, _ in enumerate(self.data.slots)],
                     lbl['slots']
@@ -158,7 +170,8 @@ class XTrack2DSTCTracker(object):
                 turns.append(out)
                 pred_ptr += 1
 
-                if not self._label_empty(lbl['slots']):
+                if not self._label_empty(lbl['slots']) or state_component_mentioned:
+                    state_component_mentioned = True
                     if goals_correct:
                         accuracy += 1
                     accuracy_n += 1
@@ -196,7 +209,7 @@ def main(dataset_name, data_file, output_file, model_file):
     tracker_output = {
         'wall-time': t,
         'dataset': dataset_name,
-        'sessions': resultr
+        'sessions': result
     }
 
     logging.info('Writing to: %s' % output_file)

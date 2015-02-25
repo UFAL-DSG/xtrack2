@@ -197,25 +197,32 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
         valid_data['y_seq_id'],
         valid_data['y_time']
     )
-    #prediction_train = model._predict(
-    #    train_data['x'],
-    #    train_data['x_score'],
-    #    train_data['x_switch'],
-    #    #train_data['x_actor'],
-    #    train_data['y_seq_id'],
-    #    train_data['y_time']
-    #)
-
     visualize_prediction(xtd_v, prediction_valid)
-    #visualize_prediction(xtd_t, prediction_train)
+
+    eval_train = train_data is not None
+
+    if eval_train:
+        prediction_train = model._predict(
+            train_data['x'],
+            train_data['x_score'],
+            train_data['x_switch'],
+            #train_data['x_actor'],
+            train_data['y_seq_id'],
+            train_data['y_time']
+        )
+        #visualize_prediction(xtd_t, prediction_train)
+        pass
+    else:
+        prediction_train = None
 
     logging.info('Results:')
     for group_name, slot_selection in class_groups.iteritems():
         joint_slot_name = 'joint_%s' % str(group_name)
-        #train_conf_mats = compute_stats(slots, slot_selection, classes,
-        #                                prediction_train,
-        #                                train_data['y_labels'],
-        # joint_slot_name)
+        if eval_train:
+            train_conf_mats = compute_stats(slots, slot_selection, classes,
+                                        prediction_train,
+                                        train_data['y_labels'],
+                                        joint_slot_name)
 
         valid_conf_mats = compute_stats(slots, slot_selection, classes,
                                         prediction_valid,
@@ -229,14 +236,20 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
             acc = int(valid_conf_mats[slot].accuracy() * 100)
             best_acc[slot] = max(best_acc[slot], acc)
             p.print_out("%d (best %d)" % (acc, best_acc[slot]))
-            #p.tab(30)
-            #acc = int(train_conf_mats[slot].accuracy() * 100)
-            #best_acc_train[slot] = max(best_acc_train[slot], acc)
-            #p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
+            if eval_train:
+                p.tab(30)
+                acc = int(train_conf_mats[slot].accuracy() * 100)
+                best_acc_train[slot] = max(best_acc_train[slot], acc)
+                p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
             logging.info(p.render())
 
             cmat = valid_conf_mats[slot].mat
-            #cmat_train = train_conf_mats[slot].mat
+            if eval_train:
+                cmat_train = train_conf_mats[slot].mat
+            else:
+                cmat_train = None
+
+
             if slot != joint_slot_name:
                 slot_classes = classes[slot]
             else:
@@ -251,22 +264,26 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                                                      int(p),
                                                      int(r),
                                                      total_i))
-                #p, r, total_i = compute_prt(cmat_train, i)
-                #pp.tab(43)
-                #pp.print_out("%10s P(%3d) R(%3d) Total(%4d)" % (cls_name[:10],
-                #                                     int(p),
-                #                                     int(r),
-                #                                     total_i))
+                if eval_train:
+                    p, r, total_i = compute_prt(cmat_train, i)
+                    pp.tab(43)
+                    pp.print_out("%10s P(%3d) R(%3d) Total(%4d)" % (cls_name[:10],
+                                                         int(p),
+                                                         int(r),
+                                                         total_i))
                 logging.info(pp.render())
 
 
     _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
+    logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
+
+    #if eval_train:
     #_, accuracy_train = tracker_train.track(
     #    tracking_log_file_name=track_log + ".train")
-    logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
-    #logging.info('Tracking accuracy: %d (train)' % int(accuracy_train * 100))
+    #logging.info('Tracking accuracy: %d (train)' % int(accuracy_train *
+    # 100))
 
-    return 0.0 #accuracy
+    return accuracy
 
 class TrainingStats(object):
     def __init__(self):
@@ -287,7 +304,8 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
          rnn_type, rnn_n_layers,
          lstm_no_peepholes,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
-         input_activation):
+         input_activation,
+         eval_on_full_train):
     random.seed(0)
 
     out = init_env(out)
@@ -350,8 +368,15 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
     tracker_train = XTrack2DSTCTracker(xtd_t, model)
 
     valid_data = model.prepare_data(xtd_v.sequences, slots)
-    train_data = model.prepare_data(xtd_t.sequences, slots)
+    if not eval_on_full_train:
+        selected_train_seqs = []
+        for i in range(100):
+            ndx = random.randint(0, len(xtd_t.sequences) - 1)
+            selected_train_seqs.append(xtd_t.sequences[ndx])
+    else:
+        selected_train_seqs = xtd_t.sequences
 
+    train_data = model.prepare_data(selected_train_seqs, slots)
     joint_slots = ['joint_%s' % str(grp) for grp in class_groups.keys()]
     best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
@@ -368,9 +393,24 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
     timestep_cntr = 0
     stats = TrainingStats()
     mb_histogram = defaultdict(int)
+    mb_ids = range(len(minibatches))
+    mb_to_go = []
+    mb_bad = []
+
+    epoch = 0
+
+    mb_loss = {}
     while True:
-        mb_id, mb_data = random.choice(minibatches)
-        mb_histogram[mb_id] += 1
+        if len(mb_to_go) == 0:
+            mb_to_go = list(mb_ids)
+            epoch += 1
+
+        mb_ndx = random.choice(mb_to_go)
+        mb_to_go.remove(mb_ndx)
+
+        #mb_id, mb_data = random.choice(minibatches)
+        mb_id, mb_data = minibatches[mb_ndx]
+        mb_histogram[mb_ndx] += 1
         #if et is not None:
         #    epoch_time = time.time() - et
         #else:
@@ -386,6 +426,7 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             lr, x,
             x_score, x_switch,
             y_seq_id, y_time, *y_labels)
+        mb_loss[mb_ndx] = loss
         t = time.time() - t
         example_cntr += x.shape[1]
         timestep_cntr += x.shape[0]
@@ -400,13 +441,24 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
         if example_cntr % 100 == 0:
             logging.info('Processed %d examples, %d timesteps.' % (
                 example_cntr, timestep_cntr))
+            logging.info('Epoch:             %10d (%d mb remain)' % (epoch,
+                                                                     len(mb_to_go)))
             logging.info('Mean loss:         %10.2f' % stats.mean('loss'))
+            logging.info('Curr loss:         %10.2f' % loss)
             logging.info('Mean update ratio: %10.6f' % stats.mean('update_ratio'))
             logging.info('Mean time:         %10.4f' % stats.mean('time'))
+
             mb_hist_min = min(mb_histogram.values())
             mb_hist_max = max(mb_histogram.values())
-            logging.info('MB histogram: min(%d) max(%d)' % (
-                mb_hist_min, mb_hist_max))
+            mb_hist_avg = np.mean(np.array(mb_histogram.values(),
+                                           dtype=np.float32))
+            logging.info('MB histogram: min(%d) max(%d) avg(%.1f) len(%d)' % (
+                mb_hist_min, mb_hist_max, mb_hist_avg, len(mb_histogram)))
+
+            if debug:
+                lstm_input = model._lstm_input(x, x_score, x_switch)
+                logging.info('One LSTM input: %s' % str(lstm_input[len(
+                    lstm_input)/2]))
 
 
 
@@ -433,7 +485,46 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             )
             logging.info('Valid loss:         %10.2f' % valid_loss)
 
+            sorted_items = sorted(mb_loss.items(), key=lambda e: -e[1])
+            for ii, (i, loss) in enumerate(sorted_items[:5]):
+                logging.info('Worst training example #%d (loss %.2f):' % (ii,
+                                                                      loss, ))
+
+                _, d = minibatches[i]
+
+                x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = d
+
+                for d in zip(*x):
+                    ln = ""
+                    for w in d:
+                        ln += xtd_t.vocab_rev[w]
+                        ln += " "
+                    logging.info("  %s" % ln)
+
+            for ii, (i, loss) in enumerate(sorted_items[-5:]):
+                logging.info('Best training example #%d (loss %.2f):' % (ii,
+                                                                      loss, ))
+
+                _, d = minibatches[i]
+
+                x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = d
+
+                for d in zip(*x):
+                    ln = ""
+                    for w in d:
+                        ln += xtd_t.vocab_rev[w]
+                        ln += " "
+                    logging.info("  %s" % ln)
+
+
+            mb_bad = [i for i, _ in sorted_items[:100]]
+            random.shuffle(mb_bad)
+            #mb_to_go.extend(mb_bad)
+
+            mb_loss = {}
+
             stats = TrainingStats()
+
 
 
 
@@ -488,6 +579,8 @@ def build_argument_parser():
     parser.add_argument('--debug', default=False,
                         action='store_true')
     parser.add_argument('--track_log', default='rprop', type=str)
+    parser.add_argument('--eval_on_full_train', default=False,
+                        action='store_true')
 
     return parser
 

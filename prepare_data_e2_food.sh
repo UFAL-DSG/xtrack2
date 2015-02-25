@@ -35,9 +35,8 @@ python xtrack_data2.py \
         --out_file ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
-        --n_best_order 0,1,2,3,4,5 \
-        --n_nbest_samples 10 \
-        --split_dialogs \
+        --n_best_order 1 \
+        --n_nbest_samples 1 \
         --include_system_utterances \
         --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do
