@@ -201,7 +201,7 @@ class LstmRecurrent(Layer):
 
     def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
-                 peepholes=False):
+                 peepholes=False, enable_branch_exp=False):
         if name:
             self.name = name
         self.init = getattr(inits, init)
@@ -215,6 +215,8 @@ class LstmRecurrent(Layer):
 
         self.gate_act = activations.sigmoid
         self.modul_act = activations.tanh
+
+        self.enable_branch_exp = enable_branch_exp
 
     def connect(self, l_in):
         self.l_in = l_in

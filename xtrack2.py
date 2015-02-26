@@ -350,7 +350,8 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
                       input_n_layers=input_n_layers,
                       input_n_hidden=input_n_hidden,
                       input_activation=input_activation,
-                      token_features=xtd_t.token_features
+                      token_features=xtd_t.token_features,
+                      enable_branch_exp=enable_branch_exp
         )
 
         try:

@@ -17,7 +17,7 @@ class Model(NeuralModel):
                  debug, p_drop,
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
-                 token_features):
+                 token_features, enable_branch_exp):
         self.vocab = vocab
         self.slots = slots
         self.slot_classes = slot_classes
@@ -83,7 +83,8 @@ class Model(NeuralModel):
                                        seq_output=True,
                                        out_cells=False,
                                        peepholes=not lstm_no_peepholes,
-                                       p_drop=p_drop)
+                                       p_drop=p_drop,
+                                       enable_branch_exp=enable_branch_exp)
 
             elif rnn_type == 'rnn':
                 lstm_layer = Recurrent(name="lstm",
