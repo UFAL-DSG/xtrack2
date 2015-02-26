@@ -305,7 +305,7 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
          lstm_no_peepholes,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
-         eval_on_full_train):
+         eval_on_full_train, enable_branch_exp):
     random.seed(0)
 
     out = init_env(out)
@@ -583,6 +583,9 @@ def build_argument_parser():
                         action='store_true')
     parser.add_argument('--track_log', default='rprop', type=str)
     parser.add_argument('--eval_on_full_train', default=False,
+                        action='store_true')
+
+    parser.add_argument('--enable_branch_exp', default=False,
                         action='store_true')
 
     return parser
