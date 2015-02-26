@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "$1 --branch" > exp/branch
+echo "$1 --enable_branch_exp" > exp/branch
 echo "$1" >> exp/branch
 
 N_EXPERIMENTS=10
