@@ -21,7 +21,7 @@ def theano_one_hot(idx, n):
     one_hot = T.set_subtensor(z[T.arange(idx.shape[0]), idx], 1)
     return one_hot
 
-srng = RandomStreams()
+srng = RandomStreams(seed=1234)
 
 class Layer(object):
     name = "unnamed_layer"
@@ -116,7 +116,7 @@ class Embedding(Layer):
         # Normalize.
         emb_mean = emb.mean(axis=0)
         emb_std = emb.std(axis=0)
-        emb = (emb - emb_mean) / (emb_std + 1e-7)
+        emb = (emb - emb_mean) / (emb_std + 1e-7) * 100
 
         assert not (emb == np.nan).any()
 
@@ -236,7 +236,7 @@ class LstmRecurrent(Layer):
         # Initialize forget gates to large values.
         b = self.b.get_value()
         b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
-        b[self.size:] = 0.0
+        #b[self.size:] = 0.0
         self.b.set_value(b)
 
         # Recurrent connections.
@@ -249,15 +249,15 @@ class LstmRecurrent(Layer):
         self.p_vec_f = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
-                           name=self._name_param("P"))
+                           name=self._name_param("peep_f"))
         self.p_vec_i = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
-                           name=self._name_param("P"))
+                           name=self._name_param("peep_i"))
         self.p_vec_o = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
-                           name=self._name_param("P"))
+                           name=self._name_param("peep_o"))
 
         self.init_c = self.init((self.size, ),
                                 layer_width=self.size,

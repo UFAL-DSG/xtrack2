@@ -10,20 +10,21 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size, n_input_tokens, n_cells,
+    def __init__(self, slots, slot_classes, emb_size, enable_input_ftrs,
+                 n_input_tokens, n_cells,
                  rnn_type, rnn_n_layers,
                  lstm_no_peepholes, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
                  debug, p_drop,
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
-                 token_features, enable_branch_exp):
+                 token_features,
+                 momentum, enable_branch_exp):
         self.vocab = vocab
         self.slots = slots
         self.slot_classes = slot_classes
 
         x = T.imatrix()
-
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
@@ -43,21 +44,24 @@ class Model(NeuralModel):
         x_switch = tt.itensor3()
         input_switch_layer = IdentityInput(x_switch, 1)
 
-        token_n_features = len(token_features.values()[0])
-        input_token_features_layer = Embedding(name="emb_ftr",
-                                               size=token_n_features,
-                                               n_features=n_input_tokens,
-                                               input=x,
-                                               static=True)
-        input_token_features_layer.init_from_dict(token_features)
+        zip_layers = [
+             input_token_layer,
+             input_score_layer,
+             input_switch_layer,
+        ]
+
+        if enable_input_ftrs:
+            token_n_features = len(token_features.values()[0])
+            input_token_features_layer = Embedding(name="emb_ftr",
+                                                   size=token_n_features,
+                                                   n_features=n_input_tokens,
+                                                   input=x,
+                                                   static=True)
+            input_token_features_layer.init_from_dict(token_features)
+            zip_layers.append(input_token_features_layer)
 
         zip_layer = ZipLayer(concat_axis=2,
-                             layers=[
-                                 input_token_layer,
-                                 input_score_layer,
-                                 input_switch_layer,
-                                 input_token_features_layer,
-                             ])
+                             layers=zip_layers)
         prev_layer = zip_layer
 
         if input_n_layers > 0:
@@ -78,7 +82,7 @@ class Model(NeuralModel):
             logging.info('Creating RNN layer: %s with %d neurons.' % (
                 rnn_type, n_cells))
             if rnn_type == 'lstm':
-                lstm_layer = LstmRecurrent(name="lstm",
+                lstm_layer = LstmRecurrent(name="lstm_%d" % i,
                                        size=n_cells,
                                        seq_output=True,
                                        out_cells=False,
@@ -87,7 +91,7 @@ class Model(NeuralModel):
                                        enable_branch_exp=enable_branch_exp)
 
             elif rnn_type == 'rnn':
-                lstm_layer = Recurrent(name="lstm",
+                lstm_layer = Recurrent(name="lstm_%d" % i,
                                        size=n_cells,
                                        seq_output=True,
                                        p_drop=p_drop)
@@ -126,7 +130,7 @@ class Model(NeuralModel):
             costs.append(slot_objective)
         cost = SumOut()
         cost.connect(*costs)  #, scale=1.0 / len(slots))
-        params = list(cost.get_params())
+        self.params = params = list(cost.get_params())
         n_params = sum(p.get_value().size for p in params)
         logging.info('This model has %d parameters.' % n_params)
 
@@ -146,6 +150,8 @@ class Model(NeuralModel):
             #reg = updates.Regularizer(maxnorm=5.0)
             updater = updates.Adam(lr=lr, b1=0.01, b2=0.01, clipnorm=5.0)  #,
             # regularizer=reg)
+        elif opt_type == "momentum":
+            updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=5.0)
         else:
             raise Exception("Unknonw opt.")
 
