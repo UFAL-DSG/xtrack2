@@ -21,7 +21,7 @@ def theano_one_hot(idx, n):
     one_hot = T.set_subtensor(z[T.arange(idx.shape[0]), idx], 1)
     return one_hot
 
-srng = RandomStreams()
+srng = RandomStreams(seed=1234)
 
 class Layer(object):
     name = "unnamed_layer"
@@ -247,15 +247,15 @@ class LstmRecurrent(Layer):
         self.p_vec_f = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
-                           name=self._name_param("P"))
+                           name=self._name_param("peep_f"))
         self.p_vec_i = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
-                           name=self._name_param("P"))
+                           name=self._name_param("peep_i"))
         self.p_vec_o = self.init((self.size, ),
                            layer_width=self.size,
                            scale=self.init_scale,
-                           name=self._name_param("P"))
+                           name=self._name_param("peep_o"))
 
         self.init_c = self.init((self.size, ),
                                 layer_width=self.size,

@@ -50,6 +50,35 @@ def compute_stats(slots, slot_selection, classes, prediction, y,
     return conf_mats
 
 
+def print_mb(slots, classes, vocab_rev, mb, prediction):
+    x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = mb
+
+    labels = {}
+    pred_id = {}
+    for i, (seq_id, time), lbls in enumerate(zip(zip(y_seq_id, y_time),
+                                              *y_labels)):
+        labels[(seq_id, time)] = lbls
+        pred_id[(seq_id, time)] = i
+
+    example = []
+    for dialog_id, dialog in enumerate(zip(*x)):
+        print
+        for t, w in enumerate(dialog):
+            print vocab_rev[w],
+
+            curr_ndx = (dialog_id, t)
+            if curr_ndx in labels:
+                curr_label = labels[curr_ndx]
+                curr_pred = [prediction[i][pred_id[curr_ndx]]
+                             for i, _ in enumerate(slots)]
+
+                print
+                print curr_label
+                print curr_pred
+
+
+
+
 def visualize_prediction(xtd, prediction):
     #x = data['x'].transpose(1, 0)
     pred_ptr = 0
@@ -185,6 +214,12 @@ def compute_prt(cmat, i):
     return p, r, total_i
 
 
+def visualize_mb(model, mb):
+    prediction = model._predict(*mb)
+
+    #print_mb(xtd_v, prediction_valid)
+
+
 def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                class_groups,
                best_acc, best_acc_train, tracker_valid, tracker_train,
@@ -291,25 +326,68 @@ class TrainingStats(object):
 
     def insert(self, **kwargs):
         for key, val in kwargs.iteritems():
+            if type(val) is np.ndarray:
+                val = float(val)
             self.data[key].append(val)
 
     def mean(self, arg):
         return np.array(self.data[arg]).mean()
 
-def main(args_lst, experiment_path, out, n_cells, emb_size,
-         n_epochs, lr, opt_type, momentum, model_file,
-         final_model_file, mb_size,
-         eid, rebuild_model, oclf_n_hidden,
-         oclf_n_layers, oclf_activation, debug, track_log,
+
+def _get_example_list(minibatches, sorted_items, xtd_t):
+    examples = []
+    for ii, (i, loss) in enumerate(sorted_items):
+        _, d = minibatches[i]
+
+        x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = d
+
+        example = []
+        for d in zip(*x):
+            ln = ""
+            for w in d:
+                ln += xtd_t.vocab_rev[w]
+                ln += " "
+            example.append(ln)
+        examples.append(example)
+    return examples
+
+
+def get_extreme_examples(mb_loss, minibatches, xtd_t):
+    sorted_items = sorted(mb_loss.items(), key=lambda e: -e[1])
+    worst_mb_ndxs = sorted_items[:5]
+    worst_examples = _get_example_list(minibatches, worst_mb_ndxs, xtd_t)
+    best_mb_ndxs = sorted_items[-5:]
+    best_examples = _get_example_list(minibatches, best_mb_ndxs, xtd_t)
+
+    return (worst_examples, worst_mb_ndxs), (best_examples, best_mb_ndxs)
+
+
+def main(args_lst,
+         eid, experiment_path, out, valid_after,
+         load_params, save_params,
+         debug, track_log,
+         n_cells, emb_size,
+         n_epochs, lr, opt_type, momentum,
+         mb_size, mb_mult_data,
+         oclf_n_hidden, oclf_n_layers, oclf_activation,
          rnn_type, rnn_n_layers,
          lstm_no_peepholes,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
-         eval_on_full_train, disable_input_ftrs):
+         eval_on_full_train, enable_input_ftrs):
 
-    out = init_env(out)
+    output_dir = init_env(out)
+    mon_train = TrainingStats()
+    mon_valid = TrainingStats()
+    mon_extreme_examples = TrainingStats()
+    stats_obj = dict(
+        train=mon_train.data,
+        mon_extreme_examples=mon_extreme_examples.data,
+        args=args_lst
+    )
 
     logging.info('XTrack has been started.')
+    logging.info('Output dir: %s' % output_dir)
     logging.info('Initializing random seed to 0.')
     random.seed(0)
     logging.info('Argv: %s' % str(sys.argv))
@@ -330,42 +408,37 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
     n_input_tokens = len(xtd_t.vocab)
 
     t = time.time()
-    if rebuild_model:
-        logging.info('Rebuilding model.')
-        model = Model(slots=slots,
-                      slot_classes=xtd_t.classes,
-                      emb_size=emb_size,
-                      disable_input_ftrs=disable_input_ftrs,
-                      n_cells=n_cells,
-                      n_input_tokens=n_input_tokens,
-                      oclf_n_hidden=oclf_n_hidden,
-                      oclf_n_layers=oclf_n_layers,
-                      oclf_activation=oclf_activation,
-                      debug=debug,
-                      rnn_type=rnn_type,
-                      rnn_n_layers=rnn_n_layers,
-                      lstm_no_peepholes=lstm_no_peepholes,
-                      opt_type=opt_type,
-                      momentum=momentum,
-                      p_drop=p_drop,
-                      init_emb_from=init_emb_from,
-                      vocab=xtd_t.vocab,
-                      input_n_layers=input_n_layers,
-                      input_n_hidden=input_n_hidden,
-                      input_activation=input_activation,
-                      token_features=xtd_t.token_features
-        )
 
-        try:
-            model.save(model_file)
-        except Exception, e:
-            logging.error('Could not save model: %s' % str(e))
+    logging.info('Building model.')
+    model = Model(slots=slots,
+                  slot_classes=xtd_t.classes,
+                  emb_size=emb_size,
+                  enable_input_ftrs=enable_input_ftrs,
+                  n_cells=n_cells,
+                  n_input_tokens=n_input_tokens,
+                  oclf_n_hidden=oclf_n_hidden,
+                  oclf_n_layers=oclf_n_layers,
+                  oclf_activation=oclf_activation,
+                  debug=debug,
+                  rnn_type=rnn_type,
+                  rnn_n_layers=rnn_n_layers,
+                  lstm_no_peepholes=lstm_no_peepholes,
+                  opt_type=opt_type,
+                  momentum=momentum,
+                  p_drop=p_drop,
+                  init_emb_from=init_emb_from,
+                  vocab=xtd_t.vocab,
+                  input_n_layers=input_n_layers,
+                  input_n_hidden=input_n_hidden,
+                  input_activation=input_activation,
+                  token_features=xtd_t.token_features
+    )
 
-        logging.info('Rebuilding took: %.1f' % (time.time() - t))
-    else:
-        logging.info('Loading model from: %s' % model_file)
-        model = Model.load(model_file)
-        logging.info('Loading took: %.1f' % (time.time() - t))
+    logging.info('Rebuilding took: %.1f' % (time.time() - t))
+
+    if load_params:
+        logging.info('Loading parameters from: %s' % load_params)
+        model.load_params(load_params)
 
     tracker = XTrack2DSTCTracker(xtd_v, model)
     tracker_train = XTrack2DSTCTracker(xtd_t, model)
@@ -387,6 +460,7 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
     n_valid_not_increased = 0
     et = None
     seqs = list(xtd_t.sequences)
+    seqs = seqs * mb_mult_data
     random.shuffle(seqs)
     minibatches = prepare_minibatches(seqs, mb_size, model, slots)
     minibatches = zip(itertools.count(), minibatches)
@@ -402,7 +476,19 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
 
     epoch = 0
 
+    init_valid_loss = model._loss(
+                valid_data['x'],
+                valid_data['x_score'],
+                valid_data['x_switch'],
+                #valid_data['x_actor'],
+                valid_data['y_seq_id'],
+                valid_data['y_time'],
+                *valid_data['y_labels']
+            )
+    logging.info('Initial valid loss: %.10f' % init_valid_loss)
+
     mb_loss = {}
+    last_valid = 0
     while True:
         if len(mb_to_go) == 0:
             mb_to_go = list(mb_ids)
@@ -443,6 +529,7 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             timestep_cntr
         ))
 
+
         stats.insert(update_ratio=update_ratio, loss=loss, time=t)
         if example_cntr % 100 == 0:
             logging.info('Processed %d examples, %d timesteps.' % (
@@ -456,9 +543,13 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
 
             mb_hist_min = min(mb_histogram.values())
             mb_hist_max = max(mb_histogram.values())
-            mb_hist_avg = np.mean(np.array(mb_histogram.values(),
-                                           dtype=np.float32))
-            logging.info('MB histogram: min(%d) max(%d) avg(%.1f) len(%d)' % (
+            mb_hist_avg = float(np.mean(np.array(mb_histogram.values(),
+                                           dtype=np.float32)))
+            logging.info('Minibatch histogram:'
+                         ' min(%d)'
+                         ' max(%d)'
+                         ' avg(%.1f)'
+                         ' len(%d)' % (
                 mb_hist_min, mb_hist_max, mb_hist_avg, len(mb_histogram)))
 
             if debug:
@@ -466,9 +557,13 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
                 logging.info('One LSTM input: %s' % str(lstm_input[len(
                     lstm_input)/2]))
 
+        if (example_cntr - last_valid) > valid_after:
+            last_valid = example_cntr
+            params_file = os.path.join(output_dir, 'params.%.10d.p' %
+                                       example_cntr)
+            logging.info('Saving parameters: %s' % params_file)
+            model.save_params(params_file)
 
-
-        if example_cntr % 1000 == 0:
             tracking_acc = eval_model(model=model, train_data=train_data,
                            valid_data=valid_data,
                        class_groups=class_groups, slots=slots, classes=classes,
@@ -491,51 +586,37 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
             )
             logging.info('Valid loss:         %10.2f' % valid_loss)
 
-            sorted_items = sorted(mb_loss.items(), key=lambda e: -e[1])
-            for ii, (i, loss) in enumerate(sorted_items[:5]):
-                logging.info('Worst training example #%d (loss %.2f):' % (ii,
-                                                                      loss, ))
+            mon_train.insert(
+                time=time.time(),
+                example=example_cntr,
+                timestep_cntr=timestep_cntr,
+                mb_id=mb_id,
+                train_loss=stats.mean('loss'),
+                valid_loss=valid_loss,
+                update_ratio=stats.mean('update_ratio'),
+                tracking_acc=tracking_acc
+            )
 
-                _, d = minibatches[i]
+            stats_path = os.path.join(output_dir, 'stats.json')
+            with open(stats_path, 'w') as f_out:
+                json.dump(stats_obj, f_out)
+                os.system('ln -f -s "%s" "xtrack2_vis/stats.json"' %
+                          os.path.join('..', stats_path))
 
-                x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = d
-
-                for d in zip(*x):
-                    ln = ""
-                    for w in d:
-                        ln += xtd_t.vocab_rev[w]
-                        ln += " "
-                    logging.info("  %s" % ln)
-
-            for ii, (i, loss) in enumerate(sorted_items[-5:]):
-                logging.info('Best training example #%d (loss %.2f):' % (ii,
-                                                                      loss, ))
-
-                _, d = minibatches[i]
-
-                x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = d
-
-                for d in zip(*x):
-                    ln = ""
-                    for w in d:
-                        ln += xtd_t.vocab_rev[w]
-                        ln += " "
-                    logging.info("  %s" % ln)
-
-
-            mb_bad = [i for i, _ in sorted_items[:100]]
-            random.shuffle(mb_bad)
+            (worst_e, worst_ndx), (best_e, best_ndx) = get_extreme_examples(
+                mb_loss, minibatches, xtd_t)
+            mon_extreme_examples.insert(worst=worst_e, best=best_e)
+            #mb_bad = [i for i, _ in sorted_items[:100]]
+            #random.shuffle(mb_bad)
             #mb_to_go.extend(mb_bad)
 
             mb_loss = {}
 
             stats = TrainingStats()
 
-
-
-
-    logging.info('Saving final model to: %s' % final_model_file)
-    model.save(final_model_file)
+    params_file = os.path.join(output_dir, 'params.final.p')
+    logging.info('Saving final params to: %s' % params_file)
+    model.save_params(params_file)
 
     return best_tracking_acc
 
@@ -547,6 +628,7 @@ def build_argument_parser():
     parser.add_argument('experiment_path')
 
     parser.add_argument('--eid', default='xtrack_experiment')
+    parser.add_argument('--valid_after', default=1000, type=int)
 
     # Experiment params.
     #parser.add_argument('--rebuild_model', action='store_true', default=False,
@@ -555,7 +637,8 @@ def build_argument_parser():
     #parser.add_argument('--final_model_file',
     #                    default='xtrack_model_final.pickle')
     parser.add_argument('--load_params', default=None)
-    parser.add_argument('--out', required=True)
+    parser.add_argument('--save_params', default=None)
+    parser.add_argument('--out', default='xtrack2_out')
 
     # XTrack params.
     parser.add_argument('--n_epochs', default=0, type=int)
@@ -564,10 +647,11 @@ def build_argument_parser():
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--mb_size', default=16, type=int)
+    parser.add_argument('--mb_mult_data', default=1, type=int)
 
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
-    parser.add_argument('--disable_input_ftrs', default=False,
+    parser.add_argument('--enable_input_ftrs', default=False,
                         action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
 
@@ -595,13 +679,8 @@ def build_argument_parser():
     return parser
 
 if __name__ == '__main__':
-
-
     parser = build_argument_parser()
-
-
     args = parser.parse_args()
-    #climate.call(main)
     pdb_on_error()
     args_lst = list(sorted(vars(args).iteritems()))
     main(args_lst, **vars(args))

@@ -10,7 +10,7 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size, disable_input_ftrs,
+    def __init__(self, slots, slot_classes, emb_size, enable_input_ftrs,
                  n_input_tokens, n_cells,
                  rnn_type, rnn_n_layers,
                  lstm_no_peepholes, opt_type,
@@ -25,7 +25,6 @@ class Model(NeuralModel):
         self.slot_classes = slot_classes
 
         x = T.imatrix()
-
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
@@ -51,7 +50,7 @@ class Model(NeuralModel):
              input_switch_layer,
         ]
 
-        if not disable_input_ftrs:
+        if enable_input_ftrs:
             token_n_features = len(token_features.values()[0])
             input_token_features_layer = Embedding(name="emb_ftr",
                                                    size=token_n_features,
@@ -83,7 +82,7 @@ class Model(NeuralModel):
             logging.info('Creating RNN layer: %s with %d neurons.' % (
                 rnn_type, n_cells))
             if rnn_type == 'lstm':
-                lstm_layer = LstmRecurrent(name="lstm",
+                lstm_layer = LstmRecurrent(name="lstm_%d" % i,
                                        size=n_cells,
                                        seq_output=True,
                                        out_cells=False,
@@ -91,7 +90,7 @@ class Model(NeuralModel):
                                        p_drop=p_drop)
 
             elif rnn_type == 'rnn':
-                lstm_layer = Recurrent(name="lstm",
+                lstm_layer = Recurrent(name="lstm_%d" % i,
                                        size=n_cells,
                                        seq_output=True,
                                        p_drop=p_drop)
