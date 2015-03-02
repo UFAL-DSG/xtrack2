@@ -116,7 +116,7 @@ class Embedding(Layer):
         # Normalize.
         emb_mean = emb.mean(axis=0)
         emb_std = emb.std(axis=0)
-        emb = (emb - emb_mean) / (emb_std + 1e-7)
+        emb = (emb - emb_mean) / (emb_std + 1e-7) * 100
 
         assert not (emb == np.nan).any()
 
@@ -234,7 +234,7 @@ class LstmRecurrent(Layer):
         # Initialize forget gates to large values.
         b = self.b.get_value()
         b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
-        b[self.size:] = 0.0
+        #b[self.size:] = 0.0
         self.b.set_value(b)
 
         # Recurrent connections.

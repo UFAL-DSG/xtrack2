@@ -297,7 +297,7 @@ class TrainingStats(object):
         return np.array(self.data[arg]).mean()
 
 def main(args_lst, experiment_path, out, n_cells, emb_size,
-         n_epochs, lr, opt_type, model_file,
+         n_epochs, lr, opt_type, momentum, model_file,
          final_model_file, mb_size,
          eid, rebuild_model, oclf_n_hidden,
          oclf_n_layers, oclf_activation, debug, track_log,
@@ -305,12 +305,13 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
          lstm_no_peepholes,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
-         eval_on_full_train):
-    random.seed(0)
+         eval_on_full_train, disable_input_ftrs):
 
     out = init_env(out)
 
     logging.info('XTrack has been started.')
+    logging.info('Initializing random seed to 0.')
+    random.seed(0)
     logging.info('Argv: %s' % str(sys.argv))
     logging.info('Effective args:')
     for arg_name, arg_value in args_lst:
@@ -334,6 +335,7 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
         model = Model(slots=slots,
                       slot_classes=xtd_t.classes,
                       emb_size=emb_size,
+                      disable_input_ftrs=disable_input_ftrs,
                       n_cells=n_cells,
                       n_input_tokens=n_input_tokens,
                       oclf_n_hidden=oclf_n_hidden,
@@ -344,6 +346,7 @@ def main(args_lst, experiment_path, out, n_cells, emb_size,
                       rnn_n_layers=rnn_n_layers,
                       lstm_no_peepholes=lstm_no_peepholes,
                       opt_type=opt_type,
+                      momentum=momentum,
                       p_drop=p_drop,
                       init_emb_from=init_emb_from,
                       vocab=xtd_t.vocab,
@@ -546,22 +549,26 @@ def build_argument_parser():
     parser.add_argument('--eid', default='xtrack_experiment')
 
     # Experiment params.
-    parser.add_argument('--rebuild_model', action='store_true', default=False,
-                        required=False)
-    parser.add_argument('--model_file', default='xtrack_model.pickle')
-    parser.add_argument('--final_model_file',
-                        default='xtrack_model_final.pickle')
+    #parser.add_argument('--rebuild_model', action='store_true', default=False,
+    #                    required=False)
+    #parser.add_argument('--model_file', default='xtrack_model.pickle')
+    #parser.add_argument('--final_model_file',
+    #                    default='xtrack_model_final.pickle')
+    parser.add_argument('--load_params', default=None)
     parser.add_argument('--out', required=True)
 
     # XTrack params.
     parser.add_argument('--n_epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.1, type=float)
+    parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--mb_size', default=16, type=int)
 
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
+    parser.add_argument('--disable_input_ftrs', default=False,
+                        action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
 
     parser.add_argument('--input_n_hidden', default=32, type=int)
@@ -569,7 +576,7 @@ def build_argument_parser():
     parser.add_argument('--input_activation', default="sigmoid", type=str)
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
-    parser.add_argument('--oclf_n_layers', default=2, type=int)
+    parser.add_argument('--oclf_n_layers', default=0, type=int)
     parser.add_argument('--oclf_activation', default="tanh", type=str)
 
     parser.add_argument('--rnn_type', default='lstm')
@@ -588,7 +595,6 @@ def build_argument_parser():
     return parser
 
 if __name__ == '__main__':
-    random.seed(0)
 
 
     parser = build_argument_parser()

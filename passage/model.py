@@ -18,6 +18,26 @@ def flatten(l):
 
 
 class NeuralModel(object):
+    def __init__(self):
+        self.params = []
+
+    def save_params(self, f_name):
+        model_params = {}
+        for param in self.params:
+            model_params[param.name] = param.get_value()
+
+        with open(f_name, 'w') as f_out:
+            cPickle.dump(model_params, f_out, -1)
+
+    def load_params(self, f_name):
+        with open(f_name) as f_in:
+            model_params = cPickle.load(f_in)
+
+        for param in self.params:
+            param_val = model_params.get(param.name)
+            if param_val != None:
+                param.set_value(param_val)
+
     def save(self, f_name):
         val = sys.getrecursionlimit()
         sys.setrecursionlimit(100000)

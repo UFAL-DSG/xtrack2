@@ -70,15 +70,15 @@ class XTrackData2(object):
     def _process_msg(self, msg, msg_score, state, actor, seq, oov_ins_p,
                      n_best_order, f_dump_text, replace_entities, true_msg):
         msg = msg.lower()
-        if replace_entities:
-            for slot in self.slots:
-                for cls_name in self.classes[slot]:
-                    msg = msg.replace(cls_name, cls_name.replace(' ', '_'))
+        #if replace_entities:
+        #    for slot in self.slots:
+        #        for cls_name in self.classes[slot]:
+        #            msg = msg.replace(cls_name, cls_name.replace(' ', '_'))
 
 
         token_seq = list(tokenize(msg))
         if actor == data_model.Dialog.ACTOR_SYSTEM:
-            token_seq = ["%s" % token for token in token_seq]
+            token_seq = ["@%s" % token for token in token_seq]
 
         if not token_seq:
             token_seq = ['#NOTHING']
@@ -95,7 +95,8 @@ class XTrackData2(object):
         #    token_seq.insert(0, '#SYS')
         #else:
         #    token_seq.insert(0, '#USR')
-        #token_seq.append('#SWITCH')
+        if actor == data_model.Dialog.ACTOR_USER:
+            token_seq.append('#GEN')
 
         for i, token in enumerate(token_seq):
             token_ndx = self.get_token_ndx(token)
