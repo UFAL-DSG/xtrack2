@@ -431,7 +431,8 @@ def main(args_lst,
                   input_n_layers=input_n_layers,
                   input_n_hidden=input_n_hidden,
                   input_activation=input_activation,
-                  token_features=xtd_t.token_features
+                  token_features=xtd_t.token_features,
+                  enable_branch_exp=enable_branch_exp
     )
 
     logging.info('Rebuilding took: %.1f' % (time.time() - t))
@@ -631,11 +632,6 @@ def build_argument_parser():
     parser.add_argument('--valid_after', default=1000, type=int)
 
     # Experiment params.
-    #parser.add_argument('--rebuild_model', action='store_true', default=False,
-    #                    required=False)
-    #parser.add_argument('--model_file', default='xtrack_model.pickle')
-    #parser.add_argument('--final_model_file',
-    #                    default='xtrack_model_final.pickle')
     parser.add_argument('--load_params', default=None)
     parser.add_argument('--save_params', default=None)
     parser.add_argument('--out', default='xtrack2_out')

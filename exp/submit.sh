@@ -22,7 +22,7 @@ while read cfg; do
         #RUN_CMD="cat"
 
         $RUN_CMD << ENDOFSCRIPT
-        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py --out out/${eid} --rebuild_model --model_file out/${eid}.model ${cfg}
+        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py --out out/${eid} ${cfg}
 ENDOFSCRIPT
     done
 done < $1
