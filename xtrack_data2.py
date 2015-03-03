@@ -67,9 +67,11 @@ class XTrackData2(object):
     def _init_after_load(self):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
-    def _process_msg(self, msg, msg_score, state, actor, seq, oov_ins_p,
+    def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
+                                                           oov_ins_p,
                      word_drop_p,
-                     n_best_order, f_dump_text, replace_entities, true_msg):
+                     n_best_order, f_dump_text, replace_entities, true_msg,
+                                                           detailed_labels):
         msg = msg.lower()
         #if replace_entities:
         #    for slot in self.slots:
@@ -117,11 +119,22 @@ class XTrackData2(object):
                 seq['data_actor'].append(actor)
                 seq['data_switch'].append(0)
         #seq['data'].append(self.get_token_ndx('#EOS'))
+            if detailed_labels:
+                if i > len(token_seq) / 2:
+                    xstate = state
+                else:
+                    xstate = last_state
 
+                label = {
+                    'time': len(seq['data']) - 1,
+                    'slots': {}
+                }
+                for slot, val in zip(self.slots, self.state_to_label(xstate,
+                                                                     self.slots)):
+                    label['slots'][slot] = val
+                seq['labels'].append(label)
 
-
-
-        if actor == data_model.Dialog.ACTOR_USER:
+        if not detailed_labels and actor == data_model.Dialog.ACTOR_USER:
             label = {
                 'time': len(seq['data']) - 1,
                 'slots': {}
@@ -160,8 +173,10 @@ class XTrackData2(object):
 
     def build(self, dialogs, slots, slot_groups, based_on, oov_ins_p,
               word_drop_p,
-              include_system_utterances, n_nbest_samples, n_best_order,
+              include_system_utterances, n_nbest_samples, n_best_sample_by_p,
+        n_best_order,
               score_mean, split_dialogs, dump_text, replace_entities,
+              detailed_labels,
               include_base_seqs=False):
         self._init(slots, slot_groups, based_on, include_base_seqs)
 
@@ -181,6 +196,7 @@ class XTrackData2(object):
                     'labels': []
                 }
                 seq_data_keys = [key for key in seq if key.startswith('data')]
+                last_state = None
                 for msgs, state, actor in zip(dialog.messages,
                                               dialog.states,
                                               dialog.actors):
@@ -189,7 +205,18 @@ class XTrackData2(object):
                     if actor_is_system:
                         msg_id = 0
                     else:
-                        msg_id = random.choice(n_best_order)
+                        if not n_best_sample_by_p:
+                            msg_id = random.choice(n_best_order)
+                        else:
+                            p = random.random()
+                            for msg_id, (msg, msg_score) in enumerate(msgs[1:]):
+                                p -= 1.0 / (1 + np.exp(-msg_score))
+
+                                if p < 0:
+                                    break
+                            if p > 0:
+                                msg_id = 1
+
                     msg, msg_score = msgs[msg_id]
                     true_msg, _ = msgs[0]
 
@@ -198,9 +225,12 @@ class XTrackData2(object):
                     else:
                         #msg_score = max(msg_score, -100)
                         #msg_score = np.exp(msg_score)
-                        self._process_msg(msg, msg_score, state, actor, seq,
+                        self._process_msg(msg, msg_score, state, last_state,
+                                          actor, seq,
                                           oov_ins_p, word_drop_p, n_best_order,
-                                          f_dump_text, replace_entities, true_msg)
+                                          f_dump_text, replace_entities,
+                                          true_msg, detailed_labels)
+                    last_state = state
 
 
                 # Sanity check that all data elements are equal size.
@@ -359,6 +389,10 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('--n_best_order', default="0")
     parser.add_argument('--n_nbest_samples', default=10, type=int)
+    parser.add_argument('--n_best_sample_by_p', default=False,
+                        action='store_true')
+    parser.add_argument('--detailed_labels', default=False,
+                        action='store_true')
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
     parser.add_argument('--split_dialogs', action='store_true', default=False)
@@ -393,9 +427,11 @@ if __name__ == '__main__':
               include_system_utterances=args.include_system_utterances,
               n_best_order=n_best_order, score_mean=args.score_mean,
               dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
+              n_best_sample_by_p=args.n_best_sample_by_p,
               split_dialogs=args.split_dialogs,
               replace_entities=args.replace_entities,
-              include_base_seqs=args.include_base_seqs)
+              include_base_seqs=args.include_base_seqs,
+              detailed_labels=args.detailed_labels)
 
     logging.info('Saving.')
     xtd.save(args.out_file)

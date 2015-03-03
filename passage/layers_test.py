@@ -85,6 +85,13 @@ def test_verify_exprgrad():
 
 
 if __name__ == '__main__':
+    x = tt.shared(np.random.randn(10, 5))
+    f = theano.function([], x[::-1,:])
+    print f()
+    print x.get_value()
+    exit(0)
+
+
     test_verify_exprgrad()
     exit(0)
     import theano.gradient

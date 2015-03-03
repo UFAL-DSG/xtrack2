@@ -201,7 +201,7 @@ class LstmRecurrent(Layer):
 
     def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
-                 peepholes=False, enable_branch_exp=False):
+                 peepholes=False, enable_branch_exp=False, backward=False):
         if name:
             self.name = name
         self.init = getattr(inits, init)
@@ -212,6 +212,7 @@ class LstmRecurrent(Layer):
         self.out_cells = out_cells
         self.p_drop = p_drop
         self.peepholes = peepholes
+        self.backward = backward
 
         self.gate_act = activations.sigmoid
         self.modul_act = activations.tanh
@@ -326,8 +327,13 @@ class LstmRecurrent(Layer):
                 T.repeat(self.init_h.dimshuffle('x', 0), X.shape[1], axis=0),
             ],
             non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
-            truncate_gradient=self.truncate_gradient
+            truncate_gradient=self.truncate_gradient,
+            go_backwards=self.backward
         )
+        if self.backward:
+            out = out[::-1, ]
+            cells = cells[::-1, ]
+
         if self.seq_output:
             if self.out_cells:
                 return cells

@@ -370,7 +370,7 @@ def main(args_lst,
          n_epochs, lr, opt_type, momentum,
          mb_size, mb_mult_data,
          oclf_n_hidden, oclf_n_layers, oclf_activation,
-         rnn_type, rnn_n_layers,
+         rnn_n_layers,
          lstm_no_peepholes,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
@@ -420,7 +420,6 @@ def main(args_lst,
                   oclf_n_layers=oclf_n_layers,
                   oclf_activation=oclf_activation,
                   debug=debug,
-                  rnn_type=rnn_type,
                   rnn_n_layers=rnn_n_layers,
                   lstm_no_peepholes=lstm_no_peepholes,
                   opt_type=opt_type,
@@ -659,7 +658,6 @@ def build_argument_parser():
     parser.add_argument('--oclf_n_layers', default=0, type=int)
     parser.add_argument('--oclf_activation', default="tanh", type=str)
 
-    parser.add_argument('--rnn_type', default='lstm')
     parser.add_argument('--rnn_n_layers', default=1, type=int)
 
     parser.add_argument('--lstm_no_peepholes', default=False,

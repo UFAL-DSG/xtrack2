@@ -12,7 +12,7 @@ from passage.model import NeuralModel
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, enable_input_ftrs,
                  n_input_tokens, n_cells,
-                 rnn_type, rnn_n_layers,
+                 rnn_n_layers,
                  lstm_no_peepholes, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
                  debug, p_drop,
@@ -77,30 +77,35 @@ class Model(NeuralModel):
             self._lstm_input = theano.function([x, x_score, x_switch],
                                                prev_layer.output())
 
-        lstm_layer = None
         for i in range(rnn_n_layers):
-            logging.info('Creating RNN layer: %s with %d neurons.' % (
-                rnn_type, n_cells))
-            if rnn_type == 'lstm':
-                lstm_layer = LstmRecurrent(name="lstm_%d" % i,
-                                       size=n_cells,
-                                       seq_output=True,
-                                       out_cells=False,
-                                       peepholes=not lstm_no_peepholes,
-                                       p_drop=p_drop,
-                                       enable_branch_exp=enable_branch_exp)
+            # Forward LSTM layer.
+            logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
 
-            elif rnn_type == 'rnn':
-                lstm_layer = Recurrent(name="lstm_%d" % i,
-                                       size=n_cells,
-                                       seq_output=True,
-                                       p_drop=p_drop)
-            else:
-                raise Exception('Unknown RNN type.')
-            lstm_layer.connect(prev_layer)
-            prev_layer = lstm_layer
+            f_lstm_layer = LstmRecurrent(name="lstm_%d" % i,
+                                   size=n_cells,
+                                   seq_output=True,
+                                   out_cells=False,
+                                   peepholes=not lstm_no_peepholes,
+                                   p_drop=p_drop,
+                                   enable_branch_exp=enable_branch_exp)
+            f_lstm_layer.connect(prev_layer)
 
-        assert lstm_layer is not None
+            b_lstm_layer = LstmRecurrent(name="lstm_%d" % i,
+                                   size=n_cells,
+                                   seq_output=True,
+                                   out_cells=False,
+                                   backward=True,
+                                   peepholes=not lstm_no_peepholes,
+                                   p_drop=p_drop,
+                                   enable_branch_exp=enable_branch_exp)
+            b_lstm_layer.connect(prev_layer)
+
+            lstm_zip = ZipLayer(concat_axis=2, layers=[f_lstm_layer,
+                                                     b_lstm_layer])
+
+            prev_layer = lstm_zip
+
+        assert prev_layer is not None
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
@@ -109,7 +114,7 @@ class Model(NeuralModel):
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
         cpt = CherryPick()
-        cpt.connect(lstm_layer, y_time, y_seq_id)
+        cpt.connect(prev_layer, y_time, y_seq_id)
 
         costs = []
         predictions = []
