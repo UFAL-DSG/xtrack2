@@ -68,6 +68,7 @@ class XTrackData2(object):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
     def _process_msg(self, msg, msg_score, state, actor, seq, oov_ins_p,
+                     word_drop_p,
                      n_best_order, f_dump_text, replace_entities, true_msg):
         msg = msg.lower()
         #if replace_entities:
@@ -99,6 +100,8 @@ class XTrackData2(object):
             token_seq.append('#GEN')
 
         for i, token in enumerate(token_seq):
+            if word_drop_p > random.random():
+                continue
             token_ndx = self.get_token_ndx(token)
             seq['data'].append(token_ndx)
             seq['data_score'].append(msg_score)
@@ -156,6 +159,7 @@ class XTrackData2(object):
         return seqs
 
     def build(self, dialogs, slots, slot_groups, based_on, oov_ins_p,
+              word_drop_p,
               include_system_utterances, n_nbest_samples, n_best_order,
               score_mean, split_dialogs, dump_text, replace_entities,
               include_base_seqs=False):
@@ -195,7 +199,7 @@ class XTrackData2(object):
                         #msg_score = max(msg_score, -100)
                         #msg_score = np.exp(msg_score)
                         self._process_msg(msg, msg_score, state, actor, seq,
-                                          oov_ins_p, n_best_order,
+                                          oov_ins_p, word_drop_p, n_best_order,
                                           f_dump_text, replace_entities, true_msg)
 
 
@@ -349,6 +353,8 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('--slots', default='food')
     parser.add_argument('--oov_ins_p', type=float, required=False, default=0.0)
+    parser.add_argument('--word_drop_p', type=float, required=False,
+                        default=0.0)
     parser.add_argument('--include_system_utterances', action='store_true',
                         default=False)
     parser.add_argument('--n_best_order', default="0")
@@ -383,6 +389,7 @@ if __name__ == '__main__':
     xtd = XTrackData2()
     xtd.build(dialogs=dialogs, based_on=args.based_on, slots=slots,
               slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
+              word_drop_p=args.word_drop_p,
               include_system_utterances=args.include_system_utterances,
               n_best_order=n_best_order, score_mean=args.score_mean,
               dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
