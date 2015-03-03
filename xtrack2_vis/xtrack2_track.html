@@ -1,0 +1,30 @@
+<table>
+    {% for seq in sequences %}
+    <tr>
+        <td><h1>{{seq['id']}}</h1></td>
+    </tr>
+    <tr>
+        <td>
+        {% for t, word in enumerate(seq.tokens) %}
+            {{ word }}
+            {% if t in seq.labels %}
+            {% set label = seq.labels[t] %}
+            {% set track = seq.tracks[t] %}
+            {% set result = seq.results[t] %}
+            {% set true_input = seq.true_inputs[t] %}
+            <br><span class="trueinput">{{ true_input}}</span>
+            </td>
+            <td>
+                {% include "label.html" %}
+            </td>
+            <td>{% include "track.html" %}
+            </td>
+            <td>{% include "result.html" %}
+            </td>
+    </tr><tr><td>
+            {% endif %}
+        {% endfor %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>

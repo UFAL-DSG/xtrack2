@@ -100,17 +100,22 @@ class XTrack2DSTCTracker(object):
         for i, slot in enumerate(self.data.slots):
             goals_correct &= raw_goal_labels[slot] == label[slot]
 
-        return {
-            "goal-labels": {
+        goal_labels = {
                 slot: {goal_labels[slot]: 1.0} for slot in self.data.slots if
                 goal_labels[slot] != self.data.null_class
-            },
+            }
+        goal_labels_debug = {
+                slot: goal_labels[slot].keys()[0] for slot in goal_labels
+            }
+        return {
+            "goal-labels": goal_labels,
             "method-label": {
                 #"byconstraints": 1.0
             },
             "requested-slots": {
                 #slot: 0.0 for slot in self.data.slots
-            }
+            },
+            "debug": goal_labels_debug
         }, goals_correct
 
     def _label_empty(self, lbl):
@@ -178,9 +183,9 @@ class XTrack2DSTCTracker(object):
         assert accuracy_n > 0
         return result, accuracy * 1.0 / accuracy_n
 
-def main(dataset_name, data_file, output_file, model_file):
-    logging.info('Loading model from: %s' % model_file)
-    model = Model.load(model_file)
+def main(dataset_name, data_file, output_file, params_file):
+    logging.info('Loading model params from: %s' % params_file)
+    model = Model.load(params_file, build_train=False)
 
     logging.info('Loading data: %s' % data_file)
     data = XTrackData2.load(data_file)
@@ -213,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', type=str, default='__test__')
     parser.add_argument('--data_file', required=True)
     parser.add_argument('--output_file', required=True)
-    parser.add_argument('--model_file', required=True)
+    parser.add_argument('--params_file', required=True)
 
     pdb_on_error()
     init_logging()

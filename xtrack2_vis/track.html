@@ -1,0 +1,9 @@
+<table>
+    {% for slot_name in slots %}
+    <tr>
+        <td>{{slot_name}}</td>
+        <td>{{track['debug'].get(slot_name)}}</td>
+    </tr>
+    {% endfor %}
+</table>
+

@@ -33,8 +33,9 @@ def build(out_file, based_on, input_len, dialog_len, dialog_cnt):
 
             score = random.random()
 
-            if score > 0.5:
-                goal = new_goal
+            #if score > 0.5:
+            #    goal = new_goal
+            goal = new_goal
 
             d.add_message([(" ".join(txt), np.log(score))],
                       {'food': goal},
@@ -47,7 +48,7 @@ def build(out_file, based_on, input_len, dialog_len, dialog_cnt):
              based_on=based_on,
              oov_ins_p=0.0,
              include_system_utterances=False, n_nbest_samples=1, n_best_order=[0],
-             score_mean=0.0, dump_text='/dev/null')
+             score_mean=0.0, dump_text='/dev/null', word_drop_p=0.0)
     print '> Saving.'
     xt.save(out_file)
 

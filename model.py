@@ -1,3 +1,4 @@
+import inspect
 import logging
 import time
 
@@ -8,6 +9,9 @@ from passage import updates
 from passage.iterators import padded
 from passage.layers import *
 from passage.model import NeuralModel
+
+
+
 
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size,
@@ -20,7 +24,13 @@ class Model(NeuralModel):
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features,
-                 momentum, enable_branch_exp):
+                 momentum, enable_branch_exp, build_train=True):
+        args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
+        self.init_args = {}
+        for arg in args:
+            if arg != 'self':
+                self.init_args[arg] = locals()[arg]
+
         self.vocab = vocab
         self.slots = slots
         self.slot_classes = slot_classes
@@ -156,8 +166,7 @@ class Model(NeuralModel):
         n_params = sum(p.get_value().size for p in params)
         logging.info('This model has %d parameters.' % n_params)
 
-        cost_value = cost.output(dropout_active=False)
-        assert p_drop == 0.0
+        cost_value = cost.output(dropout_active=True)
 
         lr = tt.scalar('lr')
         clipnorm = 0.5
@@ -178,19 +187,22 @@ class Model(NeuralModel):
         else:
             raise Exception("Unknonw opt.")
 
-        model_updates = updater.get_updates(params, cost_value)
-
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time]
         loss_args += [y_label[slot] for slot in slots]
-        train_args = [lr] + loss_args
-        update_ratio = updater.get_update_ratio(params, model_updates)
 
-        logging.info('Preparing %s train function.' % opt_type)
-        t = time.time()
-        self._train = theano.function(train_args, [cost_value, update_ratio],
-                                      updates=model_updates)
-        logging.info('Preparation done. Took: %.1f' % (time.time() - t))
+        if build_train:
+            model_updates = updater.get_updates(params, cost_value)
+
+            train_args = [lr] + loss_args
+            update_ratio = updater.get_update_ratio(params, model_updates)
+
+            logging.info('Preparing %s train function.' % opt_type)
+            t = time.time()
+            self._train = theano.function(train_args, [cost_value, update_ratio],
+                                          updates=model_updates)
+            logging.info('Preparation done. Took: %.1f' % (time.time() - t))
+
         self._loss = theano.function(loss_args, cost_value)
 
         logging.info('Preparing predict function.')

@@ -18,7 +18,7 @@ def load_labels(flist_path, flist_root):
 
 
 
-def main():
+def main(trackfile1, trackfile2):
     data_file = '/xdisk/data/dstc/xtrack/e2_food/valid.json'
     data = XTrackData2.load(data_file)
 
@@ -43,8 +43,11 @@ def main():
         data_map[seq['id']] = texts
 
     tracker_files = [
-        '/xdisk/data/dstc/dstc2/scripts/baseline_output.json',
-        '/tmp/trackb.json'
+        trackfile1,
+        trackfile2
+
+        #'/xdisk/data/dstc/dstc2/scripts/baseline_output.json',
+        #'/tmp/trackb.json'
     ]
 
     flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_dev.flist'

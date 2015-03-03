@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>XTrack2 Results</title>
+    <script src="js/jquery-1.8.3.min.js"></script>
+    <script src="js/d3.min.js" charset="utf-8"></script>
+      <script src="c3/c3.js" charset="utf-8"></script>
+      <link href='c3/c3.css' rel='stylesheet' type='text/css'>
+
+
+    <!-- Google fonts -->
+    <link href='http://fonts.googleapis.com/css?family=Roboto:400,300' rel='stylesheet' type='text/css'>
+    <!--<link href='//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css' rel="stylesheet" type="text/css">-->
+
+    <style>
+        .trueinput {
+            color: #999;
+        }
+    body {
+      color: #333;
+      font-family: 'Roboto', sans-serif;
+      font-weight: 300;
+      font-size: 18px;
+      margin: 0;
+      padding: 0;
+    }
+    #wrap {
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+    .hannot {
+      background-color: #EFE;
+    }
+    .rnnannot {
+      background-color: #EEF; 
+    }
+    .rannot {
+      background-color: #FEE;  
+    }
+    .annot {
+      padding: 3px;
+    }
+    .idiv {
+      display: inline-block;
+      vertical-align: top;
+      margin: 10px;
+    }
+    h1 {
+      font-weight: 300;
+      margin: 0;
+    }
+    h2 {
+      font-weight: 300;
+      font-size: 20px;
+    }
+    #wrap {
+      margin: 20px;
+    }
+    #header {
+      background-color: #f7f6f1;
+      padding: 20px;
+      border-bottom: 1px solid #555;
+      box-shadow: 0px 0px 4px 2px #555;
+    }
+    .logprob {
+      font-family: Courier, monospace;
+    }
+
+    .button {
+      border: 0 none;
+      border-radius: 2px 2px 2px 2px;
+      color: #FFFFFF;
+      cursor: pointer;
+      display: inline-block;
+      font-family: Arial,sans-serif;
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 20px;
+      margin-bottom: 0;
+      margin-top: 10px;
+      padding: 7px 10px;
+      text-transform: none;
+      width: 200px;
+      transition: all 0.3s ease 0s;
+      -moz-transition: all 0.3s ease 0s;
+      -webkit-transition: all 0.3s ease 0s;
+      text-align: center; /* DELETE WHEN WIDTH AUTO */
+    }
+    .button:hover {
+      background-color: #444444;
+    }
+
+    .bgreen {
+      background-color: #46b98a;
+      color: #fff;
+    }
+
+    .bblue {
+      background-color: #2DB6CF;
+      color: #fff;
+    }
+
+    .bred {
+      background-color: #E0645C;
+      color: #fff;
+    }
+
+    .blight {
+      background-color: #888;
+      color: #fff;
+    }
+
+    input[type="text"] {
+      display: inline-block;
+      margin: 0;
+      width: 400px;
+      font-family: sans-serif;
+      font-size: 18px;
+      appearance: none;
+      box-shadow: none;
+      border-radius: 4px;
+      border: 1px solid #444;
+      height: 28px;
+      padding: 2px;
+      color: #333;
+    }
+    </style>
+
+  </head>
+  <body onload="start()">
+    <div id="header">
+        <h1>XTrack2 Visualization</h1>
+        <div id="blobsheader"></div>
+      </div>
+    <div id="wrap">
+      <div id="wrap">
+        <div id="blobs">
+            {% include "xtrack2_track.html" %}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

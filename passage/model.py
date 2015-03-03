@@ -21,19 +21,35 @@ def flatten(l):
 class NeuralModel(object):
     def __init__(self):
         self.params = []
+        self.init_args = {}
 
     def save_params(self, f_name):
+        obj = {}
         model_params = {}
         for param in self.params:
             model_params[param.name] = param.get_value()
 
+        obj['model_params'] = model_params
+        obj['init_args'] = self.init_args
+
         with open(f_name, 'w') as f_out:
-            cPickle.dump(model_params, f_out, -1)
+            cPickle.dump(obj, f_out, -1)
 
-    def load_params(self, f_name):
+    @classmethod
+    def load(cls, f_name, **kwargs):
         with open(f_name) as f_in:
-            model_params = cPickle.load(f_in)
+            obj = cPickle.load(f_in)
 
+        init_args = obj['init_args']
+        for arg, arg_val in kwargs.iteritems():
+            init_args[arg] = arg_val
+
+        m = cls(**init_args)
+        m.update_params(obj['model_params'])
+
+        return m
+
+    def update_params(self, model_params):
         for param in sorted(self.params, key=lambda x: x.name):
             param_val = model_params.get(param.name)
             if param_val != None:
@@ -43,6 +59,14 @@ class NeuralModel(object):
             else:
                 logging.info('Skipping param: %s' % param.name)
 
+    def load_params(self, f_name):
+        with open(f_name) as f_in:
+            obj = cPickle.load(f_in)
+
+        model_params = obj['model_params']
+        self.update_params(model_params)
+
+
     def save(self, f_name):
         val = sys.getrecursionlimit()
         sys.setrecursionlimit(100000)
@@ -51,13 +75,13 @@ class NeuralModel(object):
 
         sys.setrecursionlimit(val)
 
-    @classmethod
-    def load(cls, f_name):
-        orig = theano.config.reoptimize_unpickled_function
-        theano.config.reoptimize_unpickled_function = False
+    #@classmethod
+    #def load(cls, f_name):
+    #    orig = theano.config.reoptimize_unpickled_function
+    #    theano.config.reoptimize_unpickled_function = False
 
-        with open(f_name) as f_in:
-            res = cPickle.load(f_in)
+    #    with open(f_name) as f_in:
+    #        res = cPickle.load(f_in)#
 
-        theano.config.reoptimize_unpickled_function = orig
-        return res
+    #    theano.config.reoptimize_unpickled_function = orig
+    #    return res

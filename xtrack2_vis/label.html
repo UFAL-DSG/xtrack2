@@ -1,0 +1,8 @@
+<table>
+    {% for slot_name in slots %}
+    <tr>
+        <td>{{slot_name}}</td>
+        <td>{{classes_rev[slot_name][label['slots'].get(slot_name)]}}</td>
+    </tr>
+    {% endfor %}
+</table>

@@ -38,7 +38,6 @@ python xtrack_data2.py \
         --word_drop_p 0.0 \
         --n_best_order 1 \
         --n_nbest_samples 1 \
-        --detailed_labels \
         --include_system_utterances \
         --dump_text ${E_ROOT}/train_text.txt
 for i in valid; do

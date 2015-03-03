@@ -70,7 +70,7 @@ class XTrackData2(object):
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                                                            oov_ins_p,
                      word_drop_p,
-                     n_best_order, f_dump_text, replace_entities, true_msg
+                     n_best_order, f_dump_text, true_msg
                                                            ):
         msg = msg.lower()
 
@@ -102,6 +102,7 @@ class XTrackData2(object):
                 seq['data_switch'].append(0)
                 seq['data_debug'].append('#OOV')
 
+        seq['true_input'].append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
             label = {
                 'time': len(seq['data']) - 1,
@@ -141,12 +142,13 @@ class XTrackData2(object):
 
     def build(self, dialogs, slots, slot_groups, based_on, oov_ins_p,
               word_drop_p,
-              include_system_utterances, n_nbest_samples, n_best_sample_by_p,
-        n_best_order,
-              score_mean, split_dialogs, dump_text, replace_entities,
-
+              include_system_utterances, n_nbest_samples,
+              n_best_order,
+              score_mean, dump_text,
+              split_dialogs=False,
               include_base_seqs=False):
         self._init(slots, slot_groups, based_on, include_base_seqs)
+        n_labels = 0
 
         f_dump_text = open(dump_text, 'w')
 
@@ -162,7 +164,8 @@ class XTrackData2(object):
                     'data_score': [],
                     'data_actor': [],
                     'data_switch': [],
-                    'labels': []
+                    'labels': [],
+                    'true_input': [],
                 }
                 seq_data_keys = [key for key in seq if key.startswith('data')]
                 last_state = None
@@ -187,7 +190,7 @@ class XTrackData2(object):
                         self._process_msg(msg, msg_score, state, last_state,
                                           actor, seq,
                                           oov_ins_p, word_drop_p, n_best_order,
-                                          f_dump_text, replace_entities,
+                                          f_dump_text,
                                           true_msg)
                     last_state = state
 
@@ -196,12 +199,16 @@ class XTrackData2(object):
                 data_lens = [len(seq[key]) for key in seq_data_keys]
                 assert data_lens[1:] == data_lens[:-1]
                 if len(seq['data']) > 0:
+                    n_labels += len(seq['labels'])
 
                     if not split_dialogs:
                         self.sequences.append(seq)
                     else:
                         self.sequences.extend(self._split_dialog(seq))
             f_dump_text.write('\n')
+
+        logging.info('There are in total %d labels in %d sequences.'
+                     % (n_labels, len(self.sequences, )))
 
         if not self.stats:
             logging.info('Computing stats.')
@@ -348,13 +355,9 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('--n_best_order', default="0")
     parser.add_argument('--n_nbest_samples', default=10, type=int)
-    parser.add_argument('--n_best_sample_by_p', default=False,
-                        action='store_true')
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
     parser.add_argument('--split_dialogs', action='store_true', default=False)
-    parser.add_argument('--replace_entities', action='store_true',
-                        default=False)
 
     args = parser.parse_args()
 
@@ -384,9 +387,7 @@ if __name__ == '__main__':
               include_system_utterances=args.include_system_utterances,
               n_best_order=n_best_order, score_mean=args.score_mean,
               dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
-              n_best_sample_by_p=args.n_best_sample_by_p,
               split_dialogs=args.split_dialogs,
-              replace_entities=args.replace_entities,
               include_base_seqs=args.include_base_seqs)
 
     logging.info('Saving.')
