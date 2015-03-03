@@ -305,6 +305,7 @@ class LstmRecurrent(Layer):
         g_o = self.gate_act(g_o)
 
         h_t = g_o * T.tanh(c_t)
+
         return h_t, c_t
 
     def output(self, dropout_active=False):

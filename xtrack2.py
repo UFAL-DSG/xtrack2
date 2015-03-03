@@ -411,8 +411,6 @@ def main(args_lst,
                   enable_branch_exp=enable_branch_exp
     )
 
-    import ipdb; ipdb.set_trace()
-
     logging.info('Rebuilding took: %.1f' % (time.time() - t))
 
     if load_params:
