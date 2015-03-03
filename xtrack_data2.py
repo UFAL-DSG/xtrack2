@@ -70,14 +70,9 @@ class XTrackData2(object):
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                                                            oov_ins_p,
                      word_drop_p,
-                     n_best_order, f_dump_text, replace_entities, true_msg,
-                                                           detailed_labels):
+                     n_best_order, f_dump_text, replace_entities, true_msg
+                                                           ):
         msg = msg.lower()
-        #if replace_entities:
-        #    for slot in self.slots:
-        #        for cls_name in self.classes[slot]:
-        #            msg = msg.replace(cls_name, cls_name.replace(' ', '_'))
-
 
         token_seq = list(tokenize(msg))
         if actor == data_model.Dialog.ACTOR_SYSTEM:
@@ -86,20 +81,9 @@ class XTrackData2(object):
         if not token_seq:
             token_seq = ['#NOTHING']
 
-        #msg_score = np.power(msg_score, 1.0 / len(token_seq))
 
-        if token_seq:
-            f_dump_text.write(("%2.2f  " % msg_score) + " ".join(token_seq) +
-                              '\n')
-            f_dump_text.write(("TRUE  " + true_msg + '\n'))
-        #token_seq = list(reversed(token_seq))
-
-        #if actor == data_model.Dialog.ACTOR_SYSTEM:
-        #    token_seq.insert(0, '#SYS')
-        #else:
-        #    token_seq.insert(0, '#USR')
-        if actor == data_model.Dialog.ACTOR_USER:
-            token_seq.append('#GEN')
+        f_dump_text.write(("%2.2f  " % msg_score) + " ".join(token_seq) + '\n')
+        f_dump_text.write(("TRUE  " + true_msg + '\n'))
 
         for i, token in enumerate(token_seq):
             if word_drop_p > random.random():
@@ -108,33 +92,15 @@ class XTrackData2(object):
             seq['data'].append(token_ndx)
             seq['data_score'].append(msg_score)
             seq['data_actor'].append(actor)
-            if actor == data_model.Dialog.ACTOR_SYSTEM:
-                seq['data_switch'].append(1)
-            else:
-                seq['data_switch'].append(0)
+            seq['data_switch'].append(0)
 
-            if token != '#SWITCH' and random.random() < oov_ins_p:
+            if random.random() < oov_ins_p:
                 seq['data'].append(self.get_token_ndx('#OOV'))
                 seq['data_score'].append(msg_score)
                 seq['data_actor'].append(actor)
                 seq['data_switch'].append(0)
-        #seq['data'].append(self.get_token_ndx('#EOS'))
-            if detailed_labels:
-                if i > len(token_seq) / 2:
-                    xstate = state
-                else:
-                    xstate = last_state
 
-                label = {
-                    'time': len(seq['data']) - 1,
-                    'slots': {}
-                }
-                for slot, val in zip(self.slots, self.state_to_label(xstate,
-                                                                     self.slots)):
-                    label['slots'][slot] = val
-                seq['labels'].append(label)
-
-        if not detailed_labels and actor == data_model.Dialog.ACTOR_USER:
+        if actor == data_model.Dialog.ACTOR_USER:
             label = {
                 'time': len(seq['data']) - 1,
                 'slots': {}
@@ -176,7 +142,7 @@ class XTrackData2(object):
               include_system_utterances, n_nbest_samples, n_best_sample_by_p,
         n_best_order,
               score_mean, split_dialogs, dump_text, replace_entities,
-              detailed_labels,
+
               include_base_seqs=False):
         self._init(slots, slot_groups, based_on, include_base_seqs)
 
@@ -205,17 +171,7 @@ class XTrackData2(object):
                     if actor_is_system:
                         msg_id = 0
                     else:
-                        if not n_best_sample_by_p:
-                            msg_id = random.choice(n_best_order)
-                        else:
-                            p = random.random()
-                            for msg_id, (msg, msg_score) in enumerate(msgs[1:]):
-                                p -= 1.0 / (1 + np.exp(-msg_score))
-
-                                if p < 0:
-                                    break
-                            if p > 0:
-                                msg_id = 1
+                        msg_id = random.choice(n_best_order)
 
                     msg, msg_score = msgs[msg_id]
                     true_msg, _ = msgs[0]
@@ -229,7 +185,7 @@ class XTrackData2(object):
                                           actor, seq,
                                           oov_ins_p, word_drop_p, n_best_order,
                                           f_dump_text, replace_entities,
-                                          true_msg, detailed_labels)
+                                          true_msg)
                     last_state = state
 
 
@@ -391,8 +347,6 @@ if __name__ == '__main__':
     parser.add_argument('--n_nbest_samples', default=10, type=int)
     parser.add_argument('--n_best_sample_by_p', default=False,
                         action='store_true')
-    parser.add_argument('--detailed_labels', default=False,
-                        action='store_true')
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
     parser.add_argument('--split_dialogs', action='store_true', default=False)
@@ -430,8 +384,7 @@ if __name__ == '__main__':
               n_best_sample_by_p=args.n_best_sample_by_p,
               split_dialogs=args.split_dialogs,
               replace_entities=args.replace_entities,
-              include_base_seqs=args.include_base_seqs,
-              detailed_labels=args.detailed_labels)
+              include_base_seqs=args.include_base_seqs)
 
     logging.info('Saving.')
     xtd.save(args.out_file)

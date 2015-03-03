@@ -10,10 +10,11 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size, enable_input_ftrs,
+    def __init__(self, slots, slot_classes, emb_size,
+                 x_include_score, enable_input_ftrs,
                  n_input_tokens, n_cells,
                  rnn_n_layers,
-                 lstm_no_peepholes, opt_type,
+                 lstm_peepholes, lstm_bidi, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
                  debug, p_drop,
                  init_emb_from, vocab,
@@ -23,8 +24,10 @@ class Model(NeuralModel):
         self.vocab = vocab
         self.slots = slots
         self.slot_classes = slot_classes
+        self.x_include_score = x_include_score
 
         x = T.imatrix()
+        input_args = [x]
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
@@ -38,17 +41,17 @@ class Model(NeuralModel):
 
         prev_layer = input_token_layer
 
-        x_score = tt.tensor3()
-        input_score_layer = IdentityInput(x_score, 1)
 
-        x_switch = tt.itensor3()
-        input_switch_layer = IdentityInput(x_switch, 1)
 
         zip_layers = [
-             input_token_layer,
-             input_score_layer,
-             input_switch_layer,
+             input_token_layer
         ]
+        if x_include_score:
+            x_score = tt.tensor3()
+            input_score_layer = IdentityInput(x_score, 1)
+            zip_layers.append(input_score_layer)
+
+            input_args.append(x_score)
 
         if enable_input_ftrs:
             token_n_features = len(token_features.values()[0])
@@ -74,36 +77,50 @@ class Model(NeuralModel):
         logging.info('There are %d input layers.' % input_n_layers)
 
         if debug:
-            self._lstm_input = theano.function([x, x_score, x_switch],
-                                               prev_layer.output())
+            self._lstm_input = theano.function(input_args, prev_layer.output())
 
         for i in range(rnn_n_layers):
             # Forward LSTM layer.
             logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
 
-            f_lstm_layer = LstmRecurrent(name="lstm_%d" % i,
+            f_lstm_layer = LstmRecurrent(name="flstm_%d" % i,
                                    size=n_cells,
                                    seq_output=True,
                                    out_cells=False,
-                                   peepholes=not lstm_no_peepholes,
+                                   peepholes=lstm_peepholes,
                                    p_drop=p_drop,
                                    enable_branch_exp=enable_branch_exp)
             f_lstm_layer.connect(prev_layer)
 
-            b_lstm_layer = LstmRecurrent(name="lstm_%d" % i,
-                                   size=n_cells,
-                                   seq_output=True,
-                                   out_cells=False,
-                                   backward=True,
-                                   peepholes=not lstm_no_peepholes,
-                                   p_drop=p_drop,
-                                   enable_branch_exp=enable_branch_exp)
-            b_lstm_layer.connect(prev_layer)
+            if lstm_bidi:
+                b_lstm_layer = LstmRecurrent(name="blstm_%d" % i,
+                                       size=n_cells,
+                                       seq_output=True,
+                                       out_cells=False,
+                                       backward=True,
+                                       peepholes=lstm_peepholes,
+                                       p_drop=p_drop,
+                                       enable_branch_exp=enable_branch_exp)
+                b_lstm_layer.connect(prev_layer)
 
-            lstm_zip = ZipLayer(concat_axis=2, layers=[f_lstm_layer,
-                                                     b_lstm_layer])
+                lstm_zip = ZipLayer(concat_axis=2, layers=[f_lstm_layer,
+                                                         b_lstm_layer])
+                prev_layer = lstm_zip
+                if debug:
+                    self._lstm_output = theano.function(input_args,
+                                                   [prev_layer.output(),
+                                                    f_lstm_layer.output(),
+                                                    b_lstm_layer.output()])
+            else:
+                prev_layer = f_lstm_layer
 
-            prev_layer = lstm_zip
+                if debug:
+                    self._lstm_output = theano.function(input_args,
+                                                   [prev_layer.output(),
+                                                    f_lstm_layer.output()])
+
+
+
 
         assert prev_layer is not None
 
@@ -143,30 +160,30 @@ class Model(NeuralModel):
         assert p_drop == 0.0
 
         lr = tt.scalar('lr')
+        clipnorm = 0.5
         if opt_type == "rprop":
-            updater = updates.RProp(lr=lr, clipnorm=5.0)
+            updater = updates.RProp(lr=lr, clipnorm=clipnorm)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
-            updater = updates.SGD(lr=lr, clipnorm=5.0)
+            updater = updates.SGD(lr=lr, clipnorm=clipnorm)
         elif opt_type == "rmsprop":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.RMSprop(lr=lr, clipnorm=5.0)  #, regularizer=reg)
+            updater = updates.RMSprop(lr=lr, clipnorm=clipnorm)  #, regularizer=reg)
         elif opt_type == "adam":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.Adam(lr=lr, b1=0.01, b2=0.01, clipnorm=5.0)  #,
+            updater = updates.Adam(lr=lr, clipnorm=clipnorm)  #,
             # regularizer=reg)
         elif opt_type == "momentum":
-            updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=5.0)
+            updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=clipnorm)
         else:
             raise Exception("Unknonw opt.")
 
         model_updates = updater.get_updates(params, cost_value)
 
-        input_args = [x]
-        input_args += [x_score, x_switch]
-        input_args += [y_seq_id, y_time]
-        input_args += [y_label[slot] for slot in slots]
-        train_args = [lr] + input_args
+        loss_args = list(input_args)
+        loss_args += [y_seq_id, y_time]
+        loss_args += [y_label[slot] for slot in slots]
+        train_args = [lr] + loss_args
         update_ratio = updater.get_update_ratio(params, model_updates)
 
         logging.info('Preparing %s train function.' % opt_type)
@@ -174,12 +191,11 @@ class Model(NeuralModel):
         self._train = theano.function(train_args, [cost_value, update_ratio],
                                       updates=model_updates)
         logging.info('Preparation done. Took: %.1f' % (time.time() - t))
-        self._loss = theano.function(input_args, cost_value)
+        self._loss = theano.function(loss_args, cost_value)
 
         logging.info('Preparing predict function.')
         t = time.time()
-        predict_args = [x]
-        predict_args += [x_score, x_switch]
+        predict_args = list(input_args)
         predict_args += [y_seq_id, y_time]
         self._predict = theano.function(
             predict_args,
@@ -193,7 +209,13 @@ class Model(NeuralModel):
     def init_word_embeddings(self, w):
         self.input_emb.set_value(w)
 
-    def prepare_data(self, seqs, slots):
+    def prepare_data_train(self, seqs, slots):
+        return self._prepare_data(seqs, slots, with_labels=True)
+
+    def prepare_data_predict(self, seqs, slots):
+        return self._prepare_data(seqs, slots, with_labels=False)
+
+    def _prepare_data(self, seqs, slots, with_labels=True):
         x = []
         x_score = []
         x_actor = []
@@ -219,15 +241,18 @@ class Model(NeuralModel):
         x_actor = padded(x_actor, is_int=True).transpose(1, 0)
         x_switch = padded(x_switch, is_int=True).transpose(1, 0)
 
-        return {
-            'x': x,
-            'x_score': np.array(x_score, dtype=np.float32)[:,:, np.newaxis],
-            'x_actor': x_actor,
-            'x_switch': np.array(x_switch, dtype=np.int32)[:,:, np.newaxis],
-            'y_seq_id': y_seq_id,
-            'y_time': y_time,
-            'y_labels': y_labels,
-        }
+        x_score = np.array(x_score, dtype=np.float32)[:,:, np.newaxis]
+        x_switch = np.array(x_switch, dtype=np.int32)[:,:, np.newaxis]
+
+        data = [x]
+        if self.x_include_score:
+            data.append(x_score)
+        data.extend([y_seq_id, y_time])
+        if with_labels:
+            data.extend(y_labels)
+
+        return tuple(data)
+
 
 
 

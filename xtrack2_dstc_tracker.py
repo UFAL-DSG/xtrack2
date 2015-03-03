@@ -120,21 +120,10 @@ class XTrack2DSTCTracker(object):
         return res
 
     def track(self, tracking_log_file_name=None):
-        data = self.model.prepare_data(self.data.sequences, self.data.slots)
-        x = data['x']
-        x_score = data['x_score']
-        x_switch = data['x_switch']
-        x_actor = data['x_actor']
-        y_seq_id = data['y_seq_id']
-        y_time = data['y_time']
+        data = self.model.prepare_data_predict(self.data.sequences,
+                                               self.data.slots)
 
-        pred = self.model._predict(
-            x,
-            x_score,
-            x_switch,
-            #x_actor,
-            y_seq_id,
-            y_time)
+        pred = self.model._predict(*data)
         pred_ptr = 0
 
         accuracy = 0

@@ -182,18 +182,8 @@ def prepare_minibatches(seqs, mb_size, model, slots):
     minibatches = []
     seqs_mb = iter_data(seqs, size=mb_size)
     for mb in seqs_mb:
-        res = model.prepare_data(mb, slots)
-
-        x = res['x']
-        x_score = res['x_score']
-        x_switch = res['x_switch']
-        x_actor = res['x_actor']
-        y_seq_id = res['y_seq_id']
-        y_time = res['y_time']
-        y_labels = res['y_labels']
-
-        minibatches.append((x, x_score, x_switch, x_actor,
-                            y_seq_id, y_time, y_labels, ))
+        data = model.prepare_data_train(mb, slots)
+        minibatches.append(data)
 
     return minibatches
 
@@ -224,28 +214,13 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                class_groups,
                best_acc, best_acc_train, tracker_valid, tracker_train,
                track_log):
-    prediction_valid = model._predict(
-        valid_data['x'],
-        valid_data['x_score'],
-        valid_data['x_switch'],
-        #valid_data['x_actor'],
-        valid_data['y_seq_id'],
-        valid_data['y_time']
-    )
+    prediction_valid = model._predict(*valid_data)
     visualize_prediction(xtd_v, prediction_valid)
 
     eval_train = train_data is not None
 
     if eval_train:
-        prediction_train = model._predict(
-            train_data['x'],
-            train_data['x_score'],
-            train_data['x_switch'],
-            #train_data['x_actor'],
-            train_data['y_seq_id'],
-            train_data['y_time']
-        )
-        #visualize_prediction(xtd_t, prediction_train)
+        prediction_train = model._predict(*train_data)
         pass
     else:
         prediction_train = None
@@ -366,12 +341,12 @@ def main(args_lst,
          eid, experiment_path, out, valid_after,
          load_params, save_params,
          debug, track_log,
-         n_cells, emb_size,
+         n_cells, emb_size, x_include_score,
          n_epochs, lr, opt_type, momentum,
          mb_size, mb_mult_data,
          oclf_n_hidden, oclf_n_layers, oclf_activation,
          rnn_n_layers,
-         lstm_no_peepholes,
+         lstm_peepholes, lstm_bidi,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, enable_input_ftrs, enable_branch_exp):
@@ -413,6 +388,7 @@ def main(args_lst,
     model = Model(slots=slots,
                   slot_classes=xtd_t.classes,
                   emb_size=emb_size,
+                  x_include_score=x_include_score,
                   enable_input_ftrs=enable_input_ftrs,
                   n_cells=n_cells,
                   n_input_tokens=n_input_tokens,
@@ -421,7 +397,8 @@ def main(args_lst,
                   oclf_activation=oclf_activation,
                   debug=debug,
                   rnn_n_layers=rnn_n_layers,
-                  lstm_no_peepholes=lstm_no_peepholes,
+                  lstm_peepholes=lstm_peepholes,
+                  lstm_bidi=lstm_bidi,
                   opt_type=opt_type,
                   momentum=momentum,
                   p_drop=p_drop,
@@ -434,16 +411,19 @@ def main(args_lst,
                   enable_branch_exp=enable_branch_exp
     )
 
+    import ipdb; ipdb.set_trace()
+
     logging.info('Rebuilding took: %.1f' % (time.time() - t))
 
     if load_params:
         logging.info('Loading parameters from: %s' % load_params)
         model.load_params(load_params)
 
-    tracker = XTrack2DSTCTracker(xtd_v, model)
+    tracker_valid = XTrack2DSTCTracker(xtd_v, model)
     tracker_train = XTrack2DSTCTracker(xtd_t, model)
 
-    valid_data = model.prepare_data(xtd_v.sequences, slots)
+    valid_data_y = model.prepare_data_train(xtd_v.sequences, slots)
+    valid_data = model.prepare_data_predict(xtd_v.sequences, slots)
     if not eval_on_full_train:
         selected_train_seqs = []
         for i in range(100):
@@ -452,7 +432,7 @@ def main(args_lst,
     else:
         selected_train_seqs = xtd_t.sequences
 
-    train_data = model.prepare_data(selected_train_seqs, slots)
+    train_data = model.prepare_data_train(selected_train_seqs, slots)
     joint_slots = ['joint_%s' % str(grp) for grp in class_groups.keys()]
     best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
@@ -476,19 +456,16 @@ def main(args_lst,
 
     epoch = 0
 
-    init_valid_loss = model._loss(
-                valid_data['x'],
-                valid_data['x_score'],
-                valid_data['x_switch'],
-                #valid_data['x_actor'],
-                valid_data['y_seq_id'],
-                valid_data['y_time'],
-                *valid_data['y_labels']
-            )
+    init_valid_loss = model._loss(*valid_data_y)
     logging.info('Initial valid loss: %.10f' % init_valid_loss)
+
+    if not valid_after:
+        valid_after = len(seqs)
 
     mb_loss = {}
     last_valid = 0
+    last_inline_print = time.time()
+    last_inline_print_cnt = 0
     while True:
         if len(mb_to_go) == 0:
             mb_to_go = list(mb_ids)
@@ -512,79 +489,49 @@ def main(args_lst,
 
         #et = time.time()
         mb_done = 0
-        x, x_score, x_switch, x_actor, y_seq_id, y_time, y_labels = mb_data
         t = time.time()
-        (loss, update_ratio) = model._train(
-            lr, x,
-            x_score, x_switch,
-            y_seq_id, y_time, *y_labels)
+        (loss, update_ratio) = model._train(lr, *mb_data)
         mb_loss[mb_ndx] = loss
         t = time.time() - t
+        stats.insert(loss=loss, update_ratio=update_ratio, time=t)
+
+        x = mb_data[0]
         example_cntr += x.shape[1]
         timestep_cntr += x.shape[0]
         mb_done += 1
 
-        inline_print("     %6d examples, %10d timesteps" % (
-            example_cntr,
-            timestep_cntr
-        ))
+        if time.time() - last_inline_print > 1.0:
+            last_inline_print = time.time()
+            inline_print("     %6d examples, %4d examples/s" % (
+                example_cntr,
+                example_cntr - last_inline_print_cnt
+            ))
+            last_inline_print_cnt = example_cntr
 
-
-        stats.insert(update_ratio=update_ratio, loss=loss, time=t)
-        if example_cntr % 100 == 0:
-            logging.info('Processed %d examples, %d timesteps.' % (
-                example_cntr, timestep_cntr))
-            logging.info('Epoch:             %10d (%d mb remain)' % (epoch,
-                                                                     len(mb_to_go)))
-            logging.info('Mean loss:         %10.2f' % stats.mean('loss'))
-            logging.info('Curr loss:         %10.2f' % loss)
-            logging.info('Mean update ratio: %10.6f' % stats.mean('update_ratio'))
-            logging.info('Mean time:         %10.4f' % stats.mean('time'))
-
-            mb_hist_min = min(mb_histogram.values())
-            mb_hist_max = max(mb_histogram.values())
-            mb_hist_avg = float(np.mean(np.array(mb_histogram.values(),
-                                           dtype=np.float32)))
-            logging.info('Minibatch histogram:'
-                         ' min(%d)'
-                         ' max(%d)'
-                         ' avg(%.1f)'
-                         ' len(%d)' % (
-                mb_hist_min, mb_hist_max, mb_hist_avg, len(mb_histogram)))
-
-            if debug:
-                lstm_input = model._lstm_input(x, x_score, x_switch)
-                logging.info('One LSTM input: %s' % str(lstm_input[len(
-                    lstm_input)/2]))
-
-        if (example_cntr - last_valid) > valid_after:
+        if (example_cntr - last_valid) >= valid_after:
+            inline_print("")
             last_valid = example_cntr
             params_file = os.path.join(output_dir, 'params.%.10d.p' %
                                        example_cntr)
             logging.info('Saving parameters: %s' % params_file)
             model.save_params(params_file)
+            tracking_acc = 0.0
 
-            tracking_acc = eval_model(model=model, train_data=train_data,
-                           valid_data=valid_data,
-                       class_groups=class_groups, slots=slots, classes=classes,
-                       xtd_t=xtd_t, xtd_v=xtd_v,
-                       best_acc=best_acc, best_acc_train=best_acc_train,
-                       tracker_train=tracker_train, tracker_valid=tracker,
-                       track_log=track_log)
+            valid_loss = model._loss(*valid_data_y)
+            update_ratio = stats.mean('update_ratio')
+            update_ratio = stats.mean('update_ratio')
 
-            if tracking_acc > best_tracking_acc:
-                best_tracking_acc = tracking_acc
+            _, track_score = tracker_valid.track(track_log)
 
-            valid_loss = model._loss(
-                valid_data['x'],
-                valid_data['x_score'],
-                valid_data['x_switch'],
-                #valid_data['x_actor'],
-                valid_data['y_seq_id'],
-                valid_data['y_time'],
-                *valid_data['y_labels']
-            )
             logging.info('Valid loss:         %10.2f' % valid_loss)
+            logging.info('Valid tracking acc: %10.2f' % track_score * 100)
+            logging.info('Train loss:         %10.2f' % stats.mean('loss'))
+            logging.info('Mean update ratio:  %10.6f' % update_ratio)
+            logging.info('Mean mb time:       %10.4f' % stats.mean('time'))
+            logging.info('Epoch:              %10d (%d mb remain)' % (epoch,
+                                                                     len(mb_to_go)))
+            logging.info('Example:            %10d' % example_cntr)
+
 
             mon_train.insert(
                 time=time.time(),
@@ -603,15 +550,6 @@ def main(args_lst,
                 os.system('ln -f -s "%s" "xtrack2_vis/stats.json"' %
                           os.path.join('..', stats_path))
 
-            (worst_e, worst_ndx), (best_e, best_ndx) = get_extreme_examples(
-                mb_loss, minibatches, xtd_t)
-            mon_extreme_examples.insert(worst=worst_e, best=best_e)
-            #mb_bad = [i for i, _ in sorted_items[:100]]
-            #random.shuffle(mb_bad)
-            #mb_to_go.extend(mb_bad)
-
-            mb_loss = {}
-
             stats = TrainingStats()
 
     params_file = os.path.join(output_dir, 'params.final.p')
@@ -628,7 +566,7 @@ def build_argument_parser():
     parser.add_argument('experiment_path')
 
     parser.add_argument('--eid', default='xtrack_experiment')
-    parser.add_argument('--valid_after', default=1000, type=int)
+    parser.add_argument('--valid_after', default=None, type=int)
 
     # Experiment params.
     parser.add_argument('--load_params', default=None)
@@ -646,6 +584,7 @@ def build_argument_parser():
 
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
+    parser.add_argument('--x_include_score', default=False, action='store_true')
     parser.add_argument('--enable_input_ftrs', default=False,
                         action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
@@ -660,13 +599,15 @@ def build_argument_parser():
 
     parser.add_argument('--rnn_n_layers', default=1, type=int)
 
-    parser.add_argument('--lstm_no_peepholes', default=False,
+    parser.add_argument('--lstm_peepholes', default=False,
+                        action='store_true')
+    parser.add_argument('--lstm_bidi', default=False,
                         action='store_true')
 
 
     parser.add_argument('--debug', default=False,
                         action='store_true')
-    parser.add_argument('--track_log', default='rprop', type=str)
+    parser.add_argument('--track_log', default='track_log.txt', type=str)
     parser.add_argument('--eval_on_full_train', default=False,
                         action='store_true')
 
