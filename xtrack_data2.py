@@ -93,12 +93,14 @@ class XTrackData2(object):
             seq['data_score'].append(msg_score)
             seq['data_actor'].append(actor)
             seq['data_switch'].append(0)
+            seq['data_debug'].append(token)
 
             if random.random() < oov_ins_p:
                 seq['data'].append(self.get_token_ndx('#OOV'))
                 seq['data_score'].append(msg_score)
                 seq['data_actor'].append(actor)
                 seq['data_switch'].append(0)
+                seq['data_debug'].append('#OOV')
 
         if actor == data_model.Dialog.ACTOR_USER:
             label = {
@@ -156,6 +158,7 @@ class XTrackData2(object):
                     'id': dialog.session_id,
                     'source_dir': dialog.object_id,
                     'data': [],
+                    'data_debug': [],
                     'data_score': [],
                     'data_actor': [],
                     'data_switch': [],
