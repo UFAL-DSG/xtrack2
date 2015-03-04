@@ -7,6 +7,10 @@ def parse_param(ln):
     return param, val
 
 
+def parse_n_params(ln):
+    return int(ln.split('has')[1].split('parameters')[0].strip())
+
+
 def main(log_file, print_header):
     row = {
         'best_epoch': -1,
@@ -21,6 +25,8 @@ def main(log_file, print_header):
                 ln = next(f_lines)
             except StopIteration:
                 break
+            if 'This model has' in ln:
+                row['a_model_parameters'] = parse_n_params(ln)
             if 'Epoch' in ln:
                 epoch = int(parse(ln))
             elif 'Valid tracking acc' in ln:
