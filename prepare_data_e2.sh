@@ -13,37 +13,40 @@ SLOTS="food,area,pricerange,name:method:req_food,req_area,req_pricerange,req_nam
 echo "> Processing training data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
     --out_dir ${E_ROOT}/train \
+    --use_stringified_system_acts \
     --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
 
 echo "> Processing validation data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
     --out_dir ${E_ROOT}/valid \
+    --use_stringified_system_acts \
     --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
 
 #echo "> Processing testing data."
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
 #    --out_dir ${E_ROOT}/test
 
-echo "> Converting data to HDF5 format."
+echo "> Building JSON."
 python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
-        --out_flist_file ${E_ROOT}/train.flist \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
-        --split_dialogs \
         --n_best_order 1 \
-        --include_system_utterances
+        --n_best_samples 1 \
+        --include_system_utterances \
+        --dump_text ${E_ROOT}/train_text.txt
+
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
         --out_file ${E_ROOT}/${i}.json \
-        --out_flist_file ${E_ROOT}/${i}.flist \
         --based_on ${E_ROOT}/train.json \
         --slots ${SLOTS} \
         --oov_ins_p 0.0 \
+        --include_system_utterances \
         --n_best_order 1 \
-        --include_system_utterances
+        --n_best_samples 1
 done
 
 echo "> Finishing up."
