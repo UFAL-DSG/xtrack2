@@ -82,11 +82,13 @@ class XTrack2DSTCTracker(object):
         goal_labels = {slot: self.classes_rev[slot][np.argmax(pred[i])]
                        for i, slot in enumerate(self.data.slots)}
 
-        raw_goal_labels = {slot: np.argmax(pred[i])
-                       for i, slot in enumerate(self.data.slots)}
-        raw_goal_labels = {slot: val if pred[i][val] > 0.0 else 0 for i, (slot,
-                                                                   val) in
-                           enumerate(raw_goal_labels.iteritems())}
+        raw_goal_labels = {}
+        for i, slot in enumerate(self.data.slots):
+            val = np.argmax(pred[i])
+            if pred[i][val] == 0.0:
+                val = 0
+            raw_goal_labels[slot] = val
+
         goal_labels = {slot: self.classes_rev[slot][val]
                        for slot, val in raw_goal_labels.iteritems()}
 
