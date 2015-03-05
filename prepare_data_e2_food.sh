@@ -29,7 +29,7 @@ fi
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
 #    --out_dir ${E_ROOT}/test
 
-echo "> Converting data to HDF5 format."
+echo "> Building JSON."
 python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
