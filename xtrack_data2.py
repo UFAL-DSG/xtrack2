@@ -249,13 +249,13 @@ class XTrackData2(object):
         for word, word_id in self.vocab.iteritems():
             features = []
             for slot in self.slots:
-                features.append(int(word in slot.split()))
+                features.append(int(word in slot))
                 for cls in self.classes[slot]:
                     ftr_val = 0
                     for cls_part in cls.split():
                         if cls_part[0] == '@':
                             cls_part = cls_part[1:]
-                        if cls_part.startswith(word):
+                        if word in cls_part:
                             ftr_val = 1
                             break
 
