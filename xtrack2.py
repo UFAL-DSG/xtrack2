@@ -349,7 +349,7 @@ def main(args_lst,
          lstm_peepholes, lstm_bidi,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
-         eval_on_full_train, enable_input_ftrs, enable_branch_exp):
+         eval_on_full_train, x_include_token_ftrs, enable_branch_exp):
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -381,6 +381,7 @@ def main(args_lst,
     classes = xtd_t.classes
     class_groups = xtd_t.slot_groups
     n_input_tokens = len(xtd_t.vocab)
+    n_input_score_bins = len(xtd_t.score_bins)
 
     t = time.time()
 
@@ -389,7 +390,8 @@ def main(args_lst,
                   slot_classes=xtd_t.classes,
                   emb_size=emb_size,
                   x_include_score=x_include_score,
-                  enable_input_ftrs=enable_input_ftrs,
+                  x_include_token_ftrs=x_include_token_ftrs,
+                  n_input_score_bins=n_input_score_bins,
                   n_cells=n_cells,
                   n_input_tokens=n_input_tokens,
                   oclf_n_hidden=oclf_n_hidden,
@@ -587,7 +589,7 @@ def build_argument_parser():
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
     parser.add_argument('--x_include_score', default=False, action='store_true')
-    parser.add_argument('--enable_input_ftrs', default=False,
+    parser.add_argument('--x_include_token_ftrs', default=False,
                         action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
 

@@ -15,8 +15,8 @@ from passage.model import NeuralModel
 
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size,
-                 x_include_score, enable_input_ftrs,
-                 n_input_tokens, n_cells,
+                 x_include_score, x_include_token_ftrs,
+                 n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
                  lstm_peepholes, lstm_bidi, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
@@ -44,26 +44,30 @@ class Model(NeuralModel):
                                       input=x)
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
-            logging.info('Initializing embeddings from: %s' % init_emb_from)
+            logging.info('Initializing token embeddings from: %s'
+                         % init_emb_from)
         else:
-            logging.info('Initializing embedding randomly.')
+            logging.info('Initializing token embedding randomly.')
         self.input_emb = input_token_layer.wv
 
         prev_layer = input_token_layer
 
 
 
-        zip_layers = [
+        input_layers = [
              input_token_layer
         ]
         if x_include_score:
-            x_score = tt.tensor3()
-            input_score_layer = IdentityInput(x_score, 1)
-            zip_layers.append(input_score_layer)
+            x_score = tt.imatrix()
+            input_score_layer = Embedding(name="emb_score",
+                                          size=emb_size,
+                                          n_features=n_input_score_bins,
+                                          input=x_score)
+            input_layers.append(input_score_layer)
 
             input_args.append(x_score)
 
-        if enable_input_ftrs:
+        if x_include_token_ftrs:
             token_n_features = len(token_features.values()[0])
             input_token_features_layer = Embedding(name="emb_ftr",
                                                    size=token_n_features,
@@ -71,11 +75,15 @@ class Model(NeuralModel):
                                                    input=x,
                                                    static=True)
             input_token_features_layer.init_from_dict(token_features)
-            zip_layers.append(input_token_features_layer)
 
-        zip_layer = ZipLayer(concat_axis=2,
-                             layers=zip_layers)
-        prev_layer = zip_layer
+            ftrs_to_emb = Dense(name='ftr2emb',
+                                size=emb_size,
+                                activation='linear')
+            ftrs_to_emb.connect(input_token_features_layer)
+            input_layers.append(ftrs_to_emb)
+
+        sum_layer = SumLayer(layers=input_layers)
+        prev_layer = sum_layer
 
         if input_n_layers > 0:
             input_transform = MLP([input_n_hidden  ] * input_n_layers,
@@ -164,7 +172,11 @@ class Model(NeuralModel):
         cost.connect(*costs)  #, scale=1.0 / len(slots))
         self.params = params = list(cost.get_params())
         n_params = sum(p.get_value().size for p in params)
-        logging.info('This model has %d parameters.' % n_params)
+        logging.info('This model has %d parameters:' % n_params)
+        for param in sorted(params, key=lambda x: x.name):
+            logging.info('  - %20s: %10d' % (param.name, param.get_value(
+
+            ).size, ))
 
         cost_value = cost.output(dropout_active=True)
 
@@ -253,7 +265,7 @@ class Model(NeuralModel):
         x_actor = padded(x_actor, is_int=True).transpose(1, 0)
         x_switch = padded(x_switch, is_int=True).transpose(1, 0)
 
-        x_score = np.array(x_score, dtype=np.float32)[:,:, np.newaxis]
+        x_score = np.array(x_score, dtype=np.int32)[:,:]
         x_switch = np.array(x_switch, dtype=np.int32)[:,:, np.newaxis]
 
         data = [x]

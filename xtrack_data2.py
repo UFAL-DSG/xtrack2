@@ -28,7 +28,7 @@ def tokenize_letter(text):
 
 class XTrackData2(object):
     attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups',
-                     'stats', 'token_features']
+                     'stats', 'token_features', 'score_bins']
 
     null_class = '_null_'
 
@@ -70,15 +70,19 @@ class XTrackData2(object):
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                                                            oov_ins_p,
                      word_drop_p,
-                     n_best_order, f_dump_text, true_msg, word_score_space
+                     n_best_order, f_dump_text, true_msg, score_bins
                                                           ):
 
         curr_score_bin = ""
-        if word_score_space:
-            for i, x in enumerate(word_score_space):
+        msg_score_bin = 0
+        if score_bins:
+            for i, x in enumerate(score_bins):
                 if np.exp(msg_score) < x:
                     curr_score_bin = "__%d" % i
+                    msg_score_bin = i
                     break
+            else:
+                msg_score_bin = len(score_bins) - 1
 
         msg = msg.lower()
 
@@ -90,7 +94,9 @@ class XTrackData2(object):
             token_seq = ['#NOTHING']
 
 
-        f_dump_text.write(("%2.2f  " % msg_score) + " ".join(token_seq) + '\n')
+        f_dump_text.write(("%2.2f %d  " % (msg_score, msg_score_bin)) + " "
+                                                                        "".join(
+            token_seq) + '\n')
         f_dump_text.write(("TRUE  " + true_msg + '\n'))
 
         for i, token in enumerate(token_seq):
@@ -101,14 +107,14 @@ class XTrackData2(object):
 
             token_ndx = self.get_token_ndx(token)
             seq['data'].append(token_ndx)
-            seq['data_score'].append(msg_score)
+            seq['data_score'].append(msg_score_bin)
             seq['data_actor'].append(actor)
             seq['data_switch'].append(0)
             seq['data_debug'].append(token)
 
             if random.random() < oov_ins_p:
                 seq['data'].append(self.get_token_ndx('#OOV'))
-                seq['data_score'].append(msg_score)
+                seq['data_score'].append(msg_score_bin)
                 seq['data_actor'].append(actor)
                 seq['data_switch'].append(0)
                 seq['data_debug'].append('#OOV')
@@ -155,10 +161,11 @@ class XTrackData2(object):
               word_drop_p,
               include_system_utterances, n_nbest_samples,
               n_best_order,
-              score_mean, dump_text,
+              score_mean, dump_text, score_bins,
               split_dialogs=False,
-              include_base_seqs=False, word_score_space=None):
+              include_base_seqs=False):
         self._init(slots, slot_groups, based_on, include_base_seqs)
+        self.score_bins = score_bins
         n_labels = 0
 
         f_dump_text = open(dump_text, 'w')
@@ -206,7 +213,7 @@ class XTrackData2(object):
                                           actor, seq,
                                           oov_ins_p, word_drop_p, n_best_order,
                                           f_dump_text,
-                                          true_msg, word_score_space)
+                                          true_msg, score_bins)
                     last_state = state
 
 
@@ -225,12 +232,12 @@ class XTrackData2(object):
         logging.info('There are in total %d labels in %d sequences.'
                      % (n_labels, len(self.sequences, )))
 
-        if not self.stats:
-            logging.info('Computing stats.')
-            self._compute_stats('data_score', 'data_switch')
+        #if not self.stats:
+        #    logging.info('Computing stats.')
+        #    self._compute_stats('data_score', 'data_switch')
 
-        logging.info('Normalizing.')
-        self._normalize('data_score', 'data_switch')
+        #logging.info('Normalizing.')
+        #self._normalize('data_score', 'data_switch')
 
         if not self.based_on:
             logging.info('Building token features.')
@@ -414,8 +421,7 @@ if __name__ == '__main__':
               n_best_order=n_best_order, score_mean=args.score_mean,
               dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
               split_dialogs=args.split_dialogs,
-              include_base_seqs=args.include_base_seqs, word_score_space=[0.0,
-                                                                      0.3, 0.6, 0.95, 1.0])
+              include_base_seqs=args.include_base_seqs, score_bins=[0.0, 0.3, 0.6, 0.95, 1.0])
 
     logging.info('Saving.')
     xtd.save(args.out_file)
