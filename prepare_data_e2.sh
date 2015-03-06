@@ -8,7 +8,8 @@ cd $DIR
 . ./config.sh
 
 E_ROOT=${DATA_DIRECTORY}/xtrack/e2
-SLOTS="food,area,pricerange,name:method:req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
+SLOTS="food,area,pricerange,name"
+#:method:req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
 
 echo "> Processing training data."
 python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
@@ -33,7 +34,7 @@ python xtrack_data2.py \
         --slots ${SLOTS} \
         --oov_ins_p 0.05 \
         --n_best_order 1 \
-        --n_best_samples 1 \
+        --n_nbest_samples 1 \
         --include_system_utterances \
         --dump_text ${E_ROOT}/train_text.txt
 
@@ -46,7 +47,7 @@ for i in valid; do
         --oov_ins_p 0.0 \
         --include_system_utterances \
         --n_best_order 1 \
-        --n_best_samples 1
+        --n_nbest_samples 1
 done
 
 echo "> Finishing up."
