@@ -78,7 +78,7 @@ class XTrackData2(object):
         if score_bins:
             for i, x in enumerate(score_bins):
                 if np.exp(msg_score) < x:
-                    curr_score_bin = "__%d" % i
+                    #curr_score_bin = "__%d" % i
                     msg_score_bin = i
                     break
             else:
@@ -102,7 +102,7 @@ class XTrackData2(object):
         for i, token in enumerate(token_seq):
             if word_drop_p > random.random():
                 continue
-            token += curr_score_bin
+            #token += curr_score_bin
             #print "%5.2f" % np.exp(msg_score), token
 
             token_ndx = self.get_token_ndx(token)
