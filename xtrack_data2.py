@@ -70,8 +70,16 @@ class XTrackData2(object):
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                                                            oov_ins_p,
                      word_drop_p,
-                     n_best_order, f_dump_text, true_msg
-                                                           ):
+                     n_best_order, f_dump_text, true_msg, word_score_space
+                                                          ):
+
+        curr_score_bin = ""
+        if word_score_space:
+            for i, x in enumerate(word_score_space):
+                if np.exp(msg_score) < x:
+                    curr_score_bin = "__%d" % i
+                    break
+
         msg = msg.lower()
 
         token_seq = list(tokenize(msg))
@@ -88,6 +96,9 @@ class XTrackData2(object):
         for i, token in enumerate(token_seq):
             if word_drop_p > random.random():
                 continue
+            token += curr_score_bin
+            #print "%5.2f" % np.exp(msg_score), token
+
             token_ndx = self.get_token_ndx(token)
             seq['data'].append(token_ndx)
             seq['data_score'].append(msg_score)
@@ -146,11 +157,12 @@ class XTrackData2(object):
               n_best_order,
               score_mean, dump_text,
               split_dialogs=False,
-              include_base_seqs=False):
+              include_base_seqs=False, word_score_space=None):
         self._init(slots, slot_groups, based_on, include_base_seqs)
         n_labels = 0
 
         f_dump_text = open(dump_text, 'w')
+        self.msg_scores = []
 
         for dialog_ndx, dialog in enumerate(dialogs):
             f_dump_text.write('> %s\n' % dialog.session_id)
@@ -182,6 +194,9 @@ class XTrackData2(object):
                     msg, msg_score = msgs[msg_id]
                     true_msg, _ = msgs[0]
 
+                    if actor == data_model.Dialog.ACTOR_USER:
+                        self.msg_scores.append(np.exp(msg_score))
+
                     if not include_system_utterances and actor_is_system:
                         continue
                     else:
@@ -191,7 +206,7 @@ class XTrackData2(object):
                                           actor, seq,
                                           oov_ins_p, word_drop_p, n_best_order,
                                           f_dump_text,
-                                          true_msg)
+                                          true_msg, word_score_space)
                     last_state = state
 
 
@@ -220,6 +235,7 @@ class XTrackData2(object):
         if not self.based_on:
             logging.info('Building token features.')
             self._build_token_features()
+
 
     def _build_token_features(self):
         self.token_features = {}
@@ -314,6 +330,14 @@ class XTrackData2(object):
 
             json.dump(obj, f_out, indent=4)
 
+
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        sns.set_palette("deep", desat=.6)
+        plt.hist(self.msg_scores, [0.0, 0.3, 0.6, 0.95, 1.0])
+        plt.savefig(out_file + '.score.png')
+
+
     @classmethod
     def load(cls, in_file):
         with open(in_file, 'r') as f_in:
@@ -388,7 +412,8 @@ if __name__ == '__main__':
               n_best_order=n_best_order, score_mean=args.score_mean,
               dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
               split_dialogs=args.split_dialogs,
-              include_base_seqs=args.include_base_seqs)
+              include_base_seqs=args.include_base_seqs, word_score_space=[0.0,
+                                                                      0.3, 0.6, 0.95, 1.0])
 
     logging.info('Saving.')
     xtd.save(args.out_file)
