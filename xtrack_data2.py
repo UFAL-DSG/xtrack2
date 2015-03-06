@@ -332,6 +332,8 @@ class XTrackData2(object):
 
 
         import seaborn as sns
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         sns.set_palette("deep", desat=.6)
         plt.hist(self.msg_scores, [0.0, 0.3, 0.6, 0.95, 1.0])
