@@ -1,4 +1,4 @@
-from collections import defaultdict
+import collections
 import json
 import logging
 import os
@@ -23,6 +23,14 @@ def tokenize(text):
 def tokenize_letter(text):
     for letter in text:
         yield letter
+
+import porter
+stemmer = porter.PorterStemmer()
+
+
+#stopwords = set(open('stopwords.txt').read().split())
+stopwords = set()
+oovs = set(open('oov.txt').read().split())
 
 
 
@@ -85,12 +93,20 @@ class XTrackData2(object):
                 msg_score_bin = len(score_bins) - 1
 
         msg = msg.lower()
+        msg = (msg
+               .replace("n't", " not")
+               .replace("i'm", "i")
+               .replace("'s ", " ")
+               .replace("dont ", "do not ")
+               .replace("'d ", " ")
+        )
 
         token_seq = list(tokenize(msg))
         if actor == data_model.Dialog.ACTOR_SYSTEM:
             token_seq = ["@%s" % token for token in token_seq]
 
         if not token_seq:
+            return
             token_seq = ['#NOTHING']
 
 
@@ -100,24 +116,30 @@ class XTrackData2(object):
         f_dump_text.write(("TRUE  " + true_msg + '\n'))
 
         for i, token in enumerate(token_seq):
-            if word_drop_p > random.random():
+            if word_drop_p > random.random() or token in stopwords:
                 continue
             #token += curr_score_bin
             #print "%5.2f" % np.exp(msg_score), token
+            #token = stemmer.stem(token, 0, len(token) - 1)
+            #token = token[:4]
 
-            token_ndx = self.get_token_ndx(token)
-            seq['data'].append(token_ndx)
-            seq['data_score'].append(msg_score_bin)
-            seq['data_actor'].append(actor)
-            seq['data_switch'].append(0)
-            seq['data_debug'].append(token)
+            self.word_freq[token] += 1
 
-            if random.random() < oov_ins_p:
+            if random.random() < oov_ins_p or token in oovs:
                 seq['data'].append(self.get_token_ndx('#OOV'))
                 seq['data_score'].append(msg_score_bin)
                 seq['data_actor'].append(actor)
                 seq['data_switch'].append(0)
                 seq['data_debug'].append('#OOV')
+            else:
+                token_ndx = self.get_token_ndx(token)
+                seq['data'].append(token_ndx)
+                seq['data_score'].append(msg_score_bin)
+                seq['data_actor'].append(actor)
+                seq['data_switch'].append(0)
+                seq['data_debug'].append(token)
+
+
 
         seq['true_input'].append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
@@ -170,6 +192,7 @@ class XTrackData2(object):
 
         f_dump_text = open(dump_text, 'w')
         self.msg_scores = []
+        self.word_freq = collections.Counter()
 
         for dialog_ndx, dialog in enumerate(dialogs):
             f_dump_text.write('> %s\n' % dialog.session_id)
@@ -343,8 +366,20 @@ class XTrackData2(object):
         import seaborn as sns
         import matplotlib.pyplot as plt
         sns.set_palette("deep", desat=.6)
+        plt.figure()
         plt.hist(self.msg_scores, [0.0, 0.3, 0.6, 0.95, 1.0])
         plt.savefig(out_file + '.score.png')
+
+        plt.figure()
+        plt.hist(np.log(np.array(self.word_freq.values())))
+        plt.savefig(out_file + '.word_freqs.png')
+
+        with open(out_file + '.oov.txt', 'w') as f_out:
+            for word, freq in self.word_freq.most_common():
+                if freq < 5:
+                    f_out.write(word + '\n')
+
+        #import ipdb; ipdb.set_trace()
 
 
     @classmethod
@@ -421,7 +456,11 @@ if __name__ == '__main__':
               n_best_order=n_best_order, score_mean=args.score_mean,
               dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
               split_dialogs=args.split_dialogs,
-              include_base_seqs=args.include_base_seqs, score_bins=[0.0, 0.3, 0.6, 0.95, 1.0])
+              include_base_seqs=args.include_base_seqs,
+              #score_bins=[0.0, 0.3, 0.6, 0.95, 1.0]
+              score_bins=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                          0.95, 1.0]
+    )
 
     logging.info('Saving.')
     xtd.save(args.out_file)
