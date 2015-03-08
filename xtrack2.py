@@ -516,7 +516,6 @@ def main(args_lst,
                                        example_cntr)
             logging.info('Saving parameters: %s' % params_file)
             model.save_params(params_file)
-            tracking_acc = 0.0
 
             valid_loss = model._loss(*valid_data_y)
             update_ratio = stats.mean('update_ratio')
@@ -545,7 +544,7 @@ def main(args_lst,
                 train_loss=stats.mean('loss'),
                 valid_loss=valid_loss,
                 update_ratio=stats.mean('update_ratio'),
-                tracking_acc=tracking_acc
+                tracking_acc=track_score
             )
 
             stats_path = os.path.join(output_dir, 'stats.json')
