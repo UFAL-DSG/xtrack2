@@ -62,9 +62,12 @@ def init_logging():
 
 
 class XTrack2DSTCTracker(object):
-    def __init__(self, data, model):
+    def __init__(self, data, models):
+        assert len(models) > 0, 'You need to specify some models.'
+
         self.data = data
-        self.model = model
+        self.models = models
+        self.main_model = models[0]
 
         self.classes_rev = {}
         for slot in self.data.slots:
@@ -127,10 +130,21 @@ class XTrack2DSTCTracker(object):
         return res
 
     def track(self, tracking_log_file_name=None):
-        data = self.model.prepare_data_predict(self.data.sequences,
+        data = self.main_model.prepare_data_predict(self.data.sequences,
                                                self.data.slots)
 
-        pred = self.model._predict(*data)
+        preds = []
+        for model in self.models:
+            pred = model._predict(*data)
+            preds.append(pred)
+
+        pred = []
+        for slot_preds in zip(*preds):
+            slot_res = np.array(slot_preds[0])
+            for slot_pred in slot_preds[1:]:
+                slot_res += slot_pred
+            pred.append(slot_res / len(slot_preds))
+
         pred_ptr = 0
 
         accuracy = 0
@@ -185,15 +199,18 @@ class XTrack2DSTCTracker(object):
         assert accuracy_n > 0
         return result, accuracy * 1.0 / accuracy_n
 
+
 def main(dataset_name, data_file, output_file, params_file):
-    logging.info('Loading model params from: %s' % params_file)
-    model = Model.load(params_file, build_train=False)
+    models = []
+    for pf in params_file:
+        logging.info('Loading model from: %s' % pf)
+        models.append(Model.load(pf, build_train=False))
 
     logging.info('Loading data: %s' % data_file)
     data = XTrackData2.load(data_file)
 
     logging.info('Starting tracking.')
-    tracker = XTrack2DSTCTracker(data, model)
+    tracker = XTrack2DSTCTracker(data, models)
 
     t = time.time()
     result, accuracy = tracker.track()
@@ -220,7 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', type=str, default='__test__')
     parser.add_argument('--data_file', required=True)
     parser.add_argument('--output_file', required=True)
-    parser.add_argument('--params_file', required=True)
+    parser.add_argument('--params_file', action='append', required=True)
 
     pdb_on_error()
     init_logging()
