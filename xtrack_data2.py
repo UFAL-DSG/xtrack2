@@ -66,6 +66,7 @@ class XTrackData2(object):
     def _init_after_load(self):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
+
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                                                            oov_ins_p,
                      word_drop_p,
@@ -101,6 +102,7 @@ class XTrackData2(object):
         for i, token in enumerate(token_seq):
             if word_drop_p > random.random():
                 continue
+
             #token += curr_score_bin
             #print "%5.2f" % np.exp(msg_score), token
             #token = stemmer.stem(token, 0, len(token) - 1)
