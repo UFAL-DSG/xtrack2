@@ -11,11 +11,10 @@ def _stringify_act(acts):
     for act in acts:
         if len(act.slots) > 0:
             for slot_name, slot_value in act.slots:
-                if act.act == "request":
-                    res.append("%s_%s" % (act.act, slot_name))
-                    res.append(slot_value.replace(' ', '_'))
-        #else:
-        #    res.append("%s_" % act.act)
+                res.append("%s_%s" % (act.act, slot_name))
+                res.append(slot_value.replace(' ', '_'))
+        else:
+            res.append("%s_" % act.act)
 
     if len(res) == 0:
         res = ["sys"]

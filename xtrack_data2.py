@@ -24,15 +24,6 @@ def tokenize_letter(text):
     for letter in text:
         yield letter
 
-import porter
-stemmer = porter.PorterStemmer()
-
-
-#stopwords = set(open('stopwords.txt').read().split())
-stopwords = set()
-oovs = set(open('oov.txt').read().split())
-
-
 
 class XTrackData2(object):
     attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups',
@@ -93,20 +84,12 @@ class XTrackData2(object):
                 msg_score_bin = len(score_bins) - 1
 
         msg = msg.lower()
-        msg = (msg
-               .replace("n't", " not")
-               .replace("i'm", "i")
-               .replace("'s ", " ")
-               .replace("dont ", "do not ")
-               .replace("'d ", " ")
-        )
 
         token_seq = list(tokenize(msg))
         if actor == data_model.Dialog.ACTOR_SYSTEM:
             token_seq = ["@%s" % token for token in token_seq]
 
         if not token_seq:
-            return
             token_seq = ['#NOTHING']
 
 
@@ -116,7 +99,7 @@ class XTrackData2(object):
         f_dump_text.write(("TRUE  " + true_msg + '\n'))
 
         for i, token in enumerate(token_seq):
-            if word_drop_p > random.random() or token in stopwords:
+            if word_drop_p > random.random():
                 continue
             #token += curr_score_bin
             #print "%5.2f" % np.exp(msg_score), token
@@ -125,7 +108,7 @@ class XTrackData2(object):
 
             self.word_freq[token] += 1
 
-            if random.random() < oov_ins_p or token in oovs:
+            if random.random() < oov_ins_p:
                 seq['data'].append(self.get_token_ndx('#OOV'))
                 seq['data_score'].append(msg_score_bin)
                 seq['data_actor'].append(actor)

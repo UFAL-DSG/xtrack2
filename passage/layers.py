@@ -3,6 +3,7 @@ import theano.tensor as T
 from theano.tensor.extra_ops import repeat
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
+import itertools
 from utils import shared0s, flatten
 import activations
 import inits
@@ -495,9 +496,10 @@ class Dense(Layer):
 
 
 class MLP(Layer):
-    def __init__(self, sizes, activations, name=None, p_drop=0.):
+    def __init__(self, sizes, activations, p_drop=itertools.repeat(0.0),
+                 name=None):
         layers = []
-        for layer_id, (size, activation) in enumerate(zip(sizes, activations)):
+        for layer_id, (size, activation) in enumerate(zip(sizes, activations, p_drop)):
             layer = Dense(size=size, activation=activation, name="%s_%d" % (
                 name, layer_id, ), p_drop=p_drop)
             layers.append(layer)

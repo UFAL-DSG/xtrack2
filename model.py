@@ -79,6 +79,7 @@ class Model(NeuralModel):
             ftrs_to_emb = Dense(name='ftr2emb',
                                 size=emb_size,
                                 activation='linear')
+                                # FIX: p_drop=p_drop)
             ftrs_to_emb.connect(input_token_features_layer)
             input_layers.append(ftrs_to_emb)
 
@@ -158,7 +159,8 @@ class Model(NeuralModel):
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
-                           name="mlp_%s" % slot, p_drop=p_drop)
+                           [p_drop         ] * oclf_n_layers + [0.0      ],
+                           name="mlp_%s" % slot)
             slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output(dropout_active=False))
 
