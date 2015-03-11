@@ -50,25 +50,25 @@ def main(argv):
             if state_component in tables.keys() :
                 tables[state_component][EVALUATION_SCHEMES[(schedule, label_scheme)]][stat] = result
     
-    for state_component in ["goal.joint","method","requested.all"]:
-        print state_component.center(50)
-        evaluation_schemes = [key for key in tables[state_component].keys() if len(tables[state_component][key])>0]
-        evaluation_schemes.sort()
-        stats = tables[state_component][evaluation_schemes[0]].keys()
-        stats.sort()
-        print_row(['']+evaluation_schemes, header=True)
-        for stat in stats:
-            print_row([stat] + [tables[state_component][evaluation_scheme][stat] for evaluation_scheme in evaluation_schemes])
-        
-        print "\n\n"
-            
-        
-            
-    
+    #for state_component in ["goal.joint","method","requested.all"]:
+    #    print state_component.center(50)
+    #     evaluation_schemes = [key for key in tables[state_component].keys() if len(tables[state_component][key])>0]
+    #     evaluation_schemes.sort()
+    #     stats = tables[state_component][evaluation_schemes[0]].keys()
+    #     stats.sort()
+    #     print_row(['']+evaluation_schemes, header=True)
+    #     for stat in stats:
+    #         print_row([stat] + [tables[state_component][evaluation_scheme][stat] for evaluation_scheme in evaluation_schemes])
+    #
+    #     print "\n\n"
+
+
+
+
     print '                                    featured metrics'
     print_row(["","Joint Goals","Requested","Method"],header=True)
     print_row(["Accuracy",tables["goal.joint"]["eval_2a"]["acc"],tables["requested.all"]["eval_2a"]["acc"],tables["method"]["eval_2a"]["acc"] ])
-    #print_row(["l2",tables["goal.joint"]["eval_2a"]["l2"],tables["requested.all"]["eval_2a"]["l2"],tables["method"]["eval_2a"]["l2"] ])
+    print_row(["l2",tables["goal.joint"]["eval_2a"]["l2"],tables["requested.all"]["eval_2a"]["l2"],tables["method"]["eval_2a"]["l2"] ])
     #print_row(["roc.v2_ca05",tables["goal.joint"]["eval_2a"]["roc.v2_ca05"],tables["requested.all"]["eval_2a"]["roc.v2_ca05"],tables["method"]["eval_2a"]["roc.v2_ca05"] ])
     
     
