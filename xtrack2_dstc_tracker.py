@@ -86,15 +86,17 @@ class XTrack2DSTCTracker(object):
                        for i, slot in enumerate(self.data.slots)}
 
         raw_goal_labels = {}
+        raw_goal_labels_prob = {}
         for i, slot in enumerate(self.data.slots):
             val = np.argmax(pred[i])
             val_prob = pred[i][val]
             if pred[i][val] == 0.0:
                 val = 0
-            raw_goal_labels[slot] = (val, val_prob)
+            raw_goal_labels[slot] = val
+            raw_goal_labels_prob[slot] = val_prob
 
         goal_labels = {slot: (self.classes_rev[slot][val], val_prob)
-                       for slot, (val, val_prob) in raw_goal_labels.iteritems()}
+                       for slot, val in raw_goal_labels.iteritems()}
 
         lbl = self._label_id_to_str(label)
         pred = self._label_id_to_str(raw_goal_labels)
@@ -107,9 +109,10 @@ class XTrack2DSTCTracker(object):
             goals_correct &= raw_goal_labels[slot] == label[slot]
 
         goal_labels = {
-                slot: {goal_labels[slot][0]: goal_labels[slot][0]} for slot in self.data.slots if
-                goal_labels[slot] != self.data.null_class
-            }
+            slot: {goal_labels[slot]: raw_goal_labels_prob[slot]}
+            for slot in self.data.slots
+            if goal_labels[slot] != self.data.null_class
+        }
         goal_labels_debug = {
                 slot: goal_labels[slot].keys()[0] for slot in goal_labels
             }
