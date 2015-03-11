@@ -419,8 +419,8 @@ def main(args_lst,
         logging.info('Loading parameters from: %s' % load_params)
         model.load_params(load_params)
 
-    tracker_valid = XTrack2DSTCTracker(xtd_v, model)
-    tracker_train = XTrack2DSTCTracker(xtd_t, model)
+    tracker_valid = XTrack2DSTCTracker(xtd_v, [model])
+    tracker_train = XTrack2DSTCTracker(xtd_t, [model])
 
     valid_data_y = model.prepare_data_train(xtd_v.sequences, slots)
     valid_data = model.prepare_data_predict(xtd_v.sequences, slots)

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 EXPERIMENT_NAME=$(basename "$1")
-SMP=${SMP:-2}
-MEM_PER_WORKER=${MEM_PER_WORKER:-4}
+SMP=${SMP:-1}
+MEM_PER_WORKER=${MEM_PER_WORKER:-2}
 
 EXPERIMENT_OUT=exp/results/${EXPERIMENT_NAME}
 mkdir -p ${EXPERIMENT_OUT}
@@ -10,7 +10,7 @@ mkdir -p ${EXPERIMENT_OUT}
 cfg_cnt=0
 while read cfg; do
     cfg_cnt=$((cfg_cnt+1))
-    for i in 1 2 3 4 5; do
+    for i in $(seq 1 $2); do
         eid=${EXPERIMENT_NAME}_cfg${cfg_cnt}_${i}
         echo Submitting $eid
 
@@ -22,7 +22,7 @@ while read cfg; do
         #RUN_CMD="cat"
 
         $RUN_CMD << ENDOFSCRIPT
-        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py --out out/${eid} ${cfg}
+        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py --track_log out/${eid}_1/track.log --eid ${eid} --out out/${eid} ${cfg}
 ENDOFSCRIPT
     done
 done < $1
