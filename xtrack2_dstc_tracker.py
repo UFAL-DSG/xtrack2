@@ -95,7 +95,7 @@ class XTrack2DSTCTracker(object):
             raw_goal_labels[slot] = val
             raw_goal_labels_prob[slot] = val_prob
 
-        goal_labels = {slot: (self.classes_rev[slot][val], val_prob)
+        goal_labels = {slot: self.classes_rev[slot][val]
                        for slot, val in raw_goal_labels.iteritems()}
 
         lbl = self._label_id_to_str(label)
