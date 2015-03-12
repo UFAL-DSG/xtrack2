@@ -466,7 +466,7 @@ def main(args_lst,
     last_valid = 0
     last_inline_print = time.time()
     last_inline_print_cnt = 0
-    best_track_score = 0.0
+    best_track_acc = defaultdict(float)
     while True:
         if len(mb_to_go) == 0:
             mb_to_go = list(mb_ids)
@@ -523,11 +523,13 @@ def main(args_lst,
 
             _, track_score = tracker_valid.track(track_log)
 
-            best_track_score = max(track_score, best_track_score)
-
-            logging.info('Valid loss:         %10.2f' % valid_loss)
-            logging.info('Valid tracking acc: %10.2f %%' % (track_score * 100))
-            logging.info('Best tracking acc:  %10.2f %%' % (best_track_score * 100))
+            for group, accuracy in track_score.iteritems():
+                logging.info('Valid acc %s: %10.2f %%'
+                             % (group, accuracy * 100))
+                best_track_acc[group] = max(accuracy, best_track_acc[group])
+            for group in track_score:
+                logging.info('Best acc %s:  %10.2f %%'
+                             % (group, best_track_acc[group] * 100))
             logging.info('Train loss:         %10.2f' % stats.mean('loss'))
             logging.info('Mean update ratio:  %10.6f' % update_ratio)
             logging.info('Mean mb time:       %10.4f' % stats.mean('time'))

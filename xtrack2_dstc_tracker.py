@@ -31,7 +31,7 @@
         }
 }
 """
-
+import collections
 import time
 import json
 import logging
@@ -74,6 +74,8 @@ class XTrack2DSTCTracker(object):
             self.classes_rev[slot] = {val: key for key, val in
                                       self.data.classes[slot].iteritems()}
 
+        self.slot_groups = data.slot_groups
+
     def _label_id_to_str(self, label):
         res = {}
         for slot in self.data.slots:
@@ -103,10 +105,11 @@ class XTrack2DSTCTracker(object):
         for slot in self.data.slots:
             self.track_log.write("  %s lbl(%s) pred(%s)\n" % (slot,
                                                               lbl[slot], pred[slot]))
-
-        goals_correct = True
-        for i, slot in enumerate(self.data.slots):
-            goals_correct &= raw_goal_labels[slot] == label[slot]
+        goals_correct = {}
+        for group, slots in self.slot_groups.iteritems():
+            goals_correct[group] = True
+            for i, slot in enumerate(slots):
+                goals_correct[group] &= raw_goal_labels[slot] == label[slot]
 
         goal_labels = {
             slot: {goal_labels[slot]: raw_goal_labels_prob[slot]}
@@ -133,14 +136,18 @@ class XTrack2DSTCTracker(object):
             res &= val == 0
         return res
 
-    def track(self, tracking_log_file_name=None):
-        data = self.main_model.prepare_data_predict(self.data.sequences,
-                                               self.data.slots)
-
+    def _make_model_predictions(self, data):
         preds = []
         for model in self.models:
             pred = model._predict(*data)
             preds.append(pred)
+        return preds
+
+    def track(self, tracking_log_file_name=None):
+        data = self.main_model.prepare_data_predict(self.data.sequences,
+                                               self.data.slots)
+
+        preds = self._make_model_predictions(data)
 
         pred = []
         for slot_preds in zip(*preds):
@@ -151,8 +158,8 @@ class XTrack2DSTCTracker(object):
 
         pred_ptr = 0
 
-        accuracy = 0
-        accuracy_n = 0
+        accuracy = collections.defaultdict(int)
+        accuracy_n = collections.defaultdict(int)
         result = []
         if tracking_log_file_name:
             self.track_log = open(tracking_log_file_name, 'w')
@@ -186,9 +193,11 @@ class XTrack2DSTCTracker(object):
 
                 if not self._label_empty(lbl['slots']) or state_component_mentioned:
                     state_component_mentioned = True
-                    if goals_correct:
-                        accuracy += 1
-                    accuracy_n += 1
+
+                    for group, slots in self.slot_groups.iteritems():
+                        if goals_correct[group]:
+                            accuracy[group] += 1
+                        accuracy_n[group] += 1
 
             result.append({
                 'session-id': dialog['id'],
@@ -200,8 +209,9 @@ class XTrack2DSTCTracker(object):
         if len(pred[0]) != pred_ptr:
             raise Exception('Data mismatch.')
 
-        assert accuracy_n > 0
-        return result, accuracy * 1.0 / accuracy_n
+        for group in self.slot_groups:
+            accuracy[group] = accuracy[group] * 1.0 / max(1, accuracy_n[group])
+        return result, accuracy
 
 
 def main(dataset_name, data_file, output_file, params_file):
@@ -217,10 +227,11 @@ def main(dataset_name, data_file, output_file, params_file):
     tracker = XTrack2DSTCTracker(data, models)
 
     t = time.time()
-    result, accuracy = tracker.track()
+    result, tracking_accuracy = tracker.track()
     t = time.time() - t
     logging.info('Tracking took: %.1fs' % t)
-    logging.info('Accuracy: %.2f %%' % (accuracy * 100))
+    for group, accuracy in tracking_accuracy.iteritems():
+        logging.info('Accuracy %s: %.2f %%' % (group, accuracy * 100))
 
 
     tracker_output = {

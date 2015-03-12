@@ -130,6 +130,7 @@ class XTrackData2(object):
         if actor == data_model.Dialog.ACTOR_USER:
             label = {
                 'time': len(seq['data']) - 1,
+                'score': np.sqrt(np.exp(msg_score)),
                 'slots': {}
             }
             for slot, val in zip(self.slots, self.state_to_label(state,
@@ -427,9 +428,16 @@ if __name__ == '__main__':
     slot_groups = {}
     slots = []
     for i, slot_group in enumerate(args.slots.split(':')):
-        slot_group = slot_group.split(',')
-        slot_groups[i] = slot_group
-        slots.extend(slot_group)
+        if '=' in slot_group:
+            name, vals = slot_group.split('=', 1)
+        else:
+            name = 'grp%d' % i
+            vals = slot_group
+        slot_group = vals.split(',')
+        slot_groups[name] = slot_group
+        for slot in slot_group:
+            if not slot in slots:
+                slots.append(slot)
 
     n_best_order = map(int, args.n_best_order.split(','))
 

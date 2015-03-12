@@ -1,6 +1,10 @@
 import theano
 import theano.tensor as T
 
+def WeightedCategoricalCrossEntropy(y_true, y_pred, weights):
+    ce =  T.nnet.categorical_crossentropy(y_pred, y_true)
+    return (weights.dimshuffle('x', 0) * ce).mean()
+
 def CategoricalCrossEntropy(y_true, y_pred):
     return T.nnet.categorical_crossentropy(y_pred, y_true).mean()
 

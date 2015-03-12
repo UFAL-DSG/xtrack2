@@ -145,6 +145,7 @@ class Model(NeuralModel):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
+        y_weight = tt.vector()
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
@@ -164,10 +165,11 @@ class Model(NeuralModel):
             slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output(dropout_active=False))
 
-            slot_objective = CrossEntropyObjective()
+            slot_objective = WeightedCrossEntropyObjective()
             slot_objective.connect(
                 y_hat_layer=slot_mlp,
-                y_true=y_label[slot]
+                y_true=y_label[slot],
+                y_weights=y_weight
             )
             costs.append(slot_objective)
         cost = SumOut()
@@ -203,6 +205,7 @@ class Model(NeuralModel):
 
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time]
+        loss_args += [y_weight]
         loss_args += [y_label[slot] for slot in slots]
 
         if build_train:
@@ -249,6 +252,7 @@ class Model(NeuralModel):
         y_seq_id = []
         y_time = []
         y_labels = [[] for slot in slots]
+        y_weights = []
         for item in seqs:
             x.append(item['data'])
             x_score.append(item['data_score'])
@@ -260,6 +264,7 @@ class Model(NeuralModel):
 
                 for i, slot in enumerate(slots):
                     y_labels[i].append(label['slots'][slot])
+                y_weights.append(label['score'])
 
         x = padded(x, is_int=True).transpose(1, 0)
 
@@ -270,11 +275,14 @@ class Model(NeuralModel):
         x_score = np.array(x_score, dtype=np.int32)[:,:]
         x_switch = np.array(x_switch, dtype=np.int32)[:,:, np.newaxis]
 
+        y_weights = np.array(y_weights, dtype=np.float32)
+
         data = [x]
         if self.x_include_score:
             data.append(x_score)
         data.extend([y_seq_id, y_time])
         if with_labels:
+            data.append(y_weights)
             data.extend(y_labels)
 
         return tuple(data)

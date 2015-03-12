@@ -499,9 +499,10 @@ class MLP(Layer):
     def __init__(self, sizes, activations, p_drop=itertools.repeat(0.0),
                  name=None):
         layers = []
-        for layer_id, (size, activation) in enumerate(zip(sizes, activations, p_drop)):
+        for layer_id, (size, activation, l_p_drop) in enumerate(zip(sizes,
+                                                           activations, p_drop)):
             layer = Dense(size=size, activation=activation, name="%s_%d" % (
-                name, layer_id, ), p_drop=p_drop)
+                name, layer_id, ), p_drop=l_p_drop)
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)
@@ -552,7 +553,6 @@ class CherryPick(Layer):
         return set(self.data_layer.get_params())
 
 
-
 class CrossEntropyObjective(Layer):
     def connect(self, y_hat_layer, y_true):
         self.y_hat_layer = y_hat_layer
@@ -563,6 +563,25 @@ class CrossEntropyObjective(Layer):
 
         return costs.CategoricalCrossEntropy(self.y_true,
                                              y_hat_out)
+
+    def get_params(self):
+        return set(self.y_hat_layer.get_params())
+
+
+class WeightedCrossEntropyObjective(Layer):
+    def connect(self, y_hat_layer, y_true, y_weights):
+        self.y_hat_layer = y_hat_layer
+        self.y_true = y_true
+        self.y_weights = y_weights
+
+    def output(self, dropout_active=False):
+        y_hat_out = self.y_hat_layer.output(dropout_active=dropout_active)
+
+        return costs.WeightedCategoricalCrossEntropy(
+            self.y_true,
+            y_hat_out,
+            self.y_weights
+        )
 
     def get_params(self):
         return set(self.y_hat_layer.get_params())

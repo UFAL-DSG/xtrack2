@@ -8,20 +8,22 @@ cd $DIR
 . ./config.sh
 
 E_ROOT=${DATA_DIRECTORY}/xtrack/e2
-SLOTS="food,area,pricerange,name"
-#:method:req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
+SLOTS="food=food:area=area:pricerange=pricerange:name=name:goals=food,area,pricerange,name"
+#:method=method:req=req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
 
-echo "> Processing training data."
-python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
-    --out_dir ${E_ROOT}/train \
-    --use_stringified_system_acts \
-    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
+if [ "$1" != "skip" ]; then
+    echo "> Processing training data."
+    python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/ \
+        --out_dir ${E_ROOT}/train \
+        --use_stringified_system_acts \
+        --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_train.flist
 
-echo "> Processing validation data."
-python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
-    --out_dir ${E_ROOT}/valid \
-    --use_stringified_system_acts \
-    --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
+    echo "> Processing validation data."
+    python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/\
+        --out_dir ${E_ROOT}/valid \
+        --use_stringified_system_acts \
+        --flist ${DATA_DIRECTORY}/dstc2/scripts/config/dstc2_dev.flist
+fi
 
 #echo "> Processing testing data."
 #python import_dstc.py --data_dir ${DATA_DIRECTORY}/dstc2/data/test \
