@@ -1,5 +1,12 @@
+from collections import defaultdict
+
+
 def parse(ln):
-    return ln[59:69].strip()
+    return ln.rsplit(' ', 2)[1]
+
+
+def parse_valid_type(ln):
+    return ln.rsplit(' ', 3)[1].replace(':', '')
 
 
 def parse_param(ln):
@@ -11,36 +18,47 @@ def parse_n_params(ln):
     return int(ln.split('has')[1].split('parameters')[0].strip())
 
 
+def add_best_stats_to_row(best_acc, best_epoch, row):
+    for stat in best_acc:
+        row['a_best_acc_%s' % stat] = best_acc[stat]
+        row['b_best_epoch_%s' % stat] = best_acc[stat]
+
+
 def main(log_file, print_header):
-    row = {
-        'best_epoch': -1,
-        'best_acc': 0.0
-    }
+    best_acc = defaultdict(float)
+    best_epoch = defaultdict(lambda: -1)
+    epoch = -1
+
+    row = {}
     with open(log_file) as f_in:
         f_lines = iter(f_in)
-        acc = 0.0
-
+        acc = defaultdict(float)
         while True:
             try:
                 ln = next(f_lines)
             except StopIteration:
                 break
             if 'This model has' in ln:
-                row['a_model_parameters'] = parse_n_params(ln)
+                row['c_nparams'] = parse_n_params(ln)
             if 'Epoch' in ln:
                 epoch = int(parse(ln))
             elif 'Valid tracking acc' in ln:
-                acc = float(parse(ln))
+                acc['goals'] = float(parse(ln))
+            elif 'Valid acc' in ln:
+                valid_type = parse_valid_type(ln)
+                acc[valid_type] = float(parse(ln))
             elif 'Effective args' in ln:
                 while not 'Experiment path' in ln:
                     ln = next(f_lines)
                     param, val = parse_param(ln)
                     row[param] = val
             elif 'Example' in ln:
-                if acc > row['best_acc']:
-                    row['best_acc'] = acc
-                    row['best_epoch'] = epoch
+                for acc_type in acc:
+                    if acc[acc_type] > best_acc[acc_type]:
+                        best_acc[acc_type] = acc[acc_type]
+                        best_epoch[acc_type] = epoch
 
+    add_best_stats_to_row(best_acc, best_epoch, row)
 
 
     keys = sorted(row.keys())

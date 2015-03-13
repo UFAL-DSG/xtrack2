@@ -523,12 +523,13 @@ def main(args_lst,
 
             _, track_score = tracker_valid.track(track_log)
 
-            for group, accuracy in track_score.iteritems():
-                logging.info('Valid acc %s: %10.2f %%'
+            for group, accuracy in sorted(track_score.iteritems(),
+                                          key=lambda (g, _): g):
+                logging.info('Valid acc %15s: %10.2f %%'
                              % (group, accuracy * 100))
                 best_track_acc[group] = max(accuracy, best_track_acc[group])
-            for group in track_score:
-                logging.info('Best acc %s:  %10.2f %%'
+            for group in sorted(track_score, key=lambda g: g):
+                logging.info('Best acc %15s:  %10.2f %%'
                              % (group, best_track_acc[group] * 100))
             logging.info('Train loss:         %10.2f' % stats.mean('loss'))
             logging.info('Mean update ratio:  %10.6f' % update_ratio)
