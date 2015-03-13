@@ -341,7 +341,7 @@ def main(args_lst,
          eid, experiment_path, out, valid_after,
          load_params, save_params,
          debug, track_log,
-         n_cells, emb_size, x_include_score,
+         n_cells, emb_size, x_include_score, no_train_emb,
          n_epochs, lr, opt_type, momentum,
          mb_size, mb_mult_data,
          oclf_n_hidden, oclf_n_layers, oclf_activation,
@@ -389,6 +389,7 @@ def main(args_lst,
     model = Model(slots=slots,
                   slot_classes=xtd_t.classes,
                   emb_size=emb_size,
+                  no_train_emb=no_train_emb,
                   x_include_score=x_include_score,
                   x_include_token_ftrs=x_include_token_ftrs,
                   n_input_score_bins=n_input_score_bins,
@@ -594,6 +595,7 @@ def build_argument_parser():
     parser.add_argument('--x_include_token_ftrs', default=False,
                         action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
+    parser.add_argument('--no_train_emb', default=False, type=bool)
 
     parser.add_argument('--input_n_hidden', default=32, type=int)
     parser.add_argument('--input_n_layers', default=0, type=int)

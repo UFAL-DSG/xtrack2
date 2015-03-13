@@ -14,7 +14,7 @@ from passage.model import NeuralModel
 
 
 class Model(NeuralModel):
-    def __init__(self, slots, slot_classes, emb_size,
+    def __init__(self, slots, slot_classes, emb_size, no_train_emb,
                  x_include_score, x_include_token_ftrs,
                  n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
@@ -41,7 +41,8 @@ class Model(NeuralModel):
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
-                                      input=x)
+                                      input=x,
+                                      static=no_train_emb)
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
             logging.info('Initializing token embeddings from: %s'

@@ -68,7 +68,7 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
                 Dialog.ACTOR_USER
             )
 
-            last_state = turn.input.user_goal
+            last_state = state  #turn.input.user_goal
 
         with open(os.path.join(out_dir, "%d.json" % (i,)
                  ), "w") as f_out:

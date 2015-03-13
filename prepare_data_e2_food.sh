@@ -39,7 +39,8 @@ python xtrack_data2.py \
         --n_best_order 1 \
         --n_nbest_samples 1 \
         --include_system_utterances \
-        --dump_text ${E_ROOT}/train_text.txt
+        --dump_text ${E_ROOT}/train_text.txt \
+        --dump_cca ${E_ROOT}/train.cca.txt
 for i in valid; do
     python xtrack_data2.py \
         --data_dir ${E_ROOT}/${i} \
