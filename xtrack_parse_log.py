@@ -1,4 +1,5 @@
 from collections import defaultdict
+import re
 
 
 def parse(ln):
@@ -9,7 +10,12 @@ def parse_col(ln):
     return ln[59:69].strip()
 
 
+def remove_multiple_spaces(ln):
+    return re.sub(' +', ' ', ln)
+
+
 def parse_valid_type(ln):
+    ln = remove_multiple_spaces(ln)
     return ln.rsplit(' ', 3)[1].replace(':', '')
 
 
