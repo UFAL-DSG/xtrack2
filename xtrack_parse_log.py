@@ -31,7 +31,7 @@ def parse_n_params(ln):
 def add_best_stats_to_row(best_acc, best_epoch, row):
     for stat in best_acc:
         row['a_best_acc_%s' % stat] = best_acc[stat]
-        row['b_best_epoch_%s' % stat] = best_acc[stat]
+        row['b_best_epoch_%s' % stat] = best_epoch[stat]
 
 
 def main(log_file, print_header, sep_chr):
