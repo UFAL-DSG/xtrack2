@@ -5,6 +5,10 @@ def parse(ln):
     return ln.rsplit(' ', 2)[1]
 
 
+def parse_col(ln):
+    return ln[59:69].strip()
+
+
 def parse_valid_type(ln):
     return ln.rsplit(' ', 3)[1].replace(':', '')
 
@@ -41,9 +45,9 @@ def main(log_file, print_header):
             if 'This model has' in ln:
                 row['c_nparams'] = parse_n_params(ln)
             if 'Epoch' in ln:
-                epoch = int(parse(ln))
+                epoch = int(parse_col(ln))
             elif 'Valid tracking acc' in ln:
-                acc['goals'] = float(parse(ln))
+                acc['goals'] = float(parse_col(ln))
             elif 'Valid acc' in ln:
                 valid_type = parse_valid_type(ln)
                 acc[valid_type] = float(parse(ln))
