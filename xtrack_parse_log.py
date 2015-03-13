@@ -34,7 +34,7 @@ def add_best_stats_to_row(best_acc, best_epoch, row):
         row['b_best_epoch_%s' % stat] = best_acc[stat]
 
 
-def main(log_file, print_header):
+def main(log_file, print_header, sep_chr):
     best_acc = defaultdict(float)
     best_epoch = defaultdict(lambda: -1)
     epoch = -1
@@ -73,9 +73,9 @@ def main(log_file, print_header):
 
     keys = sorted(row.keys())
     if print_header:
-        print ';'.join(keys)
+        print sep_chr.join(keys)
 
-    print ';'.join(str(row[key]) for key in keys)
+    print sep_chr.join(str(row[key]) for key in keys)
 
 
 if __name__ == '__main__':
@@ -84,6 +84,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('log_file')
     parser.add_argument('--print_header', default=False, action='store_true')
+    parser.add_argument('--sep_chr', default='\t')
 
     args = parser.parse_args()
 
