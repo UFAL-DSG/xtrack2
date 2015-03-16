@@ -106,7 +106,7 @@ class Model(NeuralModel):
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
-                           [p_drop         ] * oclf_n_layers + [0.0      ],
+                           [0.0         ] * oclf_n_layers + [0.0      ],
                            name="mlp_%s" % slot)
             slot_mlp.connect(h_t_layer)
             mlps.append(slot_mlp)
@@ -151,12 +151,13 @@ class Model(NeuralModel):
                                                     f_lstm_layer.output(),
                                                     b_lstm_layer.output()])
             else:
-                prev_layer = f_lstm_layer
 
                 if debug:
                     self._lstm_output = theano.function(input_args,
-                                                   [prev_layer.output(),
-                                                    f_lstm_layer.output()])
+                                                        [prev_layer.output(),
+                                                         f_lstm_layer.output()])
+
+                prev_layer = f_lstm_layer
 
         assert prev_layer is not None
 

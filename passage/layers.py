@@ -483,10 +483,11 @@ class LstmWithMLP(LstmRecurrent):
 
         outs = [h_t, c_t]
 
-        h_t_layer = IdentityInput(h_t, self.size)
+        #h_t_layer = IdentityInput(h_t, self.size)
 
         for mlp in self.mlps:
-            mlp.connect(h_t_layer)
+            #mlp.connect(h_t_layer)
+            mlp.l_in.set_val(h_t)
             outs.append(mlp.output(dropout_active=bool(dropout_active)))
 
         return tuple(outs)
@@ -558,6 +559,7 @@ class MLP(Layer):
         self.size = layers[-1].size
 
     def connect(self, l_in):
+        self.l_in = l_in
         self.stack.connect(l_in)
 
     def output(self, dropout_active=False):
