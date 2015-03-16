@@ -36,7 +36,6 @@ class Layer(object):
         return "%s__%s" % (self.name, param_name, )
 
 
-
 class MatrixInput(object):
     def __init__(self, matrix):
         self.matrix = matrix
@@ -53,6 +52,9 @@ class IdentityInput(object):
     def __init__(self, val, size):
         self.val = val
         self.size = size
+
+    def set_val(self, val):
+        self.val = val
 
     def output(self, dropout_active=False):
         return self.val
@@ -104,11 +106,11 @@ class SumLayer(object):
 
 class Embedding(Layer):
 
-    def __init__(self, name=None, size=128, n_features=256, init='normal',
+    def __init__(self, name=None, size=128, n_features=256, init=inits.normal,
                  static=False, input=None):
         if name:
             self.name = name
-        self.init = getattr(inits, init)
+        self.init = init
         self.size = size
         self.n_features = n_features
         self.input = input
@@ -158,10 +160,10 @@ class Embedding(Layer):
 
 
 class Recurrent(Layer):
-    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1):
         self.size = size
-        self.init = getattr(inits, init)
+        self.init = init
         self.name = name
         self.truncate_gradient = truncate_gradient
         self.seq_output = seq_output
@@ -220,12 +222,12 @@ class Recurrent(Layer):
 
 class LstmRecurrent(Layer):
 
-    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
                  peepholes=False, enable_branch_exp=False, backward=False):
         if name:
             self.name = name
-        self.init = getattr(inits, init)
+        self.init = init
         self.init_scale = init_scale
         self.size = size
         self.truncate_gradient = truncate_gradient
@@ -406,7 +408,7 @@ class LstmRecurrent(Layer):
 
 class LstmWithMLP(LstmRecurrent):
 
-    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
                  peepholes=False, enable_branch_exp=False, backward=False,
                  mlps=None):
@@ -418,9 +420,6 @@ class LstmWithMLP(LstmRecurrent):
 
     def connect(self, l_in):
         super(LstmWithMLP, self).connect(l_in)
-
-
-
 
         self.mlp_inits = []
         n_mlp_inputs = 0
@@ -494,13 +493,13 @@ class LstmWithMLP(LstmRecurrent):
 
 
 class Dense(Layer):
-    def __init__(self, name=None, size=256, activation='rectify', init='normal',
+    def __init__(self, name=None, size=256, activation='rectify', init=inits.normal,
                  p_drop=0.):
         if name:
             self.name = name
         self.activation_str = activation
         self.activation = getattr(activations, activation)
-        self.init = getattr(inits, init)
+        self.init = init
         self.size = size
         self.p_drop = p_drop
 
@@ -547,12 +546,12 @@ class Dense(Layer):
 
 class MLP(Layer):
     def __init__(self, sizes, activations, p_drop=itertools.repeat(0.0),
-                 name=None):
+                 name=None, init=inits.normal):
         layers = []
         for layer_id, (size, activation, l_p_drop) in enumerate(zip(sizes,
                                                            activations, p_drop)):
             layer = Dense(size=size, activation=activation, name="%s_%d" % (
-                name, layer_id, ), p_drop=l_p_drop)
+                name, layer_id, ), p_drop=l_p_drop, init=init)
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)

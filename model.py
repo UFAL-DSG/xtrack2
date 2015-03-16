@@ -99,15 +99,19 @@ class Model(NeuralModel):
         if debug:
             self._lstm_input = theano.function(input_args, prev_layer.output())
 
-
+        h_t_layer = IdentityInput(None, n_cells)
         mlps = []
+        mlp_params = []
         for slot in slots:
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
                            [p_drop         ] * oclf_n_layers + [0.0      ],
                            name="mlp_%s" % slot)
+            slot_mlp.connect(h_t_layer)
             mlps.append(slot_mlp)
+            mlp_params.extend(slot_mlp.get_params())
+
 
         for i in range(rnn_n_layers):
             # Forward LSTM layer.
@@ -154,9 +158,6 @@ class Model(NeuralModel):
                                                    [prev_layer.output(),
                                                     f_lstm_layer.output()])
 
-
-
-
         assert prev_layer is not None
 
         y_seq_id = tt.ivector()
@@ -171,13 +172,13 @@ class Model(NeuralModel):
 
         costs = []
         predictions = []
-        for slot in slots:
+        for slot, slot_lstm_mlp in zip(slots, mlps):
             logging.info('Building output classifier for %s.' % slot)
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
                            [p_drop         ] * oclf_n_layers + [0.0      ],
-                           name="mlp_%s" % slot)
+                           name="mlp_%s" % slot, init=inits.copy(mlp_params))
             slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output(dropout_active=False))
 
