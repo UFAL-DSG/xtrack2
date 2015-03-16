@@ -99,18 +99,33 @@ class Model(NeuralModel):
         if debug:
             self._lstm_input = theano.function(input_args, prev_layer.output())
 
+
+        mlps = []
+        for slot in slots:
+            n_classes = len(slot_classes[slot])
+            slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
+                           [oclf_activation] * oclf_n_layers + ['softmax'],
+                           [p_drop         ] * oclf_n_layers + [0.0      ],
+                           name="mlp_%s" % slot)
+            mlps.append(slot_mlp)
+
         for i in range(rnn_n_layers):
             # Forward LSTM layer.
             logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
 
-            f_lstm_layer = LstmRecurrent(name="flstm_%d" % i,
+            f_lstm_layer = LstmWithMLP(name="flstm_%d" % i,
                                    size=n_cells,
                                    seq_output=True,
                                    out_cells=False,
                                    peepholes=lstm_peepholes,
                                    p_drop=p_drop,
-                                   enable_branch_exp=enable_branch_exp)
+                                   enable_branch_exp=enable_branch_exp,
+                                   mlps=mlps)
             f_lstm_layer.connect(prev_layer)
+
+
+
+
 
             if lstm_bidi:
                 b_lstm_layer = LstmRecurrent(name="blstm_%d" % i,

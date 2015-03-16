@@ -17,6 +17,7 @@ theano.config.floatX = 'float32'
 #theano.config.mode = 'FAST_COMPILE'
 #theano.config.linker = 'py'
 theano.config.mode = 'FAST_RUN'
+#theano.config.optimizer = 'fast_compile'
 
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
