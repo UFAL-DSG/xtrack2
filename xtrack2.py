@@ -595,7 +595,7 @@ def build_argument_parser():
     parser.add_argument('--x_include_token_ftrs', default=False,
                         action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
-    parser.add_argument('--no_train_emb', default=False, type=bool)
+    parser.add_argument('--no_train_emb', default=False, action='store_true')
 
     parser.add_argument('--input_n_hidden', default=32, type=int)
     parser.add_argument('--input_n_layers', default=0, type=int)
