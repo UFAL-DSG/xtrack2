@@ -219,15 +219,15 @@ class Model(NeuralModel):
             updater = updates.RProp(lr=lr, clipnorm=clipnorm)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
-            updater = updates.SGD(lr=lr, clipnorm=clipnorm)
+            updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
         elif opt_type == "rmsprop":
-            updater = updates.RMSprop(lr=lr, clipnorm=clipnorm)  #, regularizer=reg)
+            updater = updates.RMSprop(lr=lr, clipnorm=clipnorm, regularizer=reg)  #, regularizer=reg)
         elif opt_type == "adam":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.Adam(lr=lr, clipnorm=clipnorm)  #,
+            updater = updates.Adam(lr=lr, clipnorm=clipnorm, regularizer=reg)  #,
             # regularizer=reg)
         elif opt_type == "momentum":
-            updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=clipnorm)
+            updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=clipnorm, regularizer=reg)
         else:
             raise Exception("Unknonw opt.")
 
