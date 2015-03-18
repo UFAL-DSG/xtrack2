@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EXPERIMENT_NAME=$(basename "$1")
-SMP=${SMP:-1}
+SMP=${SMP:-2}
 MEM_PER_WORKER=${MEM_PER_WORKER:-2}
 
 EXPERIMENT_OUT=exp/results/${EXPERIMENT_NAME}
@@ -16,13 +16,11 @@ while read cfg; do
 
         STDOUT_LOCATION=${EXPERIMENT_OUT}/${eid}.stdout.txt
         STDERR_LOCATION=${EXPERIMENT_OUT}/${eid}.stderr.txt
-
-        RUN_CMD="qsub -m abe -M lukas@zilka.me -hard -l mem_free=${MEM_PER_WORKER}G,act_mem_free=${MEM_PER_WORKER}G,h_vmem=${MEM_PER_WORKER}G -pe smp ${SMP} -N ${EXPERIMENT_NAME} -o ${STDOUT_LOCATION} -e ${STDERR_LOCATION} -cwd"
-
+	. qsub_cmd.sh
         #RUN_CMD="cat"
 
         $RUN_CMD << ENDOFSCRIPT
-        PYTHONUSERBASE=/home/zilka/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid}" python xtrack2.py --track_log out/${eid}_1/track.log --eid ${eid} --out out/${eid} ${cfg}
+        PYTHONUSERBASE=/storage/ostrava1/home/ticcky/.local OMP_NUM_THREADS=${SMP} THEANO_FLAGS="base_compiledir=out/${eid},device=cpu" python xtrack2.py --track_log out/${eid}_1/track.log --eid ${eid} --out out/${eid} ${cfg}
 ENDOFSCRIPT
     done
 done < $1
