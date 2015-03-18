@@ -24,7 +24,7 @@ class Model(NeuralModel):
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features,
-                 momentum, enable_branch_exp, build_train=True):
+                 momentum, enable_branch_exp, l1, l2, build_train=True):
         args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
         self.init_args = {}
         for arg in args:
@@ -204,13 +204,13 @@ class Model(NeuralModel):
 
         lr = tt.scalar('lr')
         clipnorm = 0.5
+        reg = updates.Regularizer(l1=l1, l2=l2)
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr, clipnorm=clipnorm)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
             updater = updates.SGD(lr=lr, clipnorm=clipnorm)
         elif opt_type == "rmsprop":
-            #reg = updates.Regularizer(maxnorm=5.0)
             updater = updates.RMSprop(lr=lr, clipnorm=clipnorm)  #, regularizer=reg)
         elif opt_type == "adam":
             #reg = updates.Regularizer(maxnorm=5.0)
