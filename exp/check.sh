@@ -2,7 +2,8 @@
 
 EXPERIMENT_NAME=$(basename "$1")
 
-EXPERIMENT_OUT=exp/results/${EXPERIMENT_NAME}
+EXPERIMENT_OUT=out/
+#EXPERIMENT_OUT=exp/results/${EXPERIMENT_NAME}
 
 extra=--print_header
 
@@ -12,7 +13,7 @@ while read cfg; do
     for i in $(seq 1 $2); do
         #echo -n "${i};${cfg};"
         eid=${EXPERIMENT_NAME}_cfg${cfg_cnt}_${i}
-        STDERR_LOCATION=${EXPERIMENT_OUT}/${eid}.stderr.txt
+        STDERR_LOCATION=${EXPERIMENT_OUT}/${eid}_1/log.txt
         python xtrack_parse_log.py ${STDERR_LOCATION} $extra
         extra=
         #bash exp/check_file.sh ${STDERR_LOCATION}
