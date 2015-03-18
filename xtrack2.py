@@ -17,6 +17,7 @@ theano.config.floatX = 'float32'
 #theano.config.mode = 'FAST_COMPILE'
 #theano.config.linker = 'py'
 theano.config.mode = 'FAST_RUN'
+#theano.config.optimizer = 'fast_compile'
 
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
@@ -349,7 +350,7 @@ def main(args_lst,
          lstm_peepholes, lstm_bidi,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
-         eval_on_full_train, x_include_token_ftrs, enable_branch_exp):
+         eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2):
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -411,7 +412,9 @@ def main(args_lst,
                   input_n_hidden=input_n_hidden,
                   input_activation=input_activation,
                   token_features=xtd_t.token_features,
-                  enable_branch_exp=enable_branch_exp
+                  enable_branch_exp=enable_branch_exp,
+                  l1=l1,
+                  l2=l2
     )
 
     logging.info('Rebuilding took: %.1f' % (time.time() - t))
@@ -588,6 +591,8 @@ def build_argument_parser():
     parser.add_argument('--opt_type', default='rprop', type=str)
     parser.add_argument('--mb_size', default=16, type=int)
     parser.add_argument('--mb_mult_data', default=1, type=int)
+    parser.add_argument('--l1', default=0.0, type=float)
+    parser.add_argument('--l2', default=0.0, type=float)
 
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
