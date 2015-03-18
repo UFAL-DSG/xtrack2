@@ -631,7 +631,7 @@ class WeightedCrossEntropyObjective(Layer):
         return costs.WeightedCategoricalCrossEntropy(
             self.y_true,
             y_hat_out,
-            self.y_weights * 0 + 1
+            self.y_weights
         )
 
     def get_params(self):
