@@ -350,7 +350,8 @@ def main(args_lst,
          lstm_peepholes, lstm_bidi,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
-         eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2):
+         eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
+         x_include_mlp):
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -393,6 +394,7 @@ def main(args_lst,
                   no_train_emb=no_train_emb,
                   x_include_score=x_include_score,
                   x_include_token_ftrs=x_include_token_ftrs,
+                  x_include_mlp=x_include_mlp,
                   n_input_score_bins=n_input_score_bins,
                   n_cells=n_cells,
                   n_input_tokens=n_input_tokens,
@@ -599,6 +601,7 @@ def build_argument_parser():
     parser.add_argument('--x_include_score', default=False, action='store_true')
     parser.add_argument('--x_include_token_ftrs', default=False,
                         action='store_true')
+    parser.add_argument('--x_include_mlp', default=False, action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
     parser.add_argument('--no_train_emb', default=False, action='store_true')
 

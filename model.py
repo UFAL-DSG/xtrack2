@@ -15,7 +15,7 @@ from passage.model import NeuralModel
 
 class Model(NeuralModel):
     def __init__(self, slots, slot_classes, emb_size, no_train_emb,
-                 x_include_score, x_include_token_ftrs,
+                 x_include_score, x_include_token_ftrs, x_include_mlp,
                  n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
                  lstm_peepholes, lstm_bidi, opt_type,
@@ -116,15 +116,25 @@ class Model(NeuralModel):
         for i in range(rnn_n_layers):
             # Forward LSTM layer.
             logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
+            if x_include_mlp:
+                f_lstm_layer = LstmWithMLP(name="flstm_%d" % i,
+                                       size=n_cells,
+                                       seq_output=True,
+                                       out_cells=False,
+                                       peepholes=lstm_peepholes,
+                                       p_drop=p_drop,
+                                       enable_branch_exp=enable_branch_exp,
+                                       mlps=mlps)
+            else:
+                f_lstm_layer = LstmRecurrent(name="flstm_%d" % i,
+                                       size=n_cells,
+                                       seq_output=True,
+                                       out_cells=False,
+                                       peepholes=lstm_peepholes,
+                                       p_drop=p_drop,
+                                       enable_branch_exp=enable_branch_exp
+                )
 
-            f_lstm_layer = LstmWithMLP(name="flstm_%d" % i,
-                                   size=n_cells,
-                                   seq_output=True,
-                                   out_cells=False,
-                                   peepholes=lstm_peepholes,
-                                   p_drop=p_drop,
-                                   enable_branch_exp=enable_branch_exp,
-                                   mlps=mlps)
             f_lstm_layer.connect(prev_layer)
 
 
