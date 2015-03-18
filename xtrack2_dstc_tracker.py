@@ -224,6 +224,7 @@ class XTrack2DSTCTracker(object):
         res = [result, accuracy]
         if output_len_accuracy:
             res.append(len_accuracy)
+            res.append(len_accuracy_n)
         return tuple(res)
 
 
@@ -240,15 +241,13 @@ def main(dataset_name, data_file, output_file, params_file):
     tracker = XTrack2DSTCTracker(data, models)
 
     t = time.time()
-    result, tracking_accuracy, len_accuracy = tracker.track()
+    result, tracking_accuracy, len_accuracy, len_accuracy_n = tracker.track(output_len_accuracy=True)
     t = time.time() - t
     logging.info('Tracking took: %.1fs' % t)
     for group, accuracy in tracking_accuracy.iteritems():
         logging.info('Accuracy %s: %.2f %%' % (group, accuracy * 100))
         for t in len_accuracy:
-            logging.info('Accuracy@%d %s: %.2f %%' % (t,
-                                                        group,
-                                                        len_accuracy[t][group] * 100))
+            print '%d %.2f %d' % (t, len_accuracy[t][group], len_accuracy_n[t][group])
 
 
     tracker_output = {
