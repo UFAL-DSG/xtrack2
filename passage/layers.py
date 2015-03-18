@@ -36,7 +36,6 @@ class Layer(object):
         return "%s__%s" % (self.name, param_name, )
 
 
-
 class MatrixInput(object):
     def __init__(self, matrix):
         self.matrix = matrix
@@ -53,6 +52,9 @@ class IdentityInput(object):
     def __init__(self, val, size):
         self.val = val
         self.size = size
+
+    def set_val(self, val):
+        self.val = val
 
     def output(self, dropout_active=False):
         return self.val
@@ -104,11 +106,11 @@ class SumLayer(object):
 
 class Embedding(Layer):
 
-    def __init__(self, name=None, size=128, n_features=256, init='normal',
+    def __init__(self, name=None, size=128, n_features=256, init=inits.normal,
                  static=False, input=None):
         if name:
             self.name = name
-        self.init = getattr(inits, init)
+        self.init = init
         self.size = size
         self.n_features = n_features
         self.input = input
@@ -158,10 +160,10 @@ class Embedding(Layer):
 
 
 class Recurrent(Layer):
-    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1):
         self.size = size
-        self.init = getattr(inits, init)
+        self.init = init
         self.name = name
         self.truncate_gradient = truncate_gradient
         self.seq_output = seq_output
@@ -220,12 +222,12 @@ class Recurrent(Layer):
 
 class LstmRecurrent(Layer):
 
-    def __init__(self, name=None, size=256, init='normal', truncate_gradient=-1,
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
                  peepholes=False, enable_branch_exp=False, backward=False):
         if name:
             self.name = name
-        self.init = getattr(inits, init)
+        self.init = init
         self.init_scale = init_scale
         self.size = size
         self.truncate_gradient = truncate_gradient
@@ -239,17 +241,13 @@ class LstmRecurrent(Layer):
         self.modul_act = activations.tanh
 
         self.enable_branch_exp = enable_branch_exp
+        self.lagged = []
 
-    def connect(self, l_in):
-        self.l_in = l_in
-        self.n_in = l_in.size
-
-        # Input connections.
-        self.w = self.init((self.n_in, self.size * 4),
+    def _init_input_connections(self, n_in):
+        self.w = self.init((n_in, self.size * 4),
                            layer_width=self.size,
                            scale=self.init_scale,
                            name=self._name_param("W"))
-
         self.b = self.init((self.size * 4, ),
                            layer_width=self.size,
                            scale=self.init_scale,
@@ -261,26 +259,27 @@ class LstmRecurrent(Layer):
         #b[self.size:] = 0.0
         self.b.set_value(b)
 
-        # Recurrent connections.
+    def _init_recurrent_connections(self):
         self.u = self.init((self.size, self.size * 4),
                            layer_width=self.size,
                            scale=self.init_scale,
                            name=self._name_param("U"))
 
-        # Peep-hole connections.
+    def _init_peephole_connections(self):
         self.p_vec_f = self.init((self.size, ),
-                           layer_width=self.size,
-                           scale=self.init_scale,
-                           name=self._name_param("peep_f"))
+                                 layer_width=self.size,
+                                 scale=self.init_scale,
+                                 name=self._name_param("peep_f"))
         self.p_vec_i = self.init((self.size, ),
-                           layer_width=self.size,
-                           scale=self.init_scale,
-                           name=self._name_param("peep_i"))
+                                 layer_width=self.size,
+                                 scale=self.init_scale,
+                                 name=self._name_param("peep_i"))
         self.p_vec_o = self.init((self.size, ),
-                           layer_width=self.size,
-                           scale=self.init_scale,
-                           name=self._name_param("peep_o"))
+                                 layer_width=self.size,
+                                 scale=self.init_scale,
+                                 name=self._name_param("peep_o"))
 
+    def _init_initial_states(self):
         self.init_c = self.init((self.size, ),
                                 layer_width=self.size,
                                 name=self._name_param("init_c"))
@@ -288,19 +287,28 @@ class LstmRecurrent(Layer):
                                 layer_width=self.size,
                                 name=self._name_param("init_h"))
 
-        #self.p = T.stack(T.diag(self.p_vec_f), T.diag(self.p_vec_i), T.diag(
-        #    self.p_vec_o))
+    def connect(self, l_in):
+        self.l_in = l_in
 
+        self._init_input_connections(l_in.size)
+        self._init_recurrent_connections()
+        self._init_peephole_connections()  # TODO: Make also conditional.
+        self._init_initial_states()
 
         self.params = [self.w, self.u, self.b]
         self.params += [self.init_c, self.init_h]
+
         if self.peepholes:
             self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
+
+    def connect_lagged(self, l_in):
+        self.lagged.append(l_in)
 
     def _slice(self, x, n):
             return x[:, n * self.size:(n + 1) * self.size]
 
-    def step(self, x_t, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o):
+    def step(self, x_t, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o,
+             dropout_active):
         h_tm1_dot_u = T.dot(h_tm1, u)
         gates_fiom = x_t + h_tm1_dot_u
 
@@ -329,33 +337,23 @@ class LstmRecurrent(Layer):
 
         return h_t, c_t
 
-    def output(self, dropout_active=False):
+    def _compute_x_dot_w(self, dropout_active):
         X = self.l_in.output(dropout_active=dropout_active)
         if self.p_drop > 0. and dropout_active:
             X = dropout(X, self.p_drop)
             dropout_corr = 1.0
         else:
             dropout_corr = 1.0 - self.p_drop
-
         x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
-        [out, cells], _ = theano.scan(self.step,
-            sequences=[x_dot_w],
-            #outputs_info=[
-            #    T.alloc(0., X.shape[1], self.size),
-            #    T.alloc(0.,X.shape[1], self.size)
-            #],
-            outputs_info=[
-                T.repeat(self.init_c.dimshuffle('x', 0), X.shape[1], axis=0),
-                T.repeat(self.init_h.dimshuffle('x', 0), X.shape[1], axis=0),
-            ],
-            non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
-            truncate_gradient=self.truncate_gradient,
-            go_backwards=self.backward
-        )
+        return x_dot_w
+
+    def _reverse_if_backward(self, cells, out):
         if self.backward:
             out = out[::-1, ]
             cells = cells[::-1, ]
+        return cells, out
 
+    def _prepare_result(self, cells, out):
         if self.seq_output:
             if self.out_cells:
                 return cells
@@ -366,91 +364,143 @@ class LstmRecurrent(Layer):
                 return cells[-1]
             else:
                 return out[-1]
+
+    def _prepare_outputs_info(self, x_dot_w):
+        outputs_info = [
+            T.repeat(self.init_c.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
+            T.repeat(self.init_h.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
+        ]
+        return outputs_info
+
+    def _process_scan_output(self, res):
+        (out, cells), _ = res
+
+        return out, cells
+
+    def _compute_seq(self, x_dot_w, dropout_active):
+        outputs_info = self._prepare_outputs_info(x_dot_w)
+
+        res = theano.scan(self.step,
+                                      sequences=[x_dot_w],
+                                      outputs_info=outputs_info,
+                                      non_sequences=[self.u, self.p_vec_f,
+                                                     self.p_vec_i,
+                                                     self.p_vec_o,
+                                                     1 if dropout_active else
+                                                     0],
+                                      truncate_gradient=self.truncate_gradient,
+                                      go_backwards=self.backward
+        )
+        out, cells = self._process_scan_output(res)
+        return cells, out
+
+    def output(self, dropout_active=False):
+        x_dot_w = self._compute_x_dot_w(dropout_active)
+
+        cells, out = self._compute_seq(x_dot_w, dropout_active)
+        cells, out = self._reverse_if_backward(cells, out)
+
+        return self._prepare_result(cells, out)
 
     def get_params(self):
         return self.l_in.get_params().union(self.params)
 
 
-class BayLstmRecurrent(LstmRecurrent):
+class LstmWithMLP(LstmRecurrent):
+
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
+                 seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
+                 peepholes=False, enable_branch_exp=False, backward=False,
+                 mlps=None):
+        super(LstmWithMLP, self).__init__(name, size, init, truncate_gradient,
+                                          seq_output, p_drop, init_scale,
+                                          out_cells, peepholes,
+                                          enable_branch_exp, backward)
+        self.mlps = mlps
+
     def connect(self, l_in):
-        super(BayLstmRecurrent, self).connect(l_in)
+        super(LstmWithMLP, self).connect(l_in)
 
-        self.p_w = inits.sharedX(float(np.random.randn(1)))
-        self.p_b = inits.sharedX(float(np.random.randn(1)))
+        self.mlp_inits = []
+        n_mlp_inputs = 0
+        for i, mlp in enumerate(self.mlps):
+            mlp_init = self.init((mlp.size, ), layer_width=mlp.size,
+                                 name=self._name_param("mlp_init_%d" % i))
+            self.mlp_inits.append(mlp_init)
+            n_mlp_inputs += mlp.size
 
-        self.params += [self.p_w, self.p_b]
+        self.params.extend(self.mlp_inits)
 
-    def step(self,
-             x_t, x_prob_t, x_switch_t,
-             h_tm1, c_tm1, ch_tm1,
-             u, p_vec_f, p_vec_i, p_vec_o):
+        self.w_mlp = self.init((n_mlp_inputs, self.size * 4),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("Wmlp"))
+        self.params.append(self.w_mlp)
 
-        h_t, c_t = super(BayLstmRecurrent, self).step(x_t, h_tm1, c_tm1, u,
-                                                  p_vec_f,
-                                           p_vec_i, p_vec_o)
+    def _prepare_outputs_info(self, x_dot_w):
+        outputs_info = super(LstmWithMLP, self)._prepare_outputs_info(x_dot_w)
+        for mlp_init in self.mlp_inits:
+            outputs_info.append(
+                T.repeat(mlp_init.dimshuffle('x', 0), x_dot_w.shape[1],
+                         axis=0),
+            )
+        return outputs_info
 
-        #x_switch_t = T.printing.Print('prob')(x_switch_t)
-        x_prob_t = x_prob_t * self.p_w + self.p_b
-        x_prob_t = x_prob_t.dimshuffle(0, 'x')
-        c_t = T.switch(
-            T.eq(x_switch_t, 1.0).dimshuffle(0, 'x'),
-            x_prob_t * c_t + (1.0 - x_prob_t) * ch_tm1,
-            c_t)
-        ch_t = T.switch(
-            T.eq(x_switch_t, 1.0).dimshuffle(0, 'x'),
-            c_t,
-            ch_tm1)
+    def _compute_seq(self, x_dot_w, dropout_active):
+        res = super(LstmWithMLP, self)._compute_seq(x_dot_w, dropout_active)
+        res = list(res)
+        h_t = res.pop(0)
+        c_t = res.pop(0)
+        return h_t, c_t
 
-        return h_t, c_t, ch_t
+    def _process_scan_output(self, res):
+        out = res[0][0]
+        cells = res[0][1]
 
-    def output(self, dropout_active=False):
-        X = self.l_in.output(dropout_active=dropout_active)
-        # X: (time, seq, emb)
-        #X = T.printing.Print('X')(X)
+        return out, cells
 
-        if self.p_drop > 0. and dropout_active:
-            X = dropout(X, self.p_drop)
-            dropout_corr = 1.0
-        else:
-            dropout_corr = 1.0 - self.p_drop
+    def step(self, *args):
+        i = 0
+        args = list(args)
 
-        Xprob = X[:, :, -1]
-        Xswitch = X[:, :, -2]
-        X = T.set_subtensor(X[:, :, -1], 0)
-        X = T.set_subtensor(X[:, :, -2], 0)
+        x_t = args.pop(0)
+        h_tm1 = args.pop(0)
+        c_tm1 = args.pop(0)
+        mlp_tm1 = []
+        for mlp in self.mlps:
+            mlp_tm1.append(args.pop(0))
+        xmlp_t_concat = T.concatenate(mlp_tm1, axis=1)
+        x_t += T.dot(xmlp_t_concat, self.w_mlp)
 
-        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
-        [out, cells, _], _ = theano.scan(self.step,
-            sequences=[x_dot_w, Xprob, Xswitch],
-            outputs_info=[
-                T.alloc(0., X.shape[1], self.size),
-                T.alloc(0., X.shape[1], self.size),
-                T.alloc(0., X.shape[1], self.size)
-            ],
-            non_sequences=[self.u, self.p_vec_f, self.p_vec_i, self.p_vec_o],
-            truncate_gradient=self.truncate_gradient
-        )
+        u = args.pop(0)
+        p_vec_f = args.pop(0)
+        p_vec_i = args.pop(0)
+        p_vec_o = args.pop(0)
+        dropout_active = args.pop(0)
 
-        if self.seq_output:
-            if self.out_cells:
-                return cells
-            else:
-                return out
-        else:
-            if self.out_cells:
-                return cells[-1]
-            else:
-                return out[-1]
+        h_t, c_t = super(LstmWithMLP, self).step(x_t, h_tm1, c_tm1, u, p_vec_f,
+                                                 p_vec_i, p_vec_o, dropout_active)
+
+        outs = [h_t, c_t]
+
+        #h_t_layer = IdentityInput(h_t, self.size)
+
+        for mlp in self.mlps:
+            #mlp.connect(h_t_layer)
+            mlp.l_in.set_val(h_t)
+            outs.append(mlp.output(dropout_active=bool(dropout_active)))
+
+        return tuple(outs)
 
 
 class Dense(Layer):
-    def __init__(self, name=None, size=256, activation='rectify', init='normal',
+    def __init__(self, name=None, size=256, activation='rectify', init=inits.normal,
                  p_drop=0.):
         if name:
             self.name = name
         self.activation_str = activation
         self.activation = getattr(activations, activation)
-        self.init = getattr(inits, init)
+        self.init = init
         self.size = size
         self.p_drop = p_drop
 
@@ -497,18 +547,19 @@ class Dense(Layer):
 
 class MLP(Layer):
     def __init__(self, sizes, activations, p_drop=itertools.repeat(0.0),
-                 name=None):
+                 name=None, init=inits.normal):
         layers = []
         for layer_id, (size, activation, l_p_drop) in enumerate(zip(sizes,
                                                            activations, p_drop)):
             layer = Dense(size=size, activation=activation, name="%s_%d" % (
-                name, layer_id, ), p_drop=l_p_drop)
+                name, layer_id, ), p_drop=l_p_drop, init=init)
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)
         self.size = layers[-1].size
 
     def connect(self, l_in):
+        self.l_in = l_in
         self.stack.connect(l_in)
 
     def output(self, dropout_active=False):

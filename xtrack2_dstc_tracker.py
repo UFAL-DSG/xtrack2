@@ -143,7 +143,7 @@ class XTrack2DSTCTracker(object):
             preds.append(pred)
         return preds
 
-    def track(self, tracking_log_file_name=None):
+    def track(self, tracking_log_file_name=None, output_len_accuracy=False):
         data = self.main_model.prepare_data_predict(self.data.sequences,
                                                self.data.slots)
 
@@ -158,6 +158,10 @@ class XTrack2DSTCTracker(object):
 
         pred_ptr = 0
 
+        len_accuracy = collections.defaultdict(lambda:
+                                               collections.defaultdict(int))
+        len_accuracy_n = collections.defaultdict(lambda:
+                                               collections.defaultdict(int))
         accuracy = collections.defaultdict(int)
         accuracy_n = collections.defaultdict(int)
         result = []
@@ -197,7 +201,9 @@ class XTrack2DSTCTracker(object):
                     for group, slots in self.slot_groups.iteritems():
                         if goals_correct[group]:
                             accuracy[group] += 1
+                            len_accuracy[last_pos][group] += 1
                         accuracy_n[group] += 1
+                        len_accuracy_n[last_pos][group] += 1
 
             result.append({
                 'session-id': dialog['id'],
@@ -211,7 +217,15 @@ class XTrack2DSTCTracker(object):
 
         for group in self.slot_groups:
             accuracy[group] = accuracy[group] * 1.0 / max(1, accuracy_n[group])
-        return result, accuracy
+            for t in len_accuracy:
+                factor = 1.0 / max(1, len_accuracy_n[t][group])
+                len_accuracy[t][group] = len_accuracy[t][group] * factor
+
+        res = [result, accuracy]
+        if output_len_accuracy:
+            res.append(len_accuracy)
+            res.append(len_accuracy_n)
+        return tuple(res)
 
 
 def main(dataset_name, data_file, output_file, params_file):
@@ -227,11 +241,13 @@ def main(dataset_name, data_file, output_file, params_file):
     tracker = XTrack2DSTCTracker(data, models)
 
     t = time.time()
-    result, tracking_accuracy = tracker.track()
+    result, tracking_accuracy, len_accuracy, len_accuracy_n = tracker.track(output_len_accuracy=True)
     t = time.time() - t
     logging.info('Tracking took: %.1fs' % t)
     for group, accuracy in tracking_accuracy.iteritems():
         logging.info('Accuracy %s: %.2f %%' % (group, accuracy * 100))
+        for t in len_accuracy:
+            print '%d %.2f %d' % (t, len_accuracy[t][group], len_accuracy_n[t][group])
 
 
     tracker_output = {

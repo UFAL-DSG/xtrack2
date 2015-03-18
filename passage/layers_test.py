@@ -85,12 +85,13 @@ def test_verify_exprgrad():
 
 
 if __name__ == '__main__':
-    def step(xx):
+    def step(xx, a):
         return xx
 
     x = tt.shared(np.random.randn(10, 1, 1))
-    xf, _ = theano.scan(step, sequences=x, go_backwards=False)
-    xb, _ = theano.scan(step, sequences=x, go_backwards=True)
+    xf, _ = theano.scan(step, sequences=x, non_sequences=[1],
+    go_backwards=False)
+    xb, _ = theano.scan(step, sequences=x, non_sequences=[0], go_backwards=True)
     xb = xb[::-1,]
     diff = (xb - xf).norm(2)
 

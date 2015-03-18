@@ -20,6 +20,18 @@ def normal_relu(shape, layer_width, scale=0.1, name=None):
     scale = np.sqrt(2.0 / layer_width)
     return sharedX(np.random.randn(*shape) * scale, name=name)
 
+
+def copy(params):
+    def _copy(*args, **kwargs):
+        name = kwargs.pop('name')
+        for param in params:
+            if param.name == name:
+                return param
+
+        raise Exception('Param to copy not found.')
+
+    return _copy
+
 """
 def orthogonal(shape, scale=1.1):
     " benanne lasagne ortho init (faster than qr approach)"

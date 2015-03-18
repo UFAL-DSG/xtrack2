@@ -24,6 +24,23 @@ def tokenize_letter(text):
         yield letter
 
 
+def get_cca_y(tokens, state, last_state):
+    res = []
+    if state is None:
+        state = {}
+    if last_state is None:
+        last_state = {}
+
+    key_diff = set(state.keys()).difference(last_state.keys())
+    res += list(key_diff)
+    for key in state:
+        if state[key] != last_state.get(key):
+            res.append("%s_%s" % (key, state[key]))
+
+    #print state, last_state, res
+    return " ".join(res)
+
+
 class XTrackData2(object):
     attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups',
                      'stats', 'token_features', 'score_bins']
@@ -69,7 +86,7 @@ class XTrackData2(object):
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                                                            oov_ins_p,
                      word_drop_p,
-                     n_best_order, f_dump_text, true_msg, score_bins
+                     n_best_order, f_dump_text, f_dump_cca, true_msg, score_bins
                                                           ):
 
         curr_score_bin = ""
@@ -97,6 +114,12 @@ class XTrackData2(object):
                                                                         "".join(
             token_seq) + '\n')
         f_dump_text.write(("TRUE  " + true_msg + '\n'))
+
+
+        f_dump_cca.write(" ".join(token_seq))
+        f_dump_cca.write("\t")
+        f_dump_cca.write(get_cca_y(token_seq, state, last_state))
+        f_dump_cca.write('\n')
 
         for i, token in enumerate(token_seq):
             if word_drop_p > random.random():
@@ -168,7 +191,7 @@ class XTrackData2(object):
               word_drop_p,
               include_system_utterances, n_nbest_samples,
               n_best_order,
-              score_mean, dump_text, score_bins,
+              score_mean, dump_text, dump_cca, score_bins,
               split_dialogs=False,
               include_base_seqs=False):
         self._init(slots, slot_groups, based_on, include_base_seqs)
@@ -176,11 +199,13 @@ class XTrackData2(object):
         n_labels = 0
 
         f_dump_text = open(dump_text, 'w')
+        f_dump_cca = open(dump_cca, 'w')
         self.msg_scores = []
         self.word_freq = collections.Counter()
 
         for dialog_ndx, dialog in enumerate(dialogs):
             f_dump_text.write('> %s\n' % dialog.session_id)
+            last_state = None
             for path_id in range(n_nbest_samples):
                 f_dump_text.write('>> path %d\n' % path_id)
                 seq = {
@@ -195,7 +220,7 @@ class XTrackData2(object):
                     'true_input': [],
                 }
                 seq_data_keys = [key for key in seq if key.startswith('data')]
-                last_state = None
+
                 for msgs, state, actor in zip(dialog.messages,
                                               dialog.states,
                                               dialog.actors):
@@ -220,7 +245,7 @@ class XTrackData2(object):
                         self._process_msg(msg, msg_score, state, last_state,
                                           actor, seq,
                                           oov_ins_p, word_drop_p, n_best_order,
-                                          f_dump_text,
+                                          f_dump_text, f_dump_cca,
                                           true_msg, score_bins)
                     last_state = state
 
@@ -410,6 +435,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_nbest_samples', default=10, type=int)
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
+    parser.add_argument('--dump_cca', default='/dev/null')
     parser.add_argument('--split_dialogs', action='store_true', default=False)
 
     args = parser.parse_args()
@@ -446,7 +472,8 @@ if __name__ == '__main__':
               word_drop_p=args.word_drop_p,
               include_system_utterances=args.include_system_utterances,
               n_best_order=n_best_order, score_mean=args.score_mean,
-              dump_text=args.dump_text, n_nbest_samples=args.n_nbest_samples,
+              dump_text=args.dump_text, dump_cca=args.dump_cca,
+              n_nbest_samples=args.n_nbest_samples,
               split_dialogs=args.split_dialogs,
               include_base_seqs=args.include_base_seqs,
               #score_bins=[0.0, 0.3, 0.6, 0.95, 1.0]
