@@ -19,11 +19,6 @@ def tokenize(text):
         yield match.group(1)
 
 
-def tokenize_letter(text):
-    for letter in text:
-        yield letter
-
-
 def get_cca_y(tokens, state, last_state):
     res = []
     if state is None:
@@ -51,6 +46,8 @@ class XTrackData2(object):
         self.slots = slots
         self.slot_groups = slot_groups
         self.based_on = based_on
+        self.word_freq = collections.Counter()
+
         if based_on:
             data = XTrackData2.load(based_on)
             self.vocab = data.vocab
@@ -83,82 +80,103 @@ class XTrackData2(object):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
 
-    def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
-                                                           oov_ins_p,
-                     word_drop_p,
-                     n_best_order, f_dump_text, f_dump_cca, true_msg, score_bins
-                                                          ):
-
-        curr_score_bin = ""
+    def _get_score_bin(self, msg_score, score_bins):
         msg_score_bin = 0
         if score_bins:
             for i, x in enumerate(score_bins):
                 if np.exp(msg_score) < x:
-                    #curr_score_bin = "__%d" % i
+                    # curr_score_bin = "__%d" % i
                     msg_score_bin = i
                     break
             else:
                 msg_score_bin = len(score_bins) - 1
+        return msg_score_bin
 
+    def _tokenize_msg(self, actor, msg):
         msg = msg.lower()
-
         token_seq = list(tokenize(msg))
         if actor == data_model.Dialog.ACTOR_SYSTEM:
             token_seq = ["@%s" % token for token in token_seq]
-
         if not token_seq:
             token_seq = ['#NOTHING']
+        return token_seq
 
-
+    def _dump_msg_info(self, f_dump_cca, f_dump_text, last_state, msg_score,
+                       msg_score_bin, state, token_seq, true_msg):
         f_dump_text.write(("%2.2f %d  " % (msg_score, msg_score_bin)) + " "
                                                                         "".join(
             token_seq) + '\n')
         f_dump_text.write(("TRUE  " + true_msg + '\n'))
-
-
         f_dump_cca.write(" ".join(token_seq))
         f_dump_cca.write("\t")
         f_dump_cca.write(get_cca_y(token_seq, state, last_state))
         f_dump_cca.write('\n')
 
+    def _get_token_label(self, token, state):
+        res = []
+        for cls in self.classes:
+            if state:
+                state_val = state.get(cls)
+            else:
+                state_val = None
+
+            token_is_same = False
+            if state_val == token:
+                res.append(1)
+                token_is_same = True
+            else:
+                res.append(0)
+
+            if cls == token or token_is_same:
+                res.append(1)
+            else:
+                res.append(0)
+
+        return res
+
+    def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
+        token_ndx = self.get_token_ndx(token)
+        seq['data'].append(token_ndx)
+        seq['data_score'].append(msg_score_bin)
+        seq['data_actor'].append(actor)
+        seq['data_switch'].append(0)
+        seq['data_debug'].append(token)
+        seq['token_labels'].append(self._get_token_label(token, state))
+
+    def _append_label_to_seq(self, msg_score, seq, state):
+        label = {
+            'time': len(seq['data']) - 1,
+            'score': np.sqrt(np.exp(msg_score)),
+            'slots': {}
+        }
+        for slot, val in zip(self.slots, self.state_to_label(state,
+                                                             self.slots)):
+            label['slots'][slot] = val
+        seq['labels'].append(label)
+
+    def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
+                     oov_ins_p, word_drop_p, n_best_order, f_dump_text,
+                     f_dump_cca, true_msg, score_bins):
+
+        msg_score_bin = self._get_score_bin(msg_score, score_bins)
+        token_seq = self._tokenize_msg(actor, msg)
+        self._dump_msg_info(f_dump_cca, f_dump_text, last_state, msg_score,
+                            msg_score_bin, state, token_seq, true_msg)
+
         for i, token in enumerate(token_seq):
             if word_drop_p > random.random():
                 continue
 
-            #token += curr_score_bin
-            #print "%5.2f" % np.exp(msg_score), token
-            #token = stemmer.stem(token, 0, len(token) - 1)
-            #token = token[:4]
-
             self.word_freq[token] += 1
 
             if random.random() < oov_ins_p:
-                seq['data'].append(self.get_token_ndx('#OOV'))
-                seq['data_score'].append(msg_score_bin)
-                seq['data_actor'].append(actor)
-                seq['data_switch'].append(0)
-                seq['data_debug'].append('#OOV')
-            else:
-                token_ndx = self.get_token_ndx(token)
-                seq['data'].append(token_ndx)
-                seq['data_score'].append(msg_score_bin)
-                seq['data_actor'].append(actor)
-                seq['data_switch'].append(0)
-                seq['data_debug'].append(token)
+                token = '#OOV'
 
-
+            self._append_token_to_seq(actor, msg_score_bin, seq, token, state)
 
         seq['true_input'].append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
-            label = {
-                'time': len(seq['data']) - 1,
-                'score': np.sqrt(np.exp(msg_score)),
-                'slots': {}
-            }
-            for slot, val in zip(self.slots, self.state_to_label(state,
-                                                                 self.slots)):
-                label['slots'][slot] = val
-            seq['labels'].append(label)
+            self._append_label_to_seq(msg_score, seq, state)
 
 
     def _sample_paths(self, n, dialog, allowed_ndxs):
@@ -201,7 +219,6 @@ class XTrackData2(object):
         f_dump_text = open(dump_text, 'w')
         f_dump_cca = open(dump_cca, 'w')
         self.msg_scores = []
-        self.word_freq = collections.Counter()
 
         for dialog_ndx, dialog in enumerate(dialogs):
             f_dump_text.write('> %s\n' % dialog.session_id)
@@ -217,6 +234,8 @@ class XTrackData2(object):
                     'data_actor': [],
                     'data_switch': [],
                     'labels': [],
+                    'token_labels': [],
+                    'tags': {},
                     'true_input': [],
                 }
                 seq_data_keys = [key for key in seq if key.startswith('data')]
@@ -407,7 +426,6 @@ class XTrackData2(object):
         return xtd
 
 
-
 if __name__ == '__main__':
     from utils import init_logging
     init_logging('XTrackData')
@@ -437,18 +455,20 @@ if __name__ == '__main__':
     parser.add_argument('--dump_text', default='/dev/null')
     parser.add_argument('--dump_cca', default='/dev/null')
     parser.add_argument('--split_dialogs', action='store_true', default=False)
+    parser.add_argument('--tagged', action='store_true', default=False)
 
     args = parser.parse_args()
+
+    tagged = args.tagged
 
     dialogs = []
     for f_name in sorted(os.listdir(args.data_dir), key=lambda x: int(x.split(
             '.')[0])):
         if f_name.endswith('.json'):
-            dialogs.append(
-                data_model.Dialog.deserialize(
-                    open(os.path.join(args.data_dir, f_name)).read()
-                )
+            dialog = data_model.Dialog.deserialize(
+                open(os.path.join(args.data_dir, f_name)).read()
             )
+            dialogs.append(dialog)
 
     slot_groups = {}
     slots = []
@@ -463,6 +483,7 @@ if __name__ == '__main__':
         for slot in slot_group:
             if not slot in slots:
                 slots.append(slot)
+
 
     n_best_order = map(int, args.n_best_order.split(','))
 

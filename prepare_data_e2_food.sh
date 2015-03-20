@@ -34,7 +34,7 @@ python xtrack_data2.py \
         --data_dir ${E_ROOT}/train \
         --out_file ${E_ROOT}/train.json \
         --slots ${SLOTS} \
-        --oov_ins_p 0.00 \
+        --oov_ins_p 0.1 \
         --word_drop_p 0.0 \
         --n_best_order 1 \
         --n_nbest_samples 1 \

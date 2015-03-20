@@ -23,7 +23,7 @@ class Model(NeuralModel):
                  debug, p_drop,
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
-                 token_features,
+                 token_features, token_supervision,
                  momentum, enable_branch_exp, l1, l2, build_train=True):
         args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
         self.init_args = {}
@@ -35,6 +35,7 @@ class Model(NeuralModel):
         self.slots = slots
         self.slot_classes = slot_classes
         self.x_include_score = x_include_score
+        self.token_supervision = token_supervision
 
         x = T.imatrix()
         input_args = [x]
@@ -93,6 +94,26 @@ class Model(NeuralModel):
                                   p_drop=p_drop)
             input_transform.connect(prev_layer)
             prev_layer = input_transform
+
+        if token_supervision:
+            slot_value_pred = MLP([len(slots) * 2], ['sigmoid'],
+                                  p_drop=[p_drop], name='ts')
+            slot_value_pred.connect(prev_layer)
+
+            y_tokens_label = tt.itensor3()
+            token_supervision_loss_layer = TokenSupervisionLossLayer()
+            token_supervision_loss_layer.connect(slot_value_pred, y_tokens_label)
+
+            if debug:
+                self._token_supervision_loss = theano.function(input_args + [
+                    y_tokens_label], token_supervision_loss_layer.output())
+
+        else:
+            token_supervision_loss_layer = None
+            y_tokens_label = None
+
+
+
 
         logging.info('There are %d input layers.' % input_n_layers)
 
@@ -200,6 +221,9 @@ class Model(NeuralModel):
                 y_weights=y_weight
             )
             costs.append(slot_objective)
+        if token_supervision:
+            costs.append(token_supervision_loss_layer)
+
         cost = SumOut()
         cost.connect(*costs)  #, scale=1.0 / len(slots))
         self.params = params = list(cost.get_params())
@@ -235,6 +259,8 @@ class Model(NeuralModel):
         loss_args += [y_seq_id, y_time]
         loss_args += [y_weight]
         loss_args += [y_label[slot] for slot in slots]
+        if token_supervision:
+            loss_args += [y_tokens_label]
 
         if build_train:
             model_updates = updater.get_updates(params, cost_value)
@@ -272,6 +298,14 @@ class Model(NeuralModel):
     def prepare_data_predict(self, seqs, slots):
         return self._prepare_data(seqs, slots, with_labels=False)
 
+    def _prepare_y_token_labels_padding(self):
+        token_padding = []
+        for slot in self.slots:
+            token_padding.append(0)
+            token_padding.append(0)
+
+        return [token_padding]
+
     def _prepare_data(self, seqs, slots, with_labels=True):
         x = []
         x_score = []
@@ -281,6 +315,7 @@ class Model(NeuralModel):
         y_time = []
         y_labels = [[] for slot in slots]
         y_weights = []
+        y_token_labels = []
         for item in seqs:
             x.append(item['data'])
             x_score.append(item['data_score'])
@@ -294,6 +329,8 @@ class Model(NeuralModel):
                     y_labels[i].append(label['slots'][slot])
                 y_weights.append(label['score'])
 
+            y_token_labels.append(item['token_labels'])
+
         x = padded(x, is_int=True).transpose(1, 0)
 
         x_score = padded(x_score).transpose(1, 0)
@@ -305,6 +342,12 @@ class Model(NeuralModel):
 
         y_weights = np.array(y_weights, dtype=np.float32)
 
+        y_token_labels_padding = self._prepare_y_token_labels_padding()
+
+        y_token_labels = padded(y_token_labels,
+                         is_int=True,
+                         pad_by=y_token_labels_padding).transpose(1, 0, 2)
+
         data = [x]
         if self.x_include_score:
             data.append(x_score)
@@ -312,6 +355,8 @@ class Model(NeuralModel):
         if with_labels:
             data.append(y_weights)
             data.extend(y_labels)
+            if self.token_supervision:
+                data.append(y_token_labels)
 
         return tuple(data)
 

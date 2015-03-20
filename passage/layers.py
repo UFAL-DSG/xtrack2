@@ -63,6 +63,7 @@ class IdentityInput(object):
         return set()
 
 
+
 class ZipLayer(object):
     def __init__(self, concat_axis, layers):
         self.layers = layers
@@ -633,6 +634,26 @@ class WeightedCrossEntropyObjective(Layer):
             y_hat_out,
             self.y_weights
         )
+
+    def get_params(self):
+        return set(self.y_hat_layer.get_params())
+
+
+
+class TokenSupervisionLossLayer(object):
+    def connect(self, y_hat_layer, y_true):
+        self.y_hat_layer = y_hat_layer
+        self.y_true = y_true
+        self.size = 1
+
+    def output(self, dropout_active=False):
+        y_tokens_pred = self.y_hat_layer.output(dropout_active=dropout_active)
+        token_supervision_loss = self.y_true * T.log(y_tokens_pred)
+        token_supervision_loss += self.y_true * T.log(1 - y_tokens_pred)
+        token_supervision_loss = - token_supervision_loss.sum() / \
+                                 token_supervision_loss.shape[0]
+
+        return T.cast(token_supervision_loss, dtype=theano.config.floatX)
 
     def get_params(self):
         return set(self.y_hat_layer.get_params())

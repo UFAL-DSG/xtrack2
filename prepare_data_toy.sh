@@ -6,7 +6,8 @@ python toy_gen.py \
     --out_file $out/train.json \
     --based_on $out/train.json \
     --input_len 5 \
-    --dialog_len 5
+    --dialog_len 5 \
+    --dialog_cnt 10000
 for i in test valid; do
     python toy_gen.py \
         --out_file $out/$i.json \

@@ -62,6 +62,7 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
             for hyp in turn.input.live_asr:
                 user_messages.append((hyp.hyp, hyp.score))
 
+
             out_dialog.add_message(
                 user_messages,
                 state,

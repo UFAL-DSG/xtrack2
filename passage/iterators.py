@@ -4,16 +4,18 @@ from collections import Counter
 
 from utils import floatX, intX, shuffle, iter_data
 
-def padded(seqs, pad_back=True, is_int=False):
+def padded(seqs, pad_back=True, is_int=False, pad_by=None):
+    if not pad_by:
+        pad_by = [0]
     lens = map(len, seqs)
     max_len = max(lens)
     seqs_padded = []
     for seq, seq_len in zip(seqs, lens):
         n_pad = max_len - seq_len
         if pad_back:
-            seq = seq + [0] * n_pad
+            seq = seq + pad_by * n_pad
         else:
-            seq = [0] * n_pad + seq
+            seq = pad_by * n_pad + seq
         seqs_padded.append(seq)
 
     if is_int:
