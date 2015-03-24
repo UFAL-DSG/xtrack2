@@ -176,6 +176,7 @@ class XTrackData2(object):
 
         seq['true_input'].append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
+            self._append_token_to_seq(actor, 0, seq, '@over', state)
             self._append_label_to_seq(msg_score, seq, state)
 
 
