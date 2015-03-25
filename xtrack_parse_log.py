@@ -35,7 +35,7 @@ def add_best_stats_to_row(best_acc, best_epoch, best_param_file, row):
         row['p_%s' % stat] = best_param_file[stat]
 
 
-def main(log_file, print_header, sep_chr):
+def main(log_file, print_header, sep_chr, only_best_params):
     best_acc = defaultdict(float)
     best_epoch = defaultdict(lambda: -1)
     best_param_file = {}
@@ -75,14 +75,17 @@ def main(log_file, print_header, sep_chr):
                         best_epoch[acc_type] = epoch
                         best_param_file[acc_type] = param_file
 
-    add_best_stats_to_row(best_acc, best_epoch, best_param_file, row)
+    if not only_best_params:
+        add_best_stats_to_row(best_acc, best_epoch, best_param_file, row)
 
 
-    keys = sorted(row.keys())
-    if print_header:
-        print sep_chr.join(keys)
+        keys = sorted(row.keys())
+        if print_header:
+            print sep_chr.join(keys)
 
-    print sep_chr.join(str(row[key]) for key in keys)
+        print sep_chr.join(str(row[key]) for key in keys)
+    else:
+        print best_param_file['goals']
 
 
 if __name__ == '__main__':
@@ -92,6 +95,8 @@ if __name__ == '__main__':
     parser.add_argument('log_file')
     parser.add_argument('--print_header', default=False, action='store_true')
     parser.add_argument('--sep_chr', default='\t')
+    parser.add_argument('--only_best_params', default=False,
+                        action='store_true')
 
     args = parser.parse_args()
 
