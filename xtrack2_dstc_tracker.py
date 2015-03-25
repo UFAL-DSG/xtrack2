@@ -83,10 +83,6 @@ class XTrack2DSTCTracker(object):
         return res
 
     def build_output(self, pred, label):
-
-        goal_labels = {slot: self.classes_rev[slot][np.argmax(pred[i])]
-                       for i, slot in enumerate(self.data.slots)}
-
         raw_goal_labels = {}
         raw_goal_labels_prob = {}
         for i, slot in enumerate(self.data.slots):
@@ -114,19 +110,26 @@ class XTrack2DSTCTracker(object):
         goal_labels = {
             slot: {goal_labels[slot]: raw_goal_labels_prob[slot]}
             for slot in self.data.slots
-            if goal_labels[slot] != self.data.null_class
+            if goal_labels[slot] != self.data.null_class and
+                slot in ['food', 'area','location', 'pricerange', 'name']
         }
+        method_label = {}
+        method = goal_labels.get('method')
+        if method:
+            method_label[method] = raw_goal_labels_prob['method']
+
+        req_slots = {}
+        for slot in self.data.slots:
+            if slot.startswith('req_'):
+                req_slots[slot[4:]] = raw_goal_labels_prob[slot]
+
         goal_labels_debug = {
                 slot: goal_labels[slot].keys()[0] for slot in goal_labels
             }
         return {
             "goal-labels": goal_labels,
-            "method-label": {
-                #"byconstraints": 1.0
-            },
-            "requested-slots": {
-                #slot: 0.0 for slot in self.data.slots
-            },
+            "method-label": method,
+            "requested-slots": req_slots,
             "debug": goal_labels_debug
         }, goals_correct
 
