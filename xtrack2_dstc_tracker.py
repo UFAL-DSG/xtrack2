@@ -82,22 +82,30 @@ class XTrack2DSTCTracker(object):
             res[slot] = self.classes_rev[slot][label[slot]]
         return res
 
+    def _fill_method_label(self, method_label, pred, raw_label_probs):
+        method = pred.get('method')
+        if method:
+            method_label[method] = raw_label_probs['method']
+
+    def _fill_req_slots(self, req_slots, pred, raw_label_probs):
+        for slot in self.data.slots:
+            if slot.startswith('req_'):
+                if pred[slot] != self.data.null_class:
+                    req_slots[slot[4:]] = raw_label_probs[slot]
+
     def build_output(self, pred, label):
-        raw_goal_labels = {}
-        raw_goal_labels_prob = {}
+        raw_labels = {}
+        raw_label_probs = {}
         for i, slot in enumerate(self.data.slots):
             val = np.argmax(pred[i])
             val_prob = pred[i][val]
             if pred[i][val] == 0.0:
                 val = 0
-            raw_goal_labels[slot] = val
-            raw_goal_labels_prob[slot] = val_prob
-
-        goal_labels = {slot: self.classes_rev[slot][val]
-                       for slot, val in raw_goal_labels.iteritems()}
+            raw_labels[slot] = val
+            raw_label_probs[slot] = val_prob
 
         lbl = self._label_id_to_str(label)
-        pred = self._label_id_to_str(raw_goal_labels)
+        pred = self._label_id_to_str(raw_labels)
         for slot in self.data.slots:
             self.track_log.write("  %s lbl(%s) pred(%s)\n" % (slot,
                                                               lbl[slot], pred[slot]))
@@ -105,23 +113,19 @@ class XTrack2DSTCTracker(object):
         for group, slots in self.slot_groups.iteritems():
             goals_correct[group] = True
             for i, slot in enumerate(slots):
-                goals_correct[group] &= raw_goal_labels[slot] == label[slot]
+                goals_correct[group] &= raw_labels[slot] == label[slot]
 
         goal_labels = {
-            slot: {goal_labels[slot]: raw_goal_labels_prob[slot]}
+            slot: {pred[slot]: raw_label_probs[slot]}
             for slot in self.data.slots
-            if goal_labels[slot] != self.data.null_class and
+            if pred[slot] != self.data.null_class and
                 slot in ['food', 'area','location', 'pricerange', 'name']
         }
         method_label = {}
-        method = goal_labels.get('method')
-        if method:
-            method_label[method] = raw_goal_labels_prob['method']
+        self._fill_method_label(method_label, pred, raw_label_probs)
 
         req_slots = {}
-        for slot in self.data.slots:
-            if slot.startswith('req_'):
-                req_slots[slot[4:]] = raw_goal_labels_prob[slot]
+        self._fill_req_slots(req_slots, pred, raw_label_probs)
 
         goal_labels_debug = {
                 slot: goal_labels[slot].keys()[0] for slot in goal_labels
