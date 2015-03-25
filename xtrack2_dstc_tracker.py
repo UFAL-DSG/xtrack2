@@ -116,7 +116,7 @@ class XTrack2DSTCTracker(object):
                 goals_correct[group] &= raw_labels[slot] == label[slot]
 
         goal_labels = {
-            slot: {pred[slot]: raw_label_probs[slot]}
+            slot: {pred[slot]: 1.0}  #raw_label_probs[slot]}
             for slot in self.data.slots
             if pred[slot] != self.data.null_class and
                 slot in ['food', 'area','location', 'pricerange', 'name']
