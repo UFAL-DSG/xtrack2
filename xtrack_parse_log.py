@@ -49,6 +49,7 @@ def main(log_file, print_header, sep_chr):
         while True:
             try:
                 ln = next(f_lines)
+                ln = ln.strip()
             except StopIteration:
                 break
             if 'This model has' in ln:
