@@ -128,7 +128,7 @@ class XTrack2DSTCTracker(object):
             }
         return {
             "goal-labels": goal_labels,
-            "method-label": method,
+            "method-label": method_label,
             "requested-slots": req_slots,
             "debug": goal_labels_debug
         }, goals_correct
