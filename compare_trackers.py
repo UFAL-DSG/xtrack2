@@ -17,9 +17,21 @@ def load_labels(flist_path, flist_root):
     return labels
 
 
+def get_best_hypothesis(turn):
+    food_vals = turn['goal-labels'].get('food', {'_null_': 1.0})
 
-def main(trackfile1, trackfile2):
-    data_file = '/xdisk/data/dstc/xtrack/e2_food/valid.json'
+    v, p = sorted(food_vals.items(), key=lambda x: x[1])[-1]
+    p_mass = sum(p for _, p in turn['goal-labels']['food'].items())
+    p_null = 1.0 - p_mass
+    if p > p_null:
+        return v
+    else:
+        return '_null_'
+
+
+def main():
+    #data_file = '/xdisk/data/dstc/xtrack/e2_food/valid.json'
+    data_file = '/xdisk/data/dstc/xtrack/e2dev/test.json'
     data = XTrackData2.load(data_file)
 
     data_map = {}
@@ -43,14 +55,18 @@ def main(trackfile1, trackfile2):
         data_map[seq['id']] = texts
 
     tracker_files = [
-        trackfile1,
-        trackfile2
+        #trackfile1,
+        #trackfile2
 
         #'/xdisk/data/dstc/dstc2/scripts/baseline_output.json',
-        #'/tmp/trackb.json'
+        '/xdisk/tmp/dstc2_results/team4/entry0.test.json',
+        '/xdisk/tmp/dstc2_results/team4/entry0.test.json'
+        #'/tmp/trackb.json',
+
     ]
 
-    flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_dev.flist'
+    #flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_dev.flist'
+    flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_test.flist'
     flist_root = '/xdisk/data/dstc/dstc2/data/'
 
     labels = load_labels(flist_path, flist_root)
@@ -83,12 +99,8 @@ def main(trackfile1, trackfile2):
             print ">> Turn:"
             print "  %8.2f  " % score, text
             print "           true input: %s" % turn_true['transcription']
-            food_d1 = turn1['goal-labels'].get('food', {'_null_': 1.0}).keys(
-
-            )[0]
-            food_d2 = turn2['goal-labels'].get('food', {'_null_': 1.0}).keys(
-
-            )[0]
+            food_d1 = get_best_hypothesis(turn1)
+            food_d2 = get_best_hypothesis(turn2)
             food_t = turn_true['goal-labels'].get('food', '_null_')
 
 

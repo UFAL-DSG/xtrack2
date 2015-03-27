@@ -440,7 +440,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', required=True)
     parser.add_argument('--out_file', required=True)
-    parser.add_argument('--out_flist_file', required=False)
     parser.add_argument('--based_on', type=str, required=False, default=None)
     parser.add_argument('--include_base_seqs', action='store_true',
                         default=False)
@@ -451,7 +450,7 @@ if __name__ == '__main__':
     parser.add_argument('--include_system_utterances', action='store_true',
                         default=False)
     parser.add_argument('--n_best_order', default="0")
-    parser.add_argument('--n_nbest_samples', default=10, type=int)
+    parser.add_argument('--n_nbest_samples', default=1, type=int)
     parser.add_argument('--score_mean', default=0.0, type=float)
     parser.add_argument('--dump_text', default='/dev/null')
     parser.add_argument('--dump_cca', default='/dev/null')
@@ -505,12 +504,3 @@ if __name__ == '__main__':
 
     logging.info('Saving.')
     xtd.save(args.out_file)
-
-    logging.info('Saving file list.')
-    if args.out_flist_file:
-        flist = []
-        for dialog in xtd.sequences:
-            flist.append(dialog['source_dir'])
-        with open(args.out_flist_file, "w") as f_out:
-            f_out.write("\n".join(flist))
-
