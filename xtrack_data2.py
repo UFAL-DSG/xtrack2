@@ -77,12 +77,13 @@ class XTrackData2Builder(object):
             'id': dialog.session_id,
             'source_dir': dialog.object_id,
             'data': [],
+            'data_tagged': [],
             'data_debug': [],
             'data_score': [],
             'data_actor': [],
             'labels': [],
             'token_labels': [],
-            'tags': {},
+            'tags': collections.defaultdict(list),
             'true_input': [],
         }
         return seq
@@ -110,9 +111,20 @@ class XTrackData2Builder(object):
         self.f_dump_cca.write(get_cca_y(token_seq, state, last_state))
         self.f_dump_cca.write('\n')
 
+    def _tag_token(self, token, seq):
+        tag = self.xd.tag_token(token)
+        if tag:
+            if not token in seq['tags'][tag]:
+                seq['tags'][tag].append(token)
+
+            return '#%s%d#' % (tag, seq['tags'][tag].index(token), )
+        else:
+            return token
+
     def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
         token_ndx = self.xd.get_token_ndx(token)
         seq['data'].append(token_ndx)
+        seq['data_tagged'].append(self._tag_token(token, seq))
         seq['data_score'].append(msg_score_bin)
         seq['data_actor'].append(actor)
         seq['data_debug'].append(token)
@@ -271,6 +283,11 @@ class XTrackData2(object):
             else:
                 logging.warning('Mapping to OOV: %s' % token)
                 return self.vocab['#OOV']
+
+    def tag_token(self, token):
+        for cls, vals in self.classes.iteritems():
+            if token in vals:
+                return cls
 
     def state_to_label(self, state, slots):
         res = []
