@@ -22,7 +22,7 @@ def _stringify_act(acts):
 
 
 def import_dstc(data_dir, out_dir, flist, constraint_slots,
-                requestable_slots, n_best_sample_paths, n_best_range,
+                requestable_slots,
                 use_stringified_system_acts):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
@@ -95,9 +95,7 @@ if __name__ == '__main__':
                                                        'postcode,signature')
     parser.add_argument('--use_stringified_system_acts', action='store_true',
                         default=False)
-    # Note: Avg # of ASR hyps/turn is 10.
-    parser.add_argument('--n_best_sample_paths', type=int, default=5)
-    parser.add_argument('--n_best_range', type=int, default=3)
+
     args = parser.parse_args()
 
     import_dstc(**vars(args))

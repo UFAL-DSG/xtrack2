@@ -36,140 +36,138 @@ def get_cca_y(tokens, state, last_state):
     return " ".join(res)
 
 
-class XTrackData2(object):
-    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots', 'slot_groups',
-                     'stats', 'token_features', 'score_bins']
+class XTrackData2Builder(object):
+    def _open_dump_files(self, debug_dir):
+        if debug_dir:
+            if not os.path.exists(debug_dir):
+                os.mkdir(debug_dir)
+            fname_dump_text = os.path.join(debug_dir, 'dump.text')
+            fname_dump_cca = os.path.join(debug_dir, 'dump.cca')
+        else:
+            fname_dump_text = '/dev/null'
+            fname_dump_cca = '/dev/null'
 
-    null_class = '_null_'
+        self.f_dump_text = open(fname_dump_text, 'w')
+        self.f_dump_cca = open(fname_dump_cca, 'w')
 
-    def _init(self, slots, slot_groups, based_on, include_base_seqs):
+    def __init__(self, slots, slot_groups, based_on, include_base_seqs,
+              oov_ins_p, word_drop_p, include_system_utterances, nth_best,
+              score_bins, debug_dir):
         self.slots = slots
         self.slot_groups = slot_groups
         self.based_on = based_on
+        self.include_base_seqs = include_base_seqs
+        self.oov_ins_p = oov_ins_p
+        self.word_drop_p = word_drop_p
+        self.include_system_utterances = include_system_utterances
+        self.nth_best = nth_best
+        self.debug_dir = debug_dir
+
+        self.xd = XTrackData2()
+        self.xd.initialize(self.slots, self.slot_groups, self.based_on,
+                           self.include_base_seqs, score_bins)
         self.word_freq = collections.Counter()
 
-        if based_on:
-            data = XTrackData2.load(based_on)
-            self.vocab = data.vocab
-            self.classes = data.classes
-            self.vocab_fixed = True
-            self.stats = data.stats
-            self.token_features = data.token_features
-            if include_base_seqs:
-                self.sequences = data.sequences
-            else:
-                self.sequences = []
-        else:
-            self.vocab = {
-                "#NOTHING": 0,
-                "#EOS": 1,
-                "#OOV": 2,
-            }
-
-            self.classes = {}
-            for slot in slots:
-                self.classes[slot] = {self.null_class: 0}
-
-            self.vocab_fixed = False
-            self.stats = None
-            self.sequences = []
-
-        self._init_after_load()
-
-    def _init_after_load(self):
-        self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
+        self._open_dump_files(debug_dir)
 
 
-    def _get_score_bin(self, msg_score, score_bins):
-        msg_score_bin = 0
-        if score_bins:
-            for i, x in enumerate(score_bins):
-                if np.exp(msg_score) < x:
-                    # curr_score_bin = "__%d" % i
-                    msg_score_bin = i
-                    break
-            else:
-                msg_score_bin = len(score_bins) - 1
-        return msg_score_bin
+
+    def _create_seq(self, dialog):
+        seq = {
+            'id': dialog.session_id,
+            'source_dir': dialog.object_id,
+            'data': [],
+            'data_debug': [],
+            'data_score': [],
+            'data_actor': [],
+            'labels': [],
+            'token_labels': [],
+            'tags': {},
+            'true_input': [],
+        }
+        return seq
 
     def _tokenize_msg(self, actor, msg):
         msg = msg.lower()
         token_seq = list(tokenize(msg))
+
         if actor == data_model.Dialog.ACTOR_SYSTEM:
             token_seq = ["@%s" % token for token in token_seq]
+
         if not token_seq:
             token_seq = ['#NOTHING']
+
         return token_seq
 
-    def _dump_msg_info(self, f_dump_cca, f_dump_text, last_state, msg_score,
-                       msg_score_bin, state, token_seq, true_msg):
-        f_dump_text.write(("%2.2f %d  " % (msg_score, msg_score_bin)) + " "
+    def _dump_msg_info(self, last_state, msg_score, msg_score_bin, state,
+                       token_seq, true_msg):
+        self.f_dump_text.write(("%2.2f %d  " % (msg_score, msg_score_bin)) + " "
                                                                         "".join(
             token_seq) + '\n')
-        f_dump_text.write(("TRUE  " + true_msg + '\n'))
-        f_dump_cca.write(" ".join(token_seq))
-        f_dump_cca.write("\t")
-        f_dump_cca.write(get_cca_y(token_seq, state, last_state))
-        f_dump_cca.write('\n')
-
-    def _get_token_label(self, token, state):
-        res = []
-        for cls in self.classes:
-            if state:
-                state_val = state.get(cls)
-            else:
-                state_val = None
-
-            token_is_same = False
-            if state_val == token:
-                res.append(1)
-                token_is_same = True
-            else:
-                res.append(0)
-
-            if cls == token or token_is_same:
-                res.append(1)
-            else:
-                res.append(0)
-
-        return res
+        self.f_dump_text.write(("TRUE  " + true_msg + '\n'))
+        self.f_dump_cca.write(" ".join(token_seq))
+        self.f_dump_cca.write("\t")
+        self.f_dump_cca.write(get_cca_y(token_seq, state, last_state))
+        self.f_dump_cca.write('\n')
 
     def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
-        token_ndx = self.get_token_ndx(token)
+        token_ndx = self.xd.get_token_ndx(token)
         seq['data'].append(token_ndx)
         seq['data_score'].append(msg_score_bin)
         seq['data_actor'].append(actor)
-        seq['data_switch'].append(0)
         seq['data_debug'].append(token)
-        seq['token_labels'].append(self._get_token_label(token, state))
 
     def _append_label_to_seq(self, msg_score, seq, state):
         label = {
             'time': len(seq['data']) - 1,
-            'score': np.sqrt(np.exp(msg_score)),
+            'score': np.exp(msg_score),
             'slots': {}
         }
-        for slot, val in zip(self.slots, self.state_to_label(state,
-                                                             self.slots)):
+
+        slot_labels = self.xd.state_to_label(state, self.slots)
+        for slot, val in zip(self.slots, slot_labels):
             label['slots'][slot] = val
         seq['labels'].append(label)
 
-    def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
-                     oov_ins_p, word_drop_p, n_best_order, f_dump_text,
-                     f_dump_cca, true_msg, score_bins):
+    def _process_dialog(self, dialog, last_state, seq):
+        for msgs, state, actor in zip(dialog.messages,
+                                      dialog.states,
+                                      dialog.actors):
+            actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
 
-        msg_score_bin = self._get_score_bin(msg_score, score_bins)
+            if actor_is_system:
+                msg_id = 0
+            else:
+                msg_id = self.nth_best
+
+            msg, msg_score = msgs[msg_id]
+            true_msg, _ = msgs[0]
+
+            if actor == data_model.Dialog.ACTOR_USER:
+                self.msg_scores.append(np.exp(msg_score))
+
+            if not self.include_system_utterances and actor_is_system:
+                continue
+            else:
+                self._process_msg(msg, msg_score, state, last_state, actor, seq,
+                                  true_msg)
+            last_state = state
+
+    def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
+                     true_msg):
+
+        msg_score_bin = self.xd.get_score_bin(msg_score)
         token_seq = self._tokenize_msg(actor, msg)
-        self._dump_msg_info(f_dump_cca, f_dump_text, last_state, msg_score,
-                            msg_score_bin, state, token_seq, true_msg)
+        self._dump_msg_info(last_state, msg_score, msg_score_bin, state,
+                            token_seq, true_msg)
 
         for i, token in enumerate(token_seq):
-            if word_drop_p > random.random():
+            if self.word_drop_p > random.random():
                 continue
 
             self.word_freq[token] += 1
 
-            if random.random() < oov_ins_p:
+            if random.random() < self.oov_ins_p:
                 token = '#OOV'
 
             self._append_token_to_seq(actor, msg_score_bin, seq, token, state)
@@ -179,165 +177,88 @@ class XTrackData2(object):
             self._append_token_to_seq(actor, 0, seq, '@over', state)
             self._append_label_to_seq(msg_score, seq, state)
 
+    def _perform_sanity_checks(self, seq):
+        # Sanity check that all data elements are equal size.
+        seq_data_keys = [key for key in seq if key.startswith('data')]
+        data_lens = [len(seq[key]) for key in seq_data_keys]
+        assert data_lens[1:] == data_lens[:-1]
 
-    def _sample_paths(self, n, dialog, allowed_ndxs):
-        res = []
-        for i in range(n):
-            path = []
-            for msgs in dialog:
-                path.append(random.choice([i for i in allowed_ndxs
-                                           if i < len(msgs)]))
-            res.append(path)
+    def _append_seq_if_nonempty(self, n_labels, seq):
+        if len(seq['data']) > 0:
+            n_labels += len(seq['labels'])
+            self.xd.add_sequence(seq)
+        return n_labels
 
-        return res
-
-    def _split_dialog(self, seq):
-        seqs = []
-        for i, label in enumerate(seq['labels']):
-            t = label['time']
-            new_seq = {}
-            new_seq['id'] = seq['id'] + "@%d" % i
-            new_seq['source_dir'] = seq['source_dir']
-            new_seq['labels'] = [label]
-            for key in ['data', 'data_score', 'data_actor', 'data_switch']:
-                new_seq[key] = seq[key][:t + 1]
-
-            seqs.append(new_seq)
-
-        return seqs
-
-    def build(self, dialogs, slots, slot_groups, based_on, oov_ins_p,
-              word_drop_p,
-              include_system_utterances, n_nbest_samples,
-              n_best_order,
-              score_mean, dump_text, dump_cca, score_bins,
-              split_dialogs=False,
-              include_base_seqs=False):
-        self._init(slots, slot_groups, based_on, include_base_seqs)
-        self.score_bins = score_bins
+    def build(self, dialogs):
         n_labels = 0
 
-        f_dump_text = open(dump_text, 'w')
-        f_dump_cca = open(dump_cca, 'w')
         self.msg_scores = []
 
         for dialog_ndx, dialog in enumerate(dialogs):
-            f_dump_text.write('> %s\n' % dialog.session_id)
+            self.f_dump_text.write('> %s\n' % dialog.session_id)
             last_state = None
-            for path_id in range(n_nbest_samples):
-                f_dump_text.write('>> path %d\n' % path_id)
-                seq = {
-                    'id': dialog.session_id,
-                    'source_dir': dialog.object_id,
-                    'data': [],
-                    'data_debug': [],
-                    'data_score': [],
-                    'data_actor': [],
-                    'data_switch': [],
-                    'labels': [],
-                    'token_labels': [],
-                    'tags': {},
-                    'true_input': [],
-                }
-                seq_data_keys = [key for key in seq if key.startswith('data')]
 
-                for msgs, state, actor in zip(dialog.messages,
-                                              dialog.states,
-                                              dialog.actors):
-                    actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
+            seq = self._create_seq(dialog)
 
-                    if actor_is_system:
-                        msg_id = 0
-                    else:
-                        msg_id = random.choice(n_best_order)
+            self._process_dialog(dialog, last_state, seq)
 
-                    msg, msg_score = msgs[msg_id]
-                    true_msg, _ = msgs[0]
+            self._perform_sanity_checks(seq)
+            n_labels = self._append_seq_if_nonempty(n_labels, seq)
 
-                    if actor == data_model.Dialog.ACTOR_USER:
-                        self.msg_scores.append(np.exp(msg_score))
-
-                    if not include_system_utterances and actor_is_system:
-                        continue
-                    else:
-                        #msg_score = max(msg_score, -100)
-                        #msg_score = np.exp(msg_score)
-                        self._process_msg(msg, msg_score, state, last_state,
-                                          actor, seq,
-                                          oov_ins_p, word_drop_p, n_best_order,
-                                          f_dump_text, f_dump_cca,
-                                          true_msg, score_bins)
-                    last_state = state
-
-
-                # Sanity check that all data elements are equal size.
-                data_lens = [len(seq[key]) for key in seq_data_keys]
-                assert data_lens[1:] == data_lens[:-1]
-                if len(seq['data']) > 0:
-                    n_labels += len(seq['labels'])
-
-                    if not split_dialogs:
-                        self.sequences.append(seq)
-                    else:
-                        self.sequences.extend(self._split_dialog(seq))
-            f_dump_text.write('\n')
+            self.f_dump_text.write('\n')
 
         logging.info('There are in total %d labels in %d sequences.'
-                     % (n_labels, len(self.sequences, )))
+                     % (n_labels, len(self.xd.sequences, )))
 
-        #if not self.stats:
-        #    logging.info('Computing stats.')
-        #    self._compute_stats('data_score', 'data_switch')
-
-        #logging.info('Normalizing.')
-        #self._normalize('data_score', 'data_switch')
-
-        if not self.based_on:
-            logging.info('Building token features.')
-            self._build_token_features()
+        return self.xd
 
 
-    def _build_token_features(self):
-        self.token_features = {}
-        for word, word_id in self.vocab.iteritems():
-            features = []
-            for slot in self.slots:
-                features.append(int(word in slot))
-                for cls in self.classes[slot]:
-                    ftr_val = 0
-                    for cls_part in cls.split():
-                        if cls_part[0] == '@':
-                            cls_part = cls_part[1:]
-                        if word in cls_part:
-                            ftr_val = 1
-                            break
+class XTrackData2(object):
+    attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes', 'slots',
+                     'slot_groups', 'stats', 'score_bins']
 
-                    features.append(ftr_val)
-            self.token_features[word_id] = features
+    null_class = '_null_'
+    slots = None
+    vocab = None
+    slot_groups = None
 
 
-    def _compute_stats(self, *vars):
-        score = {var: [] for var in vars}
-        for seq in self.sequences:
-            for var in vars:
-                score[var].extend(seq[var])
-        #import ipdb; ipdb.set_trace()
-        self.stats = {}
-        for var in vars:
-            mean = np.mean(score[var])
-            stddev = np.std(score[var])
-            self.stats[var] = {
-                'mean': mean,
-                'stddev': stddev
+    def initialize(self, slots, slot_groups, based_on, include_base_seqs,
+                   score_bins):
+        self.slots = slots
+        self.slot_groups = slot_groups
+
+        if based_on:
+            data = XTrackData2.load(based_on)
+            self.vocab = data.vocab
+            self.classes = data.classes
+            self.vocab_fixed = True
+            self.stats = data.stats
+            if include_base_seqs:
+                self.sequences = data.sequences
+            else:
+                self.sequences = []
+            self.score_bins = data.score_bins
+        else:
+            self.vocab = {
+                "#NOTHING": 0,
+                "#EOS": 1,
+                "#OOV": 2,
             }
 
-    def _normalize(self, *vars):
-        for seq in self.sequences:
-            for var in vars:
-                res = seq[var]
-                for i in xrange(len(res)):
-                    res[i] -= self.stats[var]['mean']
-                    res[i] /= self.stats[var]['stddev'] + 1e-7
+            self.classes = {}
+            for slot in self.slots:
+                self.classes[slot] = {self.null_class: 0}
+
+            self.vocab_fixed = False
+            self.stats = None
+            self.sequences = []
+            self.score_bins = score_bins
+
+        self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
+
+    def add_sequence(self, seq):
+        self.sequences.append(seq)
 
     def get_token_ndx(self, token):
         if token in self.vocab:
@@ -382,6 +303,18 @@ class XTrackData2(object):
 
             return res
 
+    def get_score_bin(self, msg_score):
+        msg_score_bin = 0
+        if self.score_bins:
+            for i, x in enumerate(self.score_bins):
+                if np.exp(msg_score) < x:
+                    # curr_score_bin = "__%d" % i
+                    msg_score_bin = i
+                    break
+            else:
+                msg_score_bin = len(self.score_bins) - 1
+        return msg_score_bin
+
     def save(self, out_file):
         with open(out_file, 'w') as f_out:
             obj = {}
@@ -390,7 +323,7 @@ class XTrackData2(object):
 
             json.dump(obj, f_out, indent=4)
 
-
+        """
         import matplotlib
         matplotlib.use('Agg')
         import seaborn as sns
@@ -410,6 +343,7 @@ class XTrackData2(object):
                     f_out.write(word + '\n')
 
         #import ipdb; ipdb.set_trace()
+        """
 
 
     @classmethod
@@ -422,19 +356,101 @@ class XTrackData2(object):
             val = data[attr]
             setattr(xtd, attr, val)
 
-        xtd._init_after_load()
-
         return xtd
 
 
-if __name__ == '__main__':
-    from utils import init_logging
-    init_logging('XTrackData')
+def load_dialogs(data_dir):
+    dialogs = []
+    for f_name in sorted(os.listdir(data_dir), key=lambda x: int(x.split(
+            '.')[0])):
+        if f_name.endswith('.json'):
+            dialog = data_model.Dialog.deserialize(
+                open(os.path.join(data_dir, f_name)).read()
+            )
+            dialogs.append(dialog)
+    return dialogs
 
+
+def parse_slots_and_slot_groups(args):
+    slot_groups = {}
+    slots = []
+    for i, slot_group in enumerate(args.slots.split(':')):
+        if '=' in slot_group:
+            name, vals = slot_group.split('=', 1)
+        else:
+            name = 'grp%d' % i
+            vals = slot_group
+        slot_group = vals.split(',')
+        slot_groups[name] = slot_group
+        for slot in slot_group:
+            if not slot in slots:
+                slots.append(slot)
+    return slot_groups, slots
+
+
+import import_dstc
+
+def import_dstc_data(data_directory, e_root, dataset, data_name):
+    input_dir = os.path.join(data_directory, 'dstc2/data')
+    out_dir = os.path.join(e_root, dataset)
+    flist = os.path.join(data_directory,
+                         'dstc2/scripts/config/dstc2_%s.flist' % dataset)
+    import_dstc.import_dstc(data_dir=input_dir, out_dir=out_dir, flist=flist,
+                            constraint_slots='food,area,pricerange,name',
+                            requestable_slots='food,area,pricerange,'
+                                                       'name,addr,phone,'
+                                                       'postcode,signature',
+                            use_stringified_system_acts=True)
+
+    return out_dir
+
+
+def prepare_experiment(experiment_name, data_directory, slots, slot_groups):
+    e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
+    debug_dir = os.path.join(e_root, 'debug')
+
+    based_on = None
+    for dataset in ['train', 'dev', 'test']:
+        data_dir = import_dstc_data(data_directory=data_directory,
+                                    e_root=e_root,
+                                    dataset=dataset,
+                                    data_name=experiment_name)
+        dialogs = load_dialogs(data_dir)
+
+
+
+        logging.info('Initializing.')
+        xtd_builder = XTrackData2Builder(
+            based_on=based_on,
+            include_base_seqs=False,
+            slots=slots,
+            slot_groups=slot_groups,
+            oov_ins_p=0.1,
+            word_drop_p=0.0,
+            include_system_utterances=True,
+            nth_best=1,
+            score_bins=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0],
+            debug_dir=debug_dir
+        )
+        logging.info('Building.')
+        xtd = xtd_builder.build(dialogs)
+
+        logging.info('Saving.')
+        out_file = os.path.join(e_root, '%s.json' % dataset)
+        xtd.save(out_file)
+
+        if dataset == 'train':
+            based_on = out_file
+"""
+
+def main():
+    from utils import init_logging
+
+    init_logging('XTrackData')
     random.seed(0)
     from utils import pdb_on_error
-    pdb_on_error()
 
+    pdb_on_error()
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -449,58 +465,38 @@ if __name__ == '__main__':
                         default=0.0)
     parser.add_argument('--include_system_utterances', action='store_true',
                         default=False)
-    parser.add_argument('--n_best_order', default="0")
-    parser.add_argument('--n_nbest_samples', default=1, type=int)
-    parser.add_argument('--score_mean', default=0.0, type=float)
-    parser.add_argument('--dump_text', default='/dev/null')
-    parser.add_argument('--dump_cca', default='/dev/null')
-    parser.add_argument('--split_dialogs', action='store_true', default=False)
-    parser.add_argument('--tagged', action='store_true', default=False)
+    parser.add_argument('--nth_best', type=int, default=1)
+    parser.add_argument('--debug_dir', default=None)
 
     args = parser.parse_args()
 
-    tagged = args.tagged
 
-    dialogs = []
-    for f_name in sorted(os.listdir(args.data_dir), key=lambda x: int(x.split(
-            '.')[0])):
-        if f_name.endswith('.json'):
-            dialog = data_model.Dialog.deserialize(
-                open(os.path.join(args.data_dir, f_name)).read()
-            )
-            dialogs.append(dialog)
+    slot_groups, slots = parse_slots_and_slot_groups(args)
+    score_bins = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0]
 
-    slot_groups = {}
-    slots = []
-    for i, slot_group in enumerate(args.slots.split(':')):
-        if '=' in slot_group:
-            name, vals = slot_group.split('=', 1)
-        else:
-            name = 'grp%d' % i
-            vals = slot_group
-        slot_group = vals.split(',')
-        slot_groups[name] = slot_group
-        for slot in slot_group:
-            if not slot in slots:
-                slots.append(slot)
+    dialogs = load_dialogs(args.data_dir)
 
-
-    n_best_order = map(int, args.n_best_order.split(','))
-
-    xtd = XTrackData2()
-    xtd.build(dialogs=dialogs, based_on=args.based_on, slots=slots,
-              slot_groups=slot_groups, oov_ins_p=args.oov_ins_p,
-              word_drop_p=args.word_drop_p,
-              include_system_utterances=args.include_system_utterances,
-              n_best_order=n_best_order, score_mean=args.score_mean,
-              dump_text=args.dump_text, dump_cca=args.dump_cca,
-              n_nbest_samples=args.n_nbest_samples,
-              split_dialogs=args.split_dialogs,
-              include_base_seqs=args.include_base_seqs,
-              #score_bins=[0.0, 0.3, 0.6, 0.95, 1.0]
-              score_bins=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                          0.95, 1.0]
+    logging.info('Initializing.')
+    xtd_builder = XTrackData2Builder(
+        based_on=args.based_on,
+        include_base_seqs=args.include_base_seqs,
+        slots=slots,
+        slot_groups=slot_groups,
+        oov_ins_p=args.oov_ins_p,
+        word_drop_p=args.word_drop_p,
+        include_system_utterances=args.include_system_utterances,
+        nth_best=args.nth_best,
+        score_bins=score_bins,
+        debug_dir=args.debug_dir
     )
+    logging.info('Building.')
+    xtd = xtd_builder.build(dialogs)
 
     logging.info('Saving.')
     xtd.save(args.out_file)
+
+
+if __name__ == '__main__':
+    main()
+
+    """
