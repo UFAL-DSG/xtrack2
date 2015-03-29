@@ -82,6 +82,7 @@ class XTrackData2Builder(object):
             'data_score': [],
             'data_actor': [],
             'labels': [],
+            'labels_tagged': [],
             'token_labels': [],
             'tags': collections.defaultdict(list),
             'true_input': [],
@@ -124,7 +125,9 @@ class XTrackData2Builder(object):
     def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
         token_ndx = self.xd.get_token_ndx(token)
         seq['data'].append(token_ndx)
-        seq['data_tagged'].append(self._tag_token(token, seq))
+        tagged_token = self._tag_token(token, seq)
+        tagged_token_ndx = self.xd.get_token_ndx(tagged_token)
+        seq['data_tagged'].append(tagged_token_ndx)
         seq['data_score'].append(msg_score_bin)
         seq['data_actor'].append(actor)
         seq['data_debug'].append(token)
@@ -133,13 +136,22 @@ class XTrackData2Builder(object):
         label = {
             'time': len(seq['data']) - 1,
             'score': np.exp(msg_score),
-            'slots': {}
+            'slots': {},
+            'slots_tagged': {}
         }
 
         slot_labels = self.xd.state_to_label(state, self.slots)
         for slot, val in zip(self.slots, slot_labels):
             label['slots'][slot] = val
+            try:
+                tagged_val = seq['tags'][slot].index(state.get(slot))
+            except ValueError:
+                print state.get(slot), seq['tags'][slot]
+                tagged_val = 0
+
+            label['slots_tagged'][slot] = tagged_val
         seq['labels'].append(label)
+
 
     def _process_dialog(self, dialog, last_state, seq):
         for msgs, state, actor in zip(dialog.messages,

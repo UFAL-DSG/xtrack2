@@ -14,6 +14,12 @@ from passage.model import NeuralModel
 
 
 class Model(NeuralModel):
+    def _build_tagged_classes(self):
+        res = {}
+        for slot in self.slots:
+            res[slot] = ['_other_', '_null_', 'tag1', 'tag2']
+        return res
+
     def __init__(self, slots, slot_classes, emb_size, no_train_emb,
                  x_include_score, x_include_token_ftrs, x_include_mlp,
                  n_input_tokens, n_input_score_bins, n_cells,
@@ -24,7 +30,7 @@ class Model(NeuralModel):
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features, token_supervision,
-                 momentum, enable_branch_exp, l1, l2, build_train=True):
+                 momentum, enable_branch_exp, l1, l2, tagged, build_train=True):
         args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
         self.init_args = {}
         for arg in args:
@@ -32,8 +38,12 @@ class Model(NeuralModel):
                 self.init_args[arg] = locals()[arg]
 
         self.vocab = vocab
+        self.tagged = tagged
         self.slots = slots
-        self.slot_classes = slot_classes
+        if not tagged:
+            self.slot_classes = slot_classes
+        else:
+            self.slot_classes = self._build_tagged_classes()
         self.x_include_score = x_include_score
         self.token_supervision = token_supervision
 
@@ -317,7 +327,10 @@ class Model(NeuralModel):
         y_weights = []
         y_token_labels = []
         for item in seqs:
-            x.append(item['data'])
+            if not self.tagged:
+                x.append(item['data'])
+            else:
+                x.append(item['data_tagged'])
             x_score.append(item['data_score'])
             x_actor.append(item['data_actor'])
             x_switch.append(item['data_switch'])

@@ -351,7 +351,7 @@ def main(args_lst,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
-         x_include_mlp, enable_token_supervision):
+         x_include_mlp, enable_token_supervision, tagged):
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -416,6 +416,7 @@ def main(args_lst,
                   token_features=xtd_t.token_features,
                   enable_branch_exp=enable_branch_exp,
                   token_supervision=enable_token_supervision,
+                  tagged=tagged,
                   l1=l1,
                   l2=l2
     )
@@ -631,6 +632,8 @@ def build_argument_parser():
     parser.add_argument('--enable_branch_exp', default=False,
                         action='store_true')
     parser.add_argument('--enable_token_supervision', default=False,
+                        action='store_true')
+    parser.add_argument('--tagged', default=False,
                         action='store_true')
 
     return parser
