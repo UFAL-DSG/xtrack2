@@ -11,14 +11,12 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 
-
-
 class Model(NeuralModel):
-    def _build_tagged_classes(self):
-        res = {}
-        for slot in self.slots:
-            res[slot] = ['_other_', '_null_', 'tag1', 'tag2']
-        return res
+    def _log_classes_info(self):
+        for slot, vals in self.slot_classes.iteritems():
+            logging.info('  %s:' % slot)
+            for val, val_ndx in sorted(vals.iteritems(), key=lambda x: x[1]):
+                logging.info('    - %s (%d)' % (val, val_ndx))
 
     def __init__(self, slots, slot_classes, emb_size, no_train_emb,
                  x_include_score, x_include_token_ftrs, x_include_mlp,
@@ -30,7 +28,7 @@ class Model(NeuralModel):
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features, token_supervision,
-                 momentum, enable_branch_exp, l1, l2, tagged, build_train=True):
+                 momentum, enable_branch_exp, l1, l2, build_train=True):
         args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
         self.init_args = {}
         for arg in args:
@@ -38,12 +36,14 @@ class Model(NeuralModel):
                 self.init_args[arg] = locals()[arg]
 
         self.vocab = vocab
-        self.tagged = tagged
+
         self.slots = slots
-        if not tagged:
-            self.slot_classes = slot_classes
-        else:
-            self.slot_classes = self._build_tagged_classes()
+        self.slot_classes = slot_classes
+
+
+        logging.info('We have the following classes:')
+        self._log_classes_info()
+
         self.x_include_score = x_include_score
         self.token_supervision = token_supervision
 
@@ -320,46 +320,38 @@ class Model(NeuralModel):
         x = []
         x_score = []
         x_actor = []
-        x_switch = []
         y_seq_id = []
         y_time = []
         y_labels = [[] for slot in slots]
         y_weights = []
-        y_token_labels = []
         for item in seqs:
-            if not self.tagged:
-                x.append(item['data'])
-            else:
-                x.append(item['data_tagged'])
+            x.append(item['data'])
             x_score.append(item['data_score'])
             x_actor.append(item['data_actor'])
-            x_switch.append(item['data_switch'])
-            for label in item['labels']:
+
+            labels = item['labels']
+
+            for label in labels:
                 y_seq_id.append(len(x) - 1)
                 y_time.append(label['time'])
 
                 for i, slot in enumerate(slots):
-                    y_labels[i].append(label['slots'][slot])
+                    lbl_val = label['slots'][slot]
+                    if lbl_val < 0:
+                        lbl_val = len(self.slot_classes[slot]) + lbl_val
+                    y_labels[i].append(lbl_val)
                 y_weights.append(label['score'])
-
-            y_token_labels.append(item['token_labels'])
 
         x = padded(x, is_int=True).transpose(1, 0)
 
         x_score = padded(x_score).transpose(1, 0)
         x_actor = padded(x_actor, is_int=True).transpose(1, 0)
-        x_switch = padded(x_switch, is_int=True).transpose(1, 0)
 
         x_score = np.array(x_score, dtype=np.int32)[:,:]
-        x_switch = np.array(x_switch, dtype=np.int32)[:,:, np.newaxis]
 
         y_weights = np.array(y_weights, dtype=np.float32)
 
         y_token_labels_padding = self._prepare_y_token_labels_padding()
-
-        y_token_labels = padded(y_token_labels,
-                         is_int=True,
-                         pad_by=y_token_labels_padding).transpose(1, 0, 2)
 
         data = [x]
         if self.x_include_score:
@@ -368,8 +360,6 @@ class Model(NeuralModel):
         if with_labels:
             data.append(y_weights)
             data.extend(y_labels)
-            if self.token_supervision:
-                data.append(y_token_labels)
 
         return tuple(data)
 
