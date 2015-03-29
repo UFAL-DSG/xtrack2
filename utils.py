@@ -175,3 +175,8 @@ def init_logging(logger_name='XTrack'):
     logger.addHandler(ch)
 
     logging.root = logger
+
+
+def get_git_revision_hash():
+    import subprocess
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD'])

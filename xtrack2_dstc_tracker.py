@@ -201,7 +201,7 @@ class XTrack2DSTCTracker(object):
                 )
                 if dialog['tags']:
                     self._replace_tags(out, dialog['tags'])
-                self.track_log.write(json.dumps(out))
+                #self.track_log.write(json.dumps(out))
                 self.track_log.write("\n")
                 turns.append(out)
                 pred_ptr += 1
@@ -239,25 +239,27 @@ class XTrack2DSTCTracker(object):
         return tuple(res)
 
     def _replace_tags(self, out, tags):
-        for key in ['goal-labels', 'method-label', 'requested-slots']:
-            for slot, values in out[key].iteritems():
-                new_res = {}
-                for slot_val, p in values.iteritems():
-                    if slot_val.startswith('#tag'):
-                        tag_id = int(slot_val.replace('#tag', ''))
-                        try:
-                            new_res[tags[slot][tag_id]] = p
-                        except IndexError:
-                            # This happens when the we predict a tag that
-                            # does not exist.
-                            new_res[slot_val] = p
-                    else:
-                        new_res[slot_val] = p
+        for slot, values in out['goal-labels'].iteritems():
+            self._replace_tags_for_slot(slot, tags, values)
 
-                values.clear()
-                values.update(new_res)
+        self._replace_tags_for_slot('method', tags, out['method-label'])
+        # TODO: Also replace requested.
 
-
+    def _replace_tags_for_slot(self, slot, tags, values):
+        new_res = {}
+        for slot_val, p in values.iteritems():
+            if slot_val.startswith('#%s' % slot):
+                tag_id = int(slot_val.replace('#%s' % slot, ''))
+                try:
+                    new_res[tags[slot][tag_id]] = p
+                except IndexError:
+                    # This happens when the we predict a tag that
+                    # does not exist.
+                    new_res[slot_val] = p
+            else:
+                new_res[slot_val] = p
+        values.clear()
+        values.update(new_res)
 
 
 def main(dataset_name, data_file, output_file, params_file):

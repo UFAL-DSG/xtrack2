@@ -246,9 +246,12 @@ class XTrackData2Builder(object):
                 label['slots'][slot] = val
             else:
                 try:
-                    tag_ndx = seq['tags'][slot].index(normalize_slot_value(
-                        state.get(slot, '')))
-                    tag_cls_str = "#tag%d" % tag_ndx
+                    state_val = state.get(slot, '')
+                    if not state_val:
+                        raise ValueError()
+
+                    tag_ndx = seq['tags'][slot].index(normalize_slot_value(state_val))
+                    tag_cls_str = "#%s%d" % (slot, tag_ndx)
 
                     try:
                         tagged_val = self.xd.get_value_index_for_slot(slot,
@@ -294,7 +297,7 @@ class XTrackData2(object):
         for slot in self.slots:
             self.get_token_ndx(slot)
             classes[slot] = {self.null_class: 0}
-            for slot_val in ontology[slot]:
+            for slot_val in ontology.get(slot, []):
                 slot_val = normalize_slot_value(slot_val)
                 classes[slot][slot_val] = len(classes[slot])
                 self.get_token_ndx(slot_val)
@@ -309,6 +312,7 @@ class XTrackData2(object):
         self.slots = slots
         self.slot_groups = slot_groups
         self.tagged = tagged
+        self.vocab_rev = {}
 
         if based_on:
             data = XTrackData2.load(based_on)
@@ -328,14 +332,15 @@ class XTrackData2(object):
                 "#OOV": 2,
             }
 
-            self.classes = self._build_initial_classes(ontology)
-
             self.vocab_fixed = False
             self.stats = None
             self.sequences = []
             self.score_bins = score_bins
 
+            self.classes = self._build_initial_classes(ontology)
+
         self._finalize_initialization()
+
 
     def add_sequence(self, seq):
         self.sequences.append(seq)

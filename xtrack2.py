@@ -22,7 +22,8 @@ theano.config.mode = 'FAST_RUN'
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
 from xtrack_data2 import XTrackData2
-from utils import (pdb_on_error, ConfusionMatrix, P, inline_print)
+from utils import (get_git_revision_hash, pdb_on_error, ConfusionMatrix, P,
+                   inline_print)
 from model import Model
 from xtrack2_dstc_tracker import XTrack2DSTCTracker
 
@@ -364,6 +365,7 @@ def main(args_lst,
     )
 
     logging.info('XTrack has been started.')
+    logging.info('GIT rev: %s' % get_git_revision_hash())
     logging.info('Output dir: %s' % output_dir)
     logging.info('Initializing random seed to 0.')
     random.seed(0)
