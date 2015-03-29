@@ -192,13 +192,17 @@ class XTrack2DSTCTracker(object):
                         self.track_log.write('\n%.2f ' % word_p)
                         last_word_p = word_p
                     self.track_log.write("%s " % self.data.vocab_rev[word_id])
-                self.track_log.write("\n")
+
                 last_pos = lbl['time'] + 1
 
                 out, goals_correct = self.build_output(
                     [pred[i][pred_ptr] for i, _ in enumerate(self.data.slots)],
                     lbl['slots']
                 )
+                if dialog['tags']:
+                    self._replace_tags(out, dialog['tags'])
+                self.track_log.write(json.dumps(out))
+                self.track_log.write("\n")
                 turns.append(out)
                 pred_ptr += 1
 
@@ -233,6 +237,27 @@ class XTrack2DSTCTracker(object):
             res.append(len_accuracy)
             res.append(len_accuracy_n)
         return tuple(res)
+
+    def _replace_tags(self, out, tags):
+        for key in ['goal-labels', 'method-label', 'requested-slots']:
+            for slot, values in out[key].iteritems():
+                new_res = {}
+                for slot_val, p in values.iteritems():
+                    if slot_val.startswith('#tag'):
+                        tag_id = int(slot_val.replace('#tag', ''))
+                        try:
+                            new_res[tags[slot][tag_id]] = p
+                        except IndexError:
+                            # This happens when the we predict a tag that
+                            # does not exist.
+                            new_res[slot_val] = p
+                    else:
+                        new_res[slot_val] = p
+
+                values.clear()
+                values.update(new_res)
+
+
 
 
 def main(dataset_name, data_file, output_file, params_file):
