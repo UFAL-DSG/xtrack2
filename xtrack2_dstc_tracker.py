@@ -251,7 +251,9 @@ class XTrack2DSTCTracker(object):
             if slot_val.startswith('#%s' % slot):
                 tag_id = int(slot_val.replace('#%s' % slot, ''))
                 try:
-                    new_res[tags[slot][tag_id]] = p
+                    tag_list = tags.get(slot, [])
+                    tag_val = tag_list[tag_id]
+                    new_res[tag_val] = p
                 except IndexError:
                     # This happens when the we predict a tag that
                     # does not exist.
