@@ -14,11 +14,7 @@ import data_model
 word_re = re.compile(r'([A-Za-z0-9_]+)')
 
 
-def normalize_slot_value(val):
-    return val.replace(' ', '_')
 
-def denormalize_slot_value(val):
-    return val.replace('_', ' ')
 
 
 def tokenize(text):
@@ -43,7 +39,38 @@ def get_cca_y(tokens, state, last_state):
     return " ".join(res)
 
 
-class XTrackData2Builder(object):
+class Tagger(object):
+    def normalize_slot_value(self, val):
+        return val.replace(' ', '_')
+
+    def denormalize_slot_value(self, val):
+        return val.replace('_', ' ')
+
+
+class Sequence(dict):
+    def __setattr__(self, key, value):
+        self[key] = value
+
+    def __getattr__(self, key):
+        return self[key]
+
+    def __init__(self, seq_id, source_dir):
+        self.id = seq_id
+        self.source_dir = source_dir
+        self.data = []
+        self.data_debug = []
+        self.data_score = []
+        self.data_actor = []
+        self.labels = []
+        self.token_labels = []
+        self.tags = collections.defaultdict(list)
+        self.true_input = []
+
+    def __repr__(self):
+        return json.dumps(self.__dict__)
+
+
+class DataBuilder(object):
     def _open_dump_files(self, debug_dir):
         if debug_dir:
             if not os.path.exists(debug_dir):
@@ -62,6 +89,8 @@ class XTrackData2Builder(object):
               score_bins, debug_dir, tagged, ontology, no_label_weight):
         self.slots = slots
         self.slot_groups = slot_groups
+        self.score_bins = score_bins
+        self.ontology = ontology
         self.based_on = based_on
         self.include_base_seqs = include_base_seqs
         self.oov_ins_p = oov_ins_p
@@ -70,67 +99,33 @@ class XTrackData2Builder(object):
         self.nth_best = nth_best
         self.debug_dir = debug_dir
         self.tagged = tagged
+        if tagged:
+            self.tagger = Tagger()
+        else:
+            self.tagger = None
         self.no_label_weight = no_label_weight
 
-        self.xd = XTrackData2()
-        self.xd.initialize(self.slots, self.slot_groups, self.based_on,
-                           self.include_base_seqs, score_bins, tagged, ontology)
+        self.xd = None
         self.word_freq = collections.Counter()
 
         self._open_dump_files(debug_dir)
 
-
-
-    def _create_seq(self, dialog):
-        seq = {
-            'id': dialog.session_id,
-            'source_dir': dialog.object_id,
-            'data': [],
-            'data_debug': [],
-            'data_score': [],
-            'data_actor': [],
-            'labels': [],
-            'token_labels': [],
-            'tags': collections.defaultdict(list),
-            'true_input': [],
-        }
-        return seq
-
-
-
-    def _dump_msg_info(self, last_state, msg_score, msg_score_bin, state,
-                       token_seq, true_msg):
-        self.f_dump_text.write(("%2.2f %d  " % (msg_score, msg_score_bin)) + " "
-                                                                        "".join(
-            token_seq) + '\n')
-        self.f_dump_text.write(("TRUE  " + true_msg + '\n'))
-        self.f_dump_cca.write(" ".join(token_seq))
-        self.f_dump_cca.write("\t")
-        self.f_dump_cca.write(get_cca_y(token_seq, state, last_state))
-        self.f_dump_cca.write('\n')
-
-    def _dump_seq_info(self, seq):
-        self.f_dump_text.write('\nSEQ:')
-        for token in seq['data']:
-            token_str = self.xd.vocab_rev[token]
-            self.f_dump_text.write('%s ' % token_str)
-        self.f_dump_text.write('\n')
-
     def build(self, dialogs):
+        self._create_new_data_instance()
+
         n_labels = 0
 
         self.msg_scores = []
 
         for dialog_ndx, dialog in enumerate(dialogs):
             self.f_dump_text.write('> %s\n' % dialog.session_id)
-            last_state = None
 
             seq = self._create_seq(dialog)
 
-            self._process_dialog(dialog, last_state, seq)
-
+            self._process_dialog(dialog, seq)
             self._perform_sanity_checks(seq)
-            n_labels = self._append_seq_if_nonempty(n_labels, seq)
+            self._append_seq_if_nonempty(seq)
+            n_labels += len(seq.labels)
 
             self._dump_seq_info(seq)
             self.f_dump_text.write('\n')
@@ -140,7 +135,19 @@ class XTrackData2Builder(object):
 
         return self.xd
 
-    def _process_dialog(self, dialog, last_state, seq):
+    def _create_new_data_instance(self):
+        self.xd = Data()
+        self.xd.initialize(self.slots, self.slot_groups, self.based_on,
+                           self.include_base_seqs, self.score_bins,
+                           self.tagged, self.ontology, self.tagger)
+
+    def _create_seq(self, dialog):
+        seq = Sequence(dialog.session_id, dialog.object_id)
+        return seq
+
+    def _process_dialog(self, dialog, seq):
+        last_state = None
+
         for msgs, state, actor in zip(dialog.messages,
                                       dialog.states,
                                       dialog.actors):
@@ -154,15 +161,19 @@ class XTrackData2Builder(object):
             msg, msg_score = msgs[msg_id]
             true_msg, _ = msgs[0]
 
-            if actor == data_model.Dialog.ACTOR_USER:
-                self.msg_scores.append(np.exp(msg_score))
-
             if not self.include_system_utterances and actor_is_system:
                 continue
             else:
                 self._process_msg(msg, msg_score, state, last_state, actor, seq,
                                   true_msg)
             last_state = state
+
+    def _dump_seq_info(self, seq):
+        self.f_dump_text.write('\nSEQ:')
+        for token in seq.data:
+            token_str = self.xd.vocab_rev[token]
+            self.f_dump_text.write('%s ' % token_str)
+        self.f_dump_text.write('\n')
 
     def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
                      true_msg):
@@ -183,16 +194,28 @@ class XTrackData2Builder(object):
 
             self._append_token_to_seq(actor, msg_score_bin, seq, token, state)
 
-        seq['true_input'].append(true_msg)
+        seq.true_input.append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
             self._append_label_to_seq(msg_score, seq, state)
+
+    def _dump_msg_info(self, last_state, msg_score, msg_score_bin, state,
+                       token_seq, true_msg):
+        self.f_dump_text.write(("%2.2f %d  " % (msg_score, msg_score_bin)) + " "
+                                                                        "".join(
+            token_seq) + '\n')
+        self.f_dump_text.write(("TRUE  " + true_msg + '\n'))
+        self.f_dump_cca.write(" ".join(token_seq))
+        self.f_dump_cca.write("\t")
+        self.f_dump_cca.write(get_cca_y(token_seq, state, last_state))
+        self.f_dump_cca.write('\n')
 
     def _tokenize_msg(self, actor, msg):
         msg = msg.lower()
         if self.tagged:
             for slot, slot_values in self.xd.classes.iteritems():
                 for slot_value in slot_values:
-                    msg = msg.replace(denormalize_slot_value(slot_value),
+                    msg = msg.replace(self.tagger.denormalize_slot_value(
+                        slot_value),
                                       slot_value)
 
         token_seq = list(tokenize(msg))
@@ -208,7 +231,7 @@ class XTrackData2Builder(object):
     def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
         token_ndx = self.xd.get_token_ndx(token)
         if not self.tagged:
-            seq['data'].append(token_ndx)
+            seq.data.append(token_ndx)
         else:
             if actor == data_model.Dialog.ACTOR_SYSTEM:
                 token = token[1:]
@@ -216,24 +239,24 @@ class XTrackData2Builder(object):
             if actor == data_model.Dialog.ACTOR_SYSTEM:
                 tagged_token = '@' + tagged_token
             tagged_token_ndx = self.xd.get_token_ndx(tagged_token)
-            seq['data'].append(tagged_token_ndx)
-        seq['data_score'].append(msg_score_bin)
-        seq['data_actor'].append(actor)
-        seq['data_debug'].append(token)
+            seq.data.append(tagged_token_ndx)
+        seq.data_score.append(msg_score_bin)
+        seq.data_actor.append(actor)
+        seq.data_debug.append(token)
 
     def _tag_token(self, token, seq):
         tag = self.xd.tag_token(token)
         if tag:
-            if not token in seq['tags'][tag]:
-                seq['tags'][tag].append(token)
+            if not token in seq.tags[tag]:
+                seq.tags[tag].append(token)
 
-            return '#%s%d#' % (tag, seq['tags'][tag].index(token), )
+            return '#%s%d#' % (tag, seq.tags[tag].index(token), )
         else:
             return token
 
     def _append_label_to_seq(self, msg_score, seq, state):
         label = {
-            'time': len(seq['data']) - 1,
+            'time': len(seq.data) - 1,
             'score': np.exp(msg_score),
             'slots': {}
         }
@@ -246,11 +269,14 @@ class XTrackData2Builder(object):
                 label['slots'][slot] = val
             else:
                 try:
+                    if not state:
+                        raise ValueError()
                     state_val = state.get(slot, '')
                     if not state_val:
                         raise ValueError()
 
-                    tag_ndx = seq['tags'][slot].index(normalize_slot_value(state_val))
+                    tag_ndx = seq.tags[slot].index(
+                        self.tagger.normalize_slot_value(state_val))
                     tag_cls_str = "#%s%d" % (slot, tag_ndx)
 
                     try:
@@ -262,19 +288,18 @@ class XTrackData2Builder(object):
                     tagged_val = val
 
                 label['slots'][slot] = tagged_val
-        seq['labels'].append(label)
+        seq.labels.append(label)
 
     def _perform_sanity_checks(self, seq):
         # Sanity check that all data elements are equal size.
-        seq_data_keys = [key for key in seq if key.startswith('data')]
-        data_lens = [len(seq[key]) for key in seq_data_keys]
+        seq_data_keys = [key for key in seq.__dict__ if key.startswith('data')]
+        data_lens = [len(getattr(seq, key)) for key in seq_data_keys]
         assert data_lens[1:] == data_lens[:-1]
 
-    def _append_seq_if_nonempty(self, n_labels, seq):
-        if len(seq['data']) > 0:
-            n_labels += len(seq['labels'])
+    def _append_seq_if_nonempty(self, seq):
+        if len(seq.data) > 0:
             self.xd.add_sequence(seq)
-        return n_labels
+
 
 
 
@@ -283,7 +308,7 @@ class UnknownClassException(Exception):
     pass
 
 
-class XTrackData2(object):
+class Data(object):
     attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes', 'slots',
                      'slot_groups', 'stats', 'score_bins', 'tagged']
 
@@ -298,7 +323,8 @@ class XTrackData2(object):
             self.get_token_ndx(slot)
             classes[slot] = {self.null_class: 0}
             for slot_val in ontology.get(slot, []):
-                slot_val = normalize_slot_value(slot_val)
+                if self.tagged:
+                    slot_val = self.tagger.normalize_slot_value(slot_val)
                 classes[slot][slot_val] = len(classes[slot])
                 self.get_token_ndx(slot_val)
 
@@ -308,14 +334,15 @@ class XTrackData2(object):
         self.vocab_rev = {val: key for key, val in self.vocab.iteritems()}
 
     def initialize(self, slots, slot_groups, based_on, include_base_seqs,
-                   score_bins, tagged, ontology):
+                   score_bins, tagged, ontology, tagger):
         self.slots = slots
         self.slot_groups = slot_groups
         self.tagged = tagged
         self.vocab_rev = {}
+        self.tagger = tagger
 
         if based_on:
-            data = XTrackData2.load(based_on)
+            data = Data.load(based_on)
             self.vocab = data.vocab
             self.classes = data.classes
             self.vocab_fixed = True
@@ -389,7 +416,8 @@ class XTrackData2(object):
             slot_value = state.get(slot)
 
             if slot_value:
-                slot_value = normalize_slot_value(slot_value)
+                if self.tagged:
+                    slot_value = self.tagger.normalize_slot_value(slot_value)
                 res = self.get_value_index_for_slot(slot, slot_value)
             else:
                 res = self.classes[slot][self.null_class]
@@ -444,7 +472,7 @@ class XTrackData2(object):
         with open(in_file, 'r') as f_in:
             data = json.load(f_in)
 
-        xtd = XTrackData2()
+        xtd = Data()
         for attr in cls.attrs_to_save:
             val = data[attr]
             setattr(xtd, attr, val)
@@ -518,7 +546,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
 
 
         logging.info('Initializing.')
-        xtd_builder = XTrackData2Builder(
+        xtd_builder = DataBuilder(
             based_on=based_on,
             include_base_seqs=False,
             slots=slots,
@@ -527,7 +555,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             word_drop_p=0.0,
             include_system_utterances=True,
             nth_best=1,
-            score_bins=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0],
+            score_bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.01],
             ontology=ontology,
             debug_dir=debug_dir,
             **builder_opts

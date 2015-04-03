@@ -1,8 +1,7 @@
 import json
 import os
 
-import xtrack_data2
-import import_dstc
+import data
 import xtrack2_config
 
 
@@ -22,7 +21,7 @@ def main(skip_dstc_import_step):
             method=dstc_ontology['method']
         )
 
-    xtrack_data2.prepare_experiment(
+    data.prepare_experiment(
         experiment_name='e2_tagged',
         data_directory=xtrack2_config.data_directory,
         slots=['food', 'area', 'pricerange', 'name', 'method', 'req_food',

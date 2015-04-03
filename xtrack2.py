@@ -21,11 +21,12 @@ theano.config.mode = 'FAST_RUN'
 
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
-from xtrack_data2 import XTrackData2
+from data import Data
 from utils import (get_git_revision_hash, pdb_on_error, ConfusionMatrix, P,
                    inline_print)
 from model import Model
-from xtrack2_dstc_tracker import XTrack2DSTCTracker
+from model_simple_conv import SimpleConvModel
+from dstc_tracker import XTrack2DSTCTracker
 
 
 def compute_stats(slots, slot_selection, classes, prediction, y,
@@ -352,7 +353,7 @@ def main(args_lst,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
-         x_include_mlp, enable_token_supervision):
+         x_include_mlp, enable_token_supervision, model_type):
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -376,10 +377,10 @@ def main(args_lst,
     logging.info('Experiment path: %s' % experiment_path)
 
     train_path = os.path.join(experiment_path, 'train.json')
-    xtd_t = XTrackData2.load(train_path)
+    xtd_t = Data.load(train_path)
 
     valid_path = os.path.join(experiment_path, 'dev.json')
-    xtd_v = XTrackData2.load(valid_path)
+    xtd_v = Data.load(valid_path)
 
     slots = xtd_t.slots
     classes = xtd_t.classes
@@ -389,38 +390,71 @@ def main(args_lst,
 
     t = time.time()
 
-    logging.info('Building model.')
-    model = Model(slots=slots,
-                  slot_classes=xtd_t.classes,
-                  emb_size=emb_size,
-                  no_train_emb=no_train_emb,
-                  x_include_score=x_include_score,
-                  x_include_token_ftrs=x_include_token_ftrs,
-                  x_include_mlp=x_include_mlp,
-                  n_input_score_bins=n_input_score_bins,
-                  n_cells=n_cells,
-                  n_input_tokens=n_input_tokens,
-                  oclf_n_hidden=oclf_n_hidden,
-                  oclf_n_layers=oclf_n_layers,
-                  oclf_activation=oclf_activation,
-                  debug=debug,
-                  rnn_n_layers=rnn_n_layers,
-                  lstm_peepholes=lstm_peepholes,
-                  lstm_bidi=lstm_bidi,
-                  opt_type=opt_type,
-                  momentum=momentum,
-                  p_drop=p_drop,
-                  init_emb_from=init_emb_from,
-                  vocab=xtd_t.vocab,
-                  input_n_layers=input_n_layers,
-                  input_n_hidden=input_n_hidden,
-                  input_activation=input_activation,
-                  token_features=None,
-                  enable_branch_exp=enable_branch_exp,
-                  token_supervision=enable_token_supervision,
-                  l1=l1,
-                  l2=l2
-    )
+    logging.info('Building model: %s' % model_type)
+    if model_type == 'lstm':
+        model = Model(slots=slots,
+                      slot_classes=xtd_t.classes,
+                      emb_size=emb_size,
+                      no_train_emb=no_train_emb,
+                      x_include_score=x_include_score,
+                      x_include_token_ftrs=x_include_token_ftrs,
+                      x_include_mlp=x_include_mlp,
+                      n_input_score_bins=n_input_score_bins,
+                      n_cells=n_cells,
+                      n_input_tokens=n_input_tokens,
+                      oclf_n_hidden=oclf_n_hidden,
+                      oclf_n_layers=oclf_n_layers,
+                      oclf_activation=oclf_activation,
+                      debug=debug,
+                      rnn_n_layers=rnn_n_layers,
+                      lstm_peepholes=lstm_peepholes,
+                      lstm_bidi=lstm_bidi,
+                      opt_type=opt_type,
+                      momentum=momentum,
+                      p_drop=p_drop,
+                      init_emb_from=init_emb_from,
+                      vocab=xtd_t.vocab,
+                      input_n_layers=input_n_layers,
+                      input_n_hidden=input_n_hidden,
+                      input_activation=input_activation,
+                      token_features=None,
+                      enable_branch_exp=enable_branch_exp,
+                      token_supervision=enable_token_supervision,
+                      l1=l1,
+                      l2=l2
+        )
+    elif model_type == 'conv':
+        model = SimpleConvModel(slots=slots,
+                      slot_classes=xtd_t.classes,
+                      emb_size=emb_size,
+                      no_train_emb=no_train_emb,
+                      x_include_score=x_include_score,
+                      x_include_token_ftrs=x_include_token_ftrs,
+                      x_include_mlp=x_include_mlp,
+                      n_input_score_bins=n_input_score_bins,
+                      n_cells=n_cells,
+                      n_input_tokens=n_input_tokens,
+                      oclf_n_hidden=oclf_n_hidden,
+                      oclf_n_layers=oclf_n_layers,
+                      oclf_activation=oclf_activation,
+                      debug=debug,
+                      rnn_n_layers=rnn_n_layers,
+                      lstm_peepholes=lstm_peepholes,
+                      lstm_bidi=lstm_bidi,
+                      opt_type=opt_type,
+                      momentum=momentum,
+                      p_drop=p_drop,
+                      init_emb_from=init_emb_from,
+                      vocab=xtd_t.vocab,
+                      input_n_layers=input_n_layers,
+                      input_n_hidden=input_n_hidden,
+                      input_activation=input_activation,
+                      token_features=None,
+                      enable_branch_exp=enable_branch_exp,
+                      token_supervision=enable_token_supervision,
+                      l1=l1,
+                      l2=l2
+        )
 
     logging.info('Rebuilding took: %.1f' % (time.time() - t))
 
@@ -587,6 +621,8 @@ def build_argument_parser():
     parser.add_argument('--load_params', default=None)
     parser.add_argument('--save_params', default=None)
     parser.add_argument('--out', default='xtrack2_out')
+
+    parser.add_argument('--model_type', default="lstm", type=str)
 
     # XTrack params.
     parser.add_argument('--n_epochs', default=0, type=int)

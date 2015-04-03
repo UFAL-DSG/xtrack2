@@ -40,7 +40,7 @@ import os
 
 import dstc_util
 from data_model import Dialog
-from xtrack_data2 import XTrackData2
+from data import Data
 from utils import pdb_on_error
 from model import Model
 
@@ -271,7 +271,7 @@ def main(dataset_name, data_file, output_file, params_file):
         models.append(Model.load(pf, build_train=False))
 
     logging.info('Loading data: %s' % data_file)
-    data = XTrackData2.load(data_file)
+    data = Data.load(data_file)
 
     logging.info('Starting tracking.')
     tracker = XTrack2DSTCTracker(data, models)

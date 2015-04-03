@@ -2,8 +2,7 @@ import numpy as np
 import theano
 import theano.tensor as tt
 
-from layers import (Dense, IdentityInput, MatrixInput, MLP, CherryPick,
-                             CrossEntropyObjective)
+from layers import *
 import updates
 
 
@@ -20,6 +19,35 @@ xor_data_y = [
     1,
     0
 ]
+
+
+def test_unwrapper():
+    emb_size = 5
+    y_time = tt.ivector()
+    y_seq_id = tt.ivector()
+    x = tt.tensor3()
+
+    emb = IdentityInput(x, size=5)
+
+    sequn = SeqUnwrapper(20)
+    sequn.connect(emb, y_time, y_seq_id)
+
+    rng = np.random.RandomState(23455)
+    conv = LeNetConvPoolLayer()
+    conv.connect(sequn, rng, (3, 1, 5, emb_size), (1, 1, ))
+    #prev_layer = conv
+
+    f = theano.function([x, y_time, y_seq_id], conv.output())
+
+    xx = np.random.randn(20, 4, emb_size)
+    y_time = [3, 7, 10, 12]
+    y_seq_id = [0, 0, 0, 0]
+    res = f(xx, y_time, y_seq_id)
+    print res.shape
+    print res
+    import ipdb; ipdb.set_trace()
+
+
 
 
 def test_mlp():
@@ -85,6 +113,29 @@ def test_verify_exprgrad():
 
 
 if __name__ == '__main__':
+    test_unwrapper()
+    exit(0)
+    rng = np.random.RandomState(23455)
+
+    x = tt.tensor4()
+    emb = IdentityInput(x, size=2)
+    conv = LeNetConvPoolLayer()
+    conv.connect(emb, rng, ())
+
+
+    X = tt.tensor3()
+    y_time = tt.iscalar()
+    y_seq_id = tt.iscalar()
+
+    y = X[0:y_time, y_seq_id]
+
+    f = theano.function([X, y_time, y_seq_id], y)
+
+
+
+    exit(0)
+
+
     def step(xx, a):
         return xx
 
@@ -98,6 +149,7 @@ if __name__ == '__main__':
     f = theano.function([], [x, xf, xb, diff])
 
     print f()
+
     exit(0)
 
 
