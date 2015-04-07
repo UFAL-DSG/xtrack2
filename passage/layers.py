@@ -726,7 +726,7 @@ class SeqMaxPooling(Layer):
 
     def _step(self, y_t, y_seq_id, x, x_score):
         score = x_score[0:y_t, y_seq_id].dimshuffle(0, 'x')
-        return T.max(x[0:y_t, y_seq_id,:] * score, axis=0)
+        return T.max(x[0:y_t, y_seq_id,:] * (score * 0 + 1), axis=0)
 
     def get_params(self):
         return self.prev_layer.get_params()

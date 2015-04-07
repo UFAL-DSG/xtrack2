@@ -32,6 +32,7 @@
 }
 """
 import collections
+import itertools
 import time
 import json
 import logging
@@ -43,6 +44,7 @@ from data_model import Dialog
 from data import Data
 from utils import pdb_on_error
 from model import Model
+from model_baseline import BaselineModel
 
 
 def init_logging():
@@ -184,14 +186,17 @@ class XTrack2DSTCTracker(object):
             last_pos = 0
             state_component_mentioned = False
             for lbl in dialog['labels']:
-                words = dialog['data'][last_pos:lbl['time'] + 1]
-                word_probs = dialog['data_score'][last_pos:lbl['time'] + 1]
-                last_word_p = None
-                for word_p, word_id in zip(word_probs, words):
-                    if word_p != last_word_p:
-                        self.track_log.write('\n%.2f ' % word_p)
-                        last_word_p = word_p
-                    self.track_log.write("%s " % self.data.vocab_rev[word_id])
+                #words = dialog['data'][last_pos:lbl['time'] + 1]
+                #if 'data_score' in dialog:
+                #    word_probs = dialog['data_score'][last_pos:lbl['time'] + 1]
+                #else:
+                #    word_probs = itertools.repeat(-1)
+                #last_word_p = None
+                #for word_p, word_id in zip(word_probs, words):
+                #    if word_p != last_word_p:
+                #        self.track_log.write('\n%.2f ' % word_p)
+                #        last_word_p = word_p
+                #    self.track_log.write("%s " % self.data.vocab_rev[word_id])
 
                 last_pos = lbl['time'] + 1
 
@@ -202,7 +207,7 @@ class XTrack2DSTCTracker(object):
                 if dialog['tags']:
                     self._replace_tags(out, dialog['tags'])
                 #self.track_log.write(json.dumps(out))
-                self.track_log.write("\n")
+                #self.track_log.write("\n")
                 turns.append(out)
                 pred_ptr += 1
 
@@ -221,7 +226,7 @@ class XTrack2DSTCTracker(object):
                 'turns': turns
             })
 
-            self.track_log.write("\n")
+            #self.track_log.write("\n")
 
         if len(pred[0]) != pred_ptr:
             raise Exception('Data mismatch.')
@@ -264,11 +269,15 @@ class XTrack2DSTCTracker(object):
         values.update(new_res)
 
 
-def main(dataset_name, data_file, output_file, params_file):
+def main(dataset_name, data_file, output_file, params_file, model_type):
     models = []
     for pf in params_file:
         logging.info('Loading model from: %s' % pf)
-        models.append(Model.load(pf, build_train=False))
+        if model_type == 'lstm':
+            model_cls = Model
+        elif model_type == 'baseline':
+            model_cls = BaselineModel
+        models.append(model_cls.load(pf, build_train=False))
 
     logging.info('Loading data: %s' % data_file)
     data = Data.load(data_file)
@@ -305,6 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_file', required=True)
     parser.add_argument('--output_file', required=True)
     parser.add_argument('--params_file', action='append', required=True)
+    parser.add_argument('--model_type', default='lstm')
 
     pdb_on_error()
     init_logging()

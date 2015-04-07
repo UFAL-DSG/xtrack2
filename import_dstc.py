@@ -240,10 +240,11 @@ def _stringify_act(acts):
     for act in acts:
         if len(act.slots) > 0:
             for slot_name, slot_value in act.slots:
-                res.append("%s_%s" % (act.act, slot_name))
+                res.append(act.act)
+                res.append(slot_name)
                 res.append(slot_value.replace(' ', '_'))
         else:
-            res.append("%s_" % act.act)
+            res.append("%s" % act.act)
 
     if len(res) == 0:
         res = ["sys"]
@@ -285,7 +286,7 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
                                                  else None)
             for slot in requestable_slots:
                 if slot in turn.input.requested_slots:
-                    state['req_%s' % slot] = 'yes'
+                    state['req_%s' % slot] = '@_yes'
 
             user_messages = [(turn.transcription, 0.0)]
             for hyp in turn.input.live_asr:

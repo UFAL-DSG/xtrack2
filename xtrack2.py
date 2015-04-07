@@ -26,6 +26,7 @@ from utils import (get_git_revision_hash, pdb_on_error, ConfusionMatrix, P,
                    inline_print)
 from model import Model
 from model_simple_conv import SimpleConvModel
+from model_baseline import BaselineModel
 from dstc_tracker import XTrack2DSTCTracker
 
 
@@ -455,6 +456,29 @@ def main(args_lst,
                       l1=l1,
                       l2=l2
         )
+    elif model_type == 'baseline':
+        model = BaselineModel(slots=slots,
+                      slot_classes=xtd_t.classes,
+                      oclf_n_hidden=oclf_n_hidden,
+                      oclf_n_layers=oclf_n_layers,
+                      oclf_activation=oclf_activation,
+                      n_cells=n_cells,
+                      debug=debug,
+                      opt_type=opt_type,
+                      momentum=momentum,
+                      p_drop=p_drop,
+                      vocab=xtd_t.vocab,
+                      input_n_layers=input_n_layers,
+                      input_n_hidden=input_n_hidden,
+                      input_activation=input_activation,
+                      token_features=None,
+                      enable_branch_exp=enable_branch_exp,
+                      token_supervision=enable_token_supervision,
+                      l1=l1,
+                      l2=l2
+        )
+    else:
+        raise Exception()
 
     logging.info('Rebuilding took: %.1f' % (time.time() - t))
 

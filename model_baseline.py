@@ -2,8 +2,6 @@ import inspect
 import logging
 import time
 
-import numpy as np
-
 import theano
 import theano.tensor as tt
 
@@ -13,26 +11,23 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 
-class SimpleConvModel(NeuralModel):
+class BaselineModel(NeuralModel):
     def _log_classes_info(self):
         for slot, vals in self.slot_classes.iteritems():
             logging.info('  %s:' % slot)
             for val, val_ndx in sorted(vals.iteritems(), key=lambda x: x[1]):
                 logging.info('    - %s (%d)' % (val, val_ndx))
 
-    def __init__(self, slots, slot_classes, emb_size, no_train_emb,
-                 x_include_score, x_include_token_ftrs, x_include_mlp,
-                 n_input_tokens, n_input_score_bins, n_cells,
-                 rnn_n_layers,
-                 lstm_peepholes, lstm_bidi, opt_type,
+    def __init__(self, slots, slot_classes, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
+                 n_cells,
                  debug, p_drop,
-                 init_emb_from, vocab,
+                 vocab,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features, token_supervision,
                  momentum, enable_branch_exp, l1, l2, build_train=True):
-        args = SimpleConvModel.__init__.func_code.co_varnames[
-               :SimpleConvModel.__init__.func_code.co_argcount]
+        args = BaselineModel.__init__.func_code.co_varnames[
+               :BaselineModel.__init__.func_code.co_argcount]
         self.init_args = {}
         for arg in args:
             if arg != 'self':
@@ -47,42 +42,46 @@ class SimpleConvModel(NeuralModel):
         logging.info('We have the following classes:')
         self._log_classes_info()
 
-        self.x_include_score = x_include_score
-        self.token_supervision = token_supervision
-
-        x = T.imatrix()
+        x = T.tensor3()
         input_args = [x]
-        input_token_layer = Embedding(name="emb",
-                                      size=emb_size,
-                                      n_features=n_input_tokens,
-                                      input=x,
-                                      static=no_train_emb)
+        input_layer = IdentityInput(x, len(self.vocab))
 
-        prev_layer = input_token_layer
+        prev_layer = input_layer
+
+        if input_n_layers > 0:
+            input_transform = MLP([input_n_hidden  ] * input_n_layers,
+                                  [input_activation] * input_n_layers,
+                                  p_drop=p_drop)
+            input_transform.connect(prev_layer)
+            prev_layer = input_transform
+
+        logging.info('There are %d input layers.' % input_n_layers)
+
+        if debug:
+            self._lstm_input = theano.function(input_args, prev_layer.output())
+
+
+        logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
+        f_lstm_layer = LstmRecurrent(name="lstm",
+                               size=n_cells,
+                               seq_output=True,
+                               out_cells=False,
+                               peepholes=False,
+                               p_drop=p_drop,
+                               enable_branch_exp=enable_branch_exp
+        )
+        f_lstm_layer.connect(prev_layer)
+
+        prev_layer = f_lstm_layer
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
-        y_weight = tt.vector()
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-
-        if x_include_score:
-            x_score = tt.matrix()
-            input_args.append(x_score)
-
-        maxpool = SeqMaxPooling()
-        maxpool.connect(prev_layer, x_score, y_time, y_seq_id)
-        prev_layer = maxpool
-        #unwrap = SeqUnwrapper(250)
-        #unwrap.connect(prev_layer, y_time, y_seq_id)
-        #prev_layer = unwrap
-        #rng = np.random.RandomState(23455)
-        #conv = LeNetConvPoolLayer()
-        #conv.connect(prev_layer, rng, (20, 1, 5, emb_size), (8, 1, ))
-        #prev_layer = conv
-        #logging.info('Conv output size: %d' % conv.size)
+        cpt = CherryPick()
+        cpt.connect(prev_layer, y_time, y_seq_id)
 
         costs = []
         predictions = []
@@ -93,7 +92,7 @@ class SimpleConvModel(NeuralModel):
                            [oclf_activation] * oclf_n_layers + ['softmax'],
                            [p_drop         ] * oclf_n_layers + [0.0      ],
                            name="mlp_%s" % slot)
-            slot_mlp.connect(prev_layer)
+            slot_mlp.connect(cpt)
             predictions.append(slot_mlp.output(dropout_active=False))
 
             slot_objective = CrossEntropyObjective()
@@ -115,11 +114,24 @@ class SimpleConvModel(NeuralModel):
 
         cost_value = cost.output(dropout_active=True)
 
-        assert opt_type == 'sgd'
         lr = tt.scalar('lr')
         clipnorm = 0.5
         reg = updates.Regularizer(l1=l1, l2=l2)
-        updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
+        if opt_type == "rprop":
+            updater = updates.RProp(lr=lr, clipnorm=clipnorm)
+            model_updates = updater.get_updates(params, cost_value)
+        elif opt_type == "sgd":
+            updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
+        elif opt_type == "rmsprop":
+            updater = updates.RMSprop(lr=lr, clipnorm=clipnorm, regularizer=reg)  #, regularizer=reg)
+        elif opt_type == "adam":
+            #reg = updates.Regularizer(maxnorm=5.0)
+            updater = updates.Adam(lr=lr, clipnorm=clipnorm, regularizer=reg)  #,
+            # regularizer=reg)
+        elif opt_type == "momentum":
+            updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=clipnorm, regularizer=reg)
+        else:
+            raise Exception("Unknonw opt.")
 
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time]
@@ -149,6 +161,9 @@ class SimpleConvModel(NeuralModel):
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
 
+    def init_loaded(self):
+        pass
+
     def prepare_data_train(self, seqs, slots):
         return self._prepare_data(seqs, slots, with_labels=True)
 
@@ -165,16 +180,18 @@ class SimpleConvModel(NeuralModel):
 
     def _prepare_data(self, seqs, slots, with_labels=True):
         x = []
-        x_score = []
-        x_actor = []
         y_seq_id = []
         y_time = []
         y_labels = [[] for slot in slots]
-        y_weights = []
         for item in seqs:
-            x.append(item['data'])
-            x_score.append(item['data_score'])
-            x_actor.append(item['data_actor'])
+            x_vecs = []
+            for features in item['data']:
+                x_vec = np.zeros((len(self.vocab), ))
+                for ftr, val in features.iteritems():
+                    x_vec[self.vocab[ftr]] = val
+                x_vecs.append(x_vec)
+
+            x.append(x_vecs)
 
             labels = item['labels']
 
@@ -187,17 +204,11 @@ class SimpleConvModel(NeuralModel):
                     if lbl_val < 0:
                         lbl_val = len(self.slot_classes[slot]) + lbl_val
                     y_labels[i].append(lbl_val)
-                y_weights.append(label['score'])
 
-        x = padded(x, is_int=True).transpose(1, 0)
-
-        x_score = padded(x_score).transpose(1, 0)
-        x_score = np.array(x_score, dtype=np.float32)[:,:]
-        x_score = (x_score / 10.0)
+        x_zero_pad = np.zeros((len(self.vocab), ))
+        x = padded(x, pad_by=[x_zero_pad]).transpose(1, 0, 2)
 
         data = [x]
-        if self.x_include_score:
-            data.append(x_score)
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)

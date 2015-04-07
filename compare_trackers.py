@@ -3,7 +3,7 @@ import json
 import os
 
 
-from xtrack_data2 import XTrackData2
+from data import Data
 
 
 def load_labels(flist_path, flist_root):
@@ -21,7 +21,7 @@ def get_best_hypothesis(turn):
     food_vals = turn['goal-labels'].get('food', {'_null_': 1.0})
 
     v, p = sorted(food_vals.items(), key=lambda x: x[1])[-1]
-    p_mass = sum(p for _, p in turn['goal-labels']['food'].items())
+    p_mass = sum(p for _, p in turn['goal-labels'].get('food', {}).items())
     p_null = 1.0 - p_mass
     if p > p_null:
         return v
@@ -31,8 +31,10 @@ def get_best_hypothesis(turn):
 
 def main():
     #data_file = '/xdisk/data/dstc/xtrack/e2_food/valid.json'
-    data_file = '/xdisk/data/dstc/xtrack/e2dev/test.json'
-    data = XTrackData2.load(data_file)
+    #data_file = '/xdisk/data/dstc/xtrack/e2dev/test.json'
+    data_file = '/xdisk/data/dstc/xtrack/e2_tagged_baseline/dev.json'
+    data = Data.load(data_file)
+    data.vocab_rev = {val: key for key, val in data.vocab.iteritems()}
 
     data_map = {}
     for seq in data.sequences:
@@ -45,10 +47,11 @@ def main():
         texts = []
         scores = []
         curr = []
-        for i, (d, score) in enumerate(zip(seq['data'], seq['data_score'])):
-            curr.append(data.vocab_rev[d])
+        for i, d in enumerate(seq['data']):
+            curr.append(d) #data.vocab_rev[d])
             if i in labeling:
-                texts.append((score, " ".join(curr)))
+                texts.append((0.0, str(curr)))
+                #texts.append((0.0, " ".join(curr)))
                 curr = []
         assert len(curr) == 0
         #print seq['id']
@@ -59,14 +62,15 @@ def main():
         #trackfile2
 
         #'/xdisk/data/dstc/dstc2/scripts/baseline_output.json',
-        '/xdisk/tmp/dstc2_results/team4/entry0.test.json',
-        '/xdisk/tmp/dstc2_results/team4/entry0.test.json'
-        #'/tmp/trackb.json',
+        #'/xdisk/tmp/dstc2_results/team4/entry0.test.json',
+        #'/xdisk/tmp/dstc2_results/team4/entry0.test.json'
+        '/tmp/trackb.json',
+        '/tmp/trackb.json',
 
     ]
 
-    #flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_dev.flist'
-    flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_test.flist'
+    flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_dev.flist'
+    #flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_test.flist'
     flist_root = '/xdisk/data/dstc/dstc2/data/'
 
     labels = load_labels(flist_path, flist_root)
