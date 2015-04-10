@@ -294,6 +294,7 @@ class DataBuilder(object):
                     tagged_val = val
 
                 label['slots'][slot] = tagged_val
+
         seq.labels.append(label)
 
     def _perform_sanity_checks(self, seq):

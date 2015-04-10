@@ -825,3 +825,45 @@ class LeNetConvPoolLayer(object):
         return res.flatten(2)
 
 
+class BiasedSoftmax(Layer):
+    def __init__(self, name=None, size=256, init=inits.normal):
+        if name:
+            self.name = name
+        self.init = init
+        self.size = size
+
+
+    def connect(self, l_in):
+        self.l_in = l_in
+        self.n_in = l_in.size
+
+        self.w = self.init(
+            (self.n_in, self.size - 1),
+            layer_width=self.size - 1,
+            name=self._name_param("w")
+        )
+        self.b = self.init(
+            (self.size, ),
+            layer_width=self.size,
+            name=self._name_param("b")
+        )
+        self.params = [self.w, self.b]
+
+    def output(self, pre_act=False, dropout_active=False):
+        X = self.l_in.output(dropout_active=dropout_active)
+
+        is_tensor3_softmax = X.ndim > 2
+
+        shape = X.shape
+        if is_tensor3_softmax: #reshape for tensor3 softmax
+            X = X.reshape((shape[0]*shape[1], self.n_in))
+
+        out =  activations.softmax(T.concatenate([T.zeros((X.shape[0], 1)), T.dot(X, self.w)], axis=1) + self.b)
+
+        if is_tensor3_softmax: #reshape for tensor3 softmax
+            out = out.reshape((shape[0], shape[1], self.size))
+
+        return out
+
+    def get_params(self):
+        return set(self.params).union(set(self.l_in.get_params()))

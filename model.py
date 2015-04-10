@@ -137,7 +137,7 @@ class Model(NeuralModel):
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
                            [oclf_activation] * oclf_n_layers + ['softmax'],
-                           [0.0         ] * oclf_n_layers + [0.0      ],
+                           [0.0            ] * oclf_n_layers + [0.0      ],
                            name="mlp_%s" % slot)
             slot_mlp.connect(h_t_layer)
             mlps.append(slot_mlp)
@@ -217,16 +217,25 @@ class Model(NeuralModel):
         for slot, slot_lstm_mlp in zip(slots, mlps):
             logging.info('Building output classifier for %s.' % slot)
             n_classes = len(slot_classes[slot])
-            slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
-                           [oclf_activation] * oclf_n_layers + ['softmax'],
-                           [p_drop         ] * oclf_n_layers + [0.0      ],
-                           name="mlp_%s" % slot, init=inits.copy(mlp_params))
-            slot_mlp.connect(cpt)
-            predictions.append(slot_mlp.output(dropout_active=False))
+            if oclf_n_layers > 0:
+                slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers,
+                               [oclf_activation] * oclf_n_layers,
+                               [p_drop         ] * oclf_n_layers,
+                               name="mlp_%s" % slot)
+                #name="mlp_%s" % slot, init=inits.copy(mlp_params))
+                slot_mlp.connect(cpt)
+
+            slot_softmax = BiasedSoftmax(name='softmax_%s' % slot, size=n_classes)
+            if oclf_n_layers > 0:
+                slot_softmax.connect(slot_mlp)
+            else:
+                slot_softmax.connect(cpt)
+
+            predictions.append(slot_softmax.output(dropout_active=False))
 
             slot_objective = WeightedCrossEntropyObjective()
             slot_objective.connect(
-                y_hat_layer=slot_mlp,
+                y_hat_layer=slot_softmax,
                 y_true=y_label[slot],
                 y_weights=y_weight
             )

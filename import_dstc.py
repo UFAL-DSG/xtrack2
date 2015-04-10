@@ -282,6 +282,7 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
                                    last_state,
                                    Dialog.ACTOR_SYSTEM)
             state = dict(turn.input.user_goal)
+
             state['method'] = (turn.input.method if turn.input.method != 'none'
                                                  else None)
             for slot in requestable_slots:
