@@ -14,7 +14,7 @@ while read cfg; do
         #echo -n "${i};${cfg};"
         eid=${EXPERIMENT_NAME}_cfg${cfg_cnt}_${i}
         STDERR_LOCATION=${EXPERIMENT_OUT}/${eid}_1/log.txt
-        python xtrack_parse_log.py ${STDERR_LOCATION} $extra
+        python xtrack_parse_log.py ${STDERR_LOCATION} $extra $3
         extra=
         #bash exp/check_file.sh ${STDERR_LOCATION}
     done

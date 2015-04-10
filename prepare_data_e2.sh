@@ -7,7 +7,7 @@ cd $DIR
 
 . ./config.sh
 
-E_ROOT=${DATA_DIRECTORY}/xtrack/e2${2}
+E_ROOT=${DATA_DIRECTORY}/xtrack/e2x${2}
 SLOTS="food=food:area=area:pricerange=pricerange:name=name:goals=food,area,pricerange,name:method=method:req=req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature"
 
 if [ "$1" != "skip" ]; then

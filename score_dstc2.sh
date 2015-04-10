@@ -7,7 +7,6 @@ cd $DIR
 
 . ./config.sh
 
-echo "Using cmdline arguments."
 TRACK_FILE=$1
 DATASET=$2
 
@@ -21,4 +20,4 @@ python dstc_scripts/score.py \
     --scorefile ${SCORE_FILE}
 
 python dstc_scripts/report.py --scorefile ${SCORE_FILE}
-echo $SCORE_FILE
+rm $SCORE_FILE

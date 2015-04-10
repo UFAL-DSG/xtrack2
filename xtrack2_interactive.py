@@ -14,7 +14,7 @@ from model import Model
 
 def main(model_file):
     logging.info('Loading model from: %s' % model_file)
-    model = Model.load(model_file)
+    model = Model.load(model_file, build_train=False)
 
     x = []
     x_score = []
@@ -26,30 +26,37 @@ def main(model_file):
         words = raw_input('Input:')
         words = words.lower()
         tokens = words.split()
+        seqs = []
         for token in tokens:
-
-            x.append([model.vocab.get(token, model.vocab['#OOV'])])
-            x_score.append([0.0])
-            x_switch.append([0])
-        y_seq_id = [0]
-        y_time = [len(x) - 1]
-
-        print x
+            x.append(model.vocab.get(token, model.vocab['#OOV']))
+            x_score.append(11)
+            x_switch.append(0)
+        seqs.append({
+            'data': x,
+            'data_score': x_score,
+            'data_actor': x_switch,
+            'data_switch': x_switch,
+            'labels': [
+                {
+                    'time': len(x) - 1,
+                    'slots': {
+                    },
+                    'score': 0.0
+                }
+            ],
+            'token_labels': []
+        })
+        data = model.prepare_data_predict(seqs, [])
             
-        p = model._predict(
-            x,
-            np.array(x_score, dtype=np.float32)[:,:, np.newaxis],
-            np.array(x_switch, dtype=np.int32)[:,:, np.newaxis],
-            y_seq_id,
-            y_time
-        )
+        p = model._predict(*data)
 
         for slot_name, p_slot in zip(model.slots, p):
+            print '#', slot_name
             preds = {}
             for cls_name, i in model.slot_classes[slot_name].iteritems():
                 preds[cls_name] = p_slot[0][i]
 
-            for cls, pp in sorted(preds.iteritems(), key=lambda x: -x[1])[:3]:
+            for cls, pp in sorted(preds.iteritems(), key=lambda x: -x[1])[:1]:
                 print '%10s: %.2f' % (cls, pp, )
 
 
