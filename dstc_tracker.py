@@ -41,7 +41,7 @@ import os
 
 import dstc_util
 from data_model import Dialog
-from data import Data
+from data import Data, Tagger
 from utils import pdb_on_error
 from model import Model
 from model_baseline import BaselineModel
@@ -77,6 +77,7 @@ class XTrack2DSTCTracker(object):
                                       self.data.classes[slot].iteritems()}
 
         self.slot_groups = data.slot_groups
+        self.tagger = Tagger()
 
     def _label_id_to_str(self, label):
         res = {}
@@ -258,7 +259,7 @@ class XTrack2DSTCTracker(object):
                 try:
                     tag_list = tags.get(slot, [])
                     tag_val = tag_list[tag_id]
-                    tag_val = self.data.tagger.denormalize_slot_value(tag_val)
+                    tag_val = self.tagger.denormalize_slot_value(tag_val)
                     new_res[tag_val] = p
                 except IndexError:
                     # This happens when the we predict a tag that
