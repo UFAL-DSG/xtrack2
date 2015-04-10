@@ -315,7 +315,7 @@ class UnknownClassException(Exception):
 
 
 class Data(object):
-    attrs_to_save = ['sequences', 'vocab', 'vocab_rev', 'classes', 'slots',
+    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots',
                      'slot_groups', 'stats', 'score_bins', 'tagged']
 
     null_class = '_null_'
