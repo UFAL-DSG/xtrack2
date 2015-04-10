@@ -258,11 +258,12 @@ class XTrack2DSTCTracker(object):
                 try:
                     tag_list = tags.get(slot, [])
                     tag_val = tag_list[tag_id]
+                    tag_val = self.data.tagger.denormalize_slot_value(tag_val)
                     new_res[tag_val] = p
                 except IndexError:
                     # This happens when the we predict a tag that
                     # does not exist.
-                    new_res[slot_val] = p
+                    new_res[slot_val] = '_null_'
             else:
                 new_res[slot_val] = p
         values.clear()
