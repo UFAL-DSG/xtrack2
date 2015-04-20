@@ -47,7 +47,7 @@ class Model(NeuralModel):
         self.x_include_score = x_include_score
         self.token_supervision = token_supervision
 
-        x = T.imatrix()
+        x = T.itensor3()
         input_args = [x]
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
@@ -64,39 +64,17 @@ class Model(NeuralModel):
 
         prev_layer = input_token_layer
 
+        x_score = tt.tensor3()
+        input_args.append(x_score)
+        input_score_layer = ProbLayer(name="confidence_layer",
+                                      size=emb_size,
+                                      input=x_score)
+        input_score_layer.connect(prev_layer)
+        prev_layer = input_score_layer
 
-
-        input_layers = [
-             input_token_layer
-        ]
-        if x_include_score:
-            x_score = tt.imatrix()
-            input_score_layer = Embedding(name="emb_score",
-                                          size=emb_size,
-                                          n_features=n_input_score_bins,
-                                          input=x_score)
-            input_layers.append(input_score_layer)
-
-            input_args.append(x_score)
-
-        if x_include_token_ftrs:
-            token_n_features = len(token_features.values()[0])
-            input_token_features_layer = Embedding(name="emb_ftr",
-                                                   size=token_n_features,
-                                                   n_features=n_input_tokens,
-                                                   input=x,
-                                                   static=True)
-            input_token_features_layer.init_from_dict(token_features)
-
-            ftrs_to_emb = Dense(name='ftr2emb',
-                                size=emb_size,
-                                activation='linear')
-                                # FIX: p_drop=p_drop)
-            ftrs_to_emb.connect(input_token_features_layer)
-            input_layers.append(ftrs_to_emb)
-
-        sum_layer = SumLayer(layers=input_layers)
-        prev_layer = sum_layer
+        input_maxpooling = MaxPooling(name="maxpool", pool_dimension=2)
+        input_maxpooling.connect(prev_layer)
+        prev_layer = input_maxpooling
 
         if input_n_layers > 0:
             input_transform = MLP([input_n_hidden  ] * input_n_layers,
@@ -333,9 +311,26 @@ class Model(NeuralModel):
         y_time = []
         y_labels = [[] for slot in slots]
         y_weights = []
+        wcn_cnt = 5
         for item in seqs:
-            x.append(item['data'])
-            x_score.append(item['data_score'])
+            data = []
+            data_score = []
+            for words, scores in zip(item['data'], item['data_score']):
+                new_words = []
+                new_scores = []
+                for word, score in sorted(zip(words, scores))[:wcn_cnt]:
+                    new_words.append(word)
+                    new_scores.append(np.exp(score))
+
+                n_missing = max(0, wcn_cnt - len(words))
+                new_words.extend(n_missing * [0])
+                new_scores.extend(n_missing * [0.0])
+
+                data.append(new_words)
+                data_score.append(new_scores)
+
+            x.append(data)
+            x_score.append(data_score)
             x_actor.append(item['data_actor'])
 
             labels = item['labels']
@@ -351,20 +346,16 @@ class Model(NeuralModel):
                     y_labels[i].append(lbl_val)
                 y_weights.append(label['score'])
 
-        x = padded(x, is_int=True).transpose(1, 0)
+        x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
+        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)
 
-        x_score = padded(x_score).transpose(1, 0)
-        x_actor = padded(x_actor, is_int=True).transpose(1, 0)
-
-        x_score = np.array(x_score, dtype=np.int32)[:,:]
+        #x_score = np.array(x_score, dtype=np.int32)[:,:]
 
         y_weights = np.array(y_weights, dtype=np.float32)
 
         y_token_labels_padding = self._prepare_y_token_labels_padding()
 
-        data = [x]
-        if self.x_include_score:
-            data.append(x_score)
+        data = [x, x_score]
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.append(y_weights)

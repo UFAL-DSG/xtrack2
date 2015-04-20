@@ -7,20 +7,30 @@ class Dialog(object):
 
     def __init__(self, object_id, session_id):
         self.messages = []
+        self.wcn = []
         self.states = []  # Each message has one state.
         self.actors = []  # Each message has an actor id associated.
         self.object_id = object_id
         self.session_id = session_id
 
-    def add_message(self, text, state, actor):
+    def add_message(self, text, wcn, state, actor):
         self.messages.append(text)
         self.states.append(state)
         self.actors.append(actor)
+        self._add_wcn(wcn)
+
+    def _add_wcn(self, wcn):
+        new_wcn = []
+        for hyp in wcn:
+            new_wcn.append((hyp.hyps, hyp.scores))
+
+        self.wcn.append(new_wcn)
 
     def serialize(self):
         return json.dumps(
             {
                 'messages': self.messages,
+                'wcn': self.wcn,
                 'states': self.states,
                 'actors': self.actors,
                 'object_id': self.object_id,
@@ -33,6 +43,7 @@ class Dialog(object):
 
         obj = Dialog(data['object_id'], data['session_id'])
         obj.messages = data['messages']
+        obj.wcn = data['wcn']
         obj.states = data['states']
         obj.actors= data['actors']
 

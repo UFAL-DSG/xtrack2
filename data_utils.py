@@ -51,7 +51,7 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, skip_dstc_import_step, builder_opts,
-                       builder_type):
+                       builder_type, use_wcn):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -92,7 +92,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             **builder_opts
         )
         logging.info('Building.')
-        xtd = xtd_builder.build(dialogs)
+        xtd = xtd_builder.build(dialogs, use_wcn=use_wcn)
 
         logging.info('Saving.')
         out_file = os.path.join(e_root, '%s.json' % dataset)

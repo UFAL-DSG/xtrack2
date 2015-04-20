@@ -251,9 +251,16 @@ def _stringify_act(acts):
     return " ".join(res)
 
 
+def _prepare_sys_wcn(msg):
+    res = []
+    for token in msg.split():
+        res.append(dstc_util.ASRWCNHyp(hyps=[token], scores=[0.0]))
+    return res
+
+
 def import_dstc(data_dir, out_dir, flist, constraint_slots,
                 requestable_slots,
-                use_stringified_system_acts):
+                use_stringified_system_acts, show_progress=True):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -269,6 +276,9 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
             dialog_dirs.append(os.path.join(data_dir, f_name.strip()))
 
     for i, dialog_dir in enumerate(dialog_dirs):
+        if show_progress:
+            import utils
+            utils.inline_print('%.4d/%d' % (i, len(dialog_dirs)))
         dialog = dstc_util.parse_dialog_from_directory(dialog_dir)
 
         out_dialog = Dialog(dialog_dir, dialog.session_id)
@@ -278,9 +288,13 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
                 msg = _stringify_act(turn.output.dialog_acts)
             else:
                 msg = turn.output.transcript
+
             out_dialog.add_message([(msg, 0.0)],
+                                   _prepare_sys_wcn(msg),
                                    last_state,
                                    Dialog.ACTOR_SYSTEM)
+
+
             state = dict(turn.input.user_goal)
 
             state['method'] = (turn.input.method if turn.input.method != 'none'
@@ -296,6 +310,7 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
 
             out_dialog.add_message(
                 user_messages,
+                turn.input.batch_asr_wcn,
                 state,
                 Dialog.ACTOR_USER
             )

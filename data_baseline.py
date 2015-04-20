@@ -62,7 +62,7 @@ class DataBuilderBaseline(data.DataBuilder):
             true_msg, _ = msgs[0]
 
             seq.data.append(features)
-            self._append_label_to_seq(0.0, seq, state)
+            self._append_label_to_seq(seq, state)
 
             for ftr in features:
                 self.feature_cnts[ftr] += 1

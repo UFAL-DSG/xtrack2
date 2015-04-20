@@ -112,7 +112,7 @@ class DataBuilder(object):
 
         self._open_dump_files(debug_dir)
 
-    def build(self, dialogs):
+    def build(self, dialogs, use_wcn=False):
         self._create_new_data_instance()
 
         n_labels = 0
@@ -120,17 +120,20 @@ class DataBuilder(object):
         self.msg_scores = []
 
         for dialog_ndx, dialog in enumerate(dialogs):
-            self.f_dump_text.write('> %s\n' % dialog.session_id)
+            #self.f_dump_text.write('> %s\n' % dialog.session_id)
 
             seq = self._create_seq(dialog)
 
-            self._process_dialog(dialog, seq)
+            if use_wcn:
+                self._process_dialog_wcn(dialog, seq)
+            else:
+                self._process_dialog(dialog, seq)
             self._perform_sanity_checks(seq)
             self._append_seq_if_nonempty(seq)
             n_labels += len(seq.labels)
 
-            self._dump_seq_info(seq)
-            self.f_dump_text.write('\n')
+            #self._dump_seq_info(seq)
+            #self.f_dump_text.write('\n')
 
         logging.info('There are in total %d labels in %d sequences.'
                      % (n_labels, len(self.xd.sequences, )))
@@ -174,6 +177,24 @@ class DataBuilder(object):
                                   true_msg)
             last_state = state
 
+    def _process_dialog_wcn(self, dialog, seq):
+        last_state = None
+
+        for wcn, msgs, state, actor in zip(dialog.wcn,
+                                           dialog.messages,
+                                           dialog.states,
+                                           dialog.actors):
+            actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
+
+            true_msg, _ = msgs[0]
+
+            if not self.include_system_utterances and actor_is_system:
+                continue
+            else:
+                self._process_wcn(wcn, state, last_state, actor, seq,
+                                  true_msg)
+            last_state = state
+
     def _dump_seq_info(self, seq):
         self.f_dump_text.write('\nSEQ:')
         for token in seq.data:
@@ -202,7 +223,33 @@ class DataBuilder(object):
 
         seq.true_input.append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
-            self._append_label_to_seq(msg_score, seq, state)
+            self._append_label_to_seq(seq, state)
+
+    def _process_wcn(self, wcn, state, last_state, actor, seq, true_msg):
+        for i, words in enumerate(wcn):
+            if self.word_drop_p > random.random():
+                continue
+
+            if random.random() < self.oov_ins_p:
+                token = '#OOV'
+
+            self._append_wcn_to_seq(actor, words, seq, state)
+
+        seq.true_input.append(true_msg)
+        if actor == data_model.Dialog.ACTOR_USER:
+            self._append_label_to_seq(seq, state)
+
+    def _append_wcn_to_seq(self, actor, words, seq, state):
+        tokens, token_scores = words
+        token_ndxs = []
+        for token in tokens:
+            token_ndx = self._get_token_ndx(actor, seq, token)
+            token_ndxs.append(token_ndx)
+
+        seq.data.append(token_ndxs)
+        seq.data_score.append(token_scores)
+        seq.data_actor.append(actor)
+        seq.data_debug.append(tokens)
 
     def _dump_msg_info(self, last_state, msg_score, msg_score_bin, state,
                        token_seq, true_msg):
@@ -218,10 +265,7 @@ class DataBuilder(object):
     def _tokenize_msg(self, actor, msg):
         msg = msg.lower()
         if self.tagged:
-            for slot, slot_values in self.xd.classes.iteritems():
-                for slot_value in slot_values:
-                    msg = msg.replace(self.tagger.denormalize_slot_value(
-                        slot_value), slot_value)
+            msg = self._make_input_tagged(msg)
 
 
         token_seq = list(tokenize(msg))
@@ -234,21 +278,33 @@ class DataBuilder(object):
 
         return token_seq
 
+    def _make_input_tagged(self, msg):
+        for slot, slot_values in self.xd.classes.iteritems():
+            for slot_value in slot_values:
+                msg = msg.replace(self.tagger.denormalize_slot_value(
+                    slot_value), slot_value)
+        return msg
+
+
+
     def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
+        token_ndx = self._get_token_ndx(actor, seq, token)
+
+        seq.data.append(token_ndx)
+        seq.data_score.append(msg_score_bin)
+        seq.data_actor.append(actor)
+        seq.data_debug.append(token)
+
+    def _get_token_ndx(self, actor, seq, token):
         token_ndx = self.xd.get_token_ndx(token)
-        if not self.tagged:
-            seq.data.append(token_ndx)
-        else:
+        if self.tagged:
             if actor == data_model.Dialog.ACTOR_SYSTEM:
                 token = token[1:]
             tagged_token = self._tag_token(token, seq)
             if actor == data_model.Dialog.ACTOR_SYSTEM:
                 tagged_token = '@' + tagged_token
-            tagged_token_ndx = self.xd.get_token_ndx(tagged_token)
-            seq.data.append(tagged_token_ndx)
-        seq.data_score.append(msg_score_bin)
-        seq.data_actor.append(actor)
-        seq.data_debug.append(token)
+            token_ndx = self.xd.get_token_ndx(tagged_token)
+        return token_ndx
 
     def _tag_token(self, token, seq):
         tag = self.xd.tag_token(token)
@@ -260,10 +316,10 @@ class DataBuilder(object):
         else:
             return token
 
-    def _append_label_to_seq(self, msg_score, seq, state):
+    def _append_label_to_seq(self, seq, state):
         label = {
             'time': len(seq.data) - 1,
-            'score': np.exp(msg_score),
+            #'score': np.exp(msg_score),
             'slots': {}
         }
         if self.no_label_weight:

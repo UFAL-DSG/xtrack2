@@ -44,7 +44,8 @@ def main(skip_dstc_import_step, builder_type):
             no_label_weight=True
         ),
         skip_dstc_import_step=skip_dstc_import_step,
-        builder_type=builder_type
+        builder_type=builder_type,
+        use_wcn=True
     )
 
 

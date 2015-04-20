@@ -867,3 +867,71 @@ class BiasedSoftmax(Layer):
 
     def get_params(self):
         return set(self.params).union(set(self.l_in.get_params()))
+
+
+class ProbLayer(Layer):
+    def __init__(self, name=None, size=128, init=inits.normal, input=None):
+        self.name = name
+        self.init = init
+        self.size = size
+        self.input = input
+
+    def connect(self, prev_layer):
+        self.prev_layer = prev_layer
+
+        self.w = self.init((prev_layer.size, self.size),
+                            layer_width=self.size,
+                            scale=1.0,
+                            name=self._name_param("W"))
+        self.b = self.init((self.size, ),
+                           layer_width=self.size,
+                           name=self._name_param("b"))
+
+        # self.wc = self.init((1, ),
+        #                     layer_width=1,
+        #                     scale=1.0,
+        #                     name=self._name_param("Wc"))
+        #
+        # self.wc.set_value(np.array([1.0], dtype='float32'))
+        #
+        # self.bc = self.init((1, ),
+        #                     layer_width=1,
+        #                     scale=1.0,
+        #                     name=self._name_param("bc"))
+        # self.bc.set_value(np.array([0.0], dtype='float32'))
+        self.wc = theano.shared(np.array(1.0, dtype='float32'), name=self._name_param("Wc"))
+        self.bc = theano.shared(np.array(1.0, dtype='float32'), name=self._name_param("bc"))
+
+
+
+        self.params = [self.w, self.b, self.wc, self.bc]
+
+    def output(self, dropout_active=False):
+        x = self.prev_layer.output(dropout_active=dropout_active)
+
+        y = activations.sigmoid(T.dot(x, self.w) + self.b)
+
+        cx = self.input
+        cy = activations.sigmoid(self.wc * cx + self.bc)
+
+        return y * cy.dimshuffle(0, 1, 2, 'x')
+
+    def get_params(self):
+        return self.prev_layer.get_params().union(self.params)
+
+
+class MaxPooling(Layer):
+    def __init__(self, name, pool_dimension):
+        self.name = name
+        self.pool_dimension = pool_dimension
+
+    def connect(self, prev_layer):
+        self.prev_layer = prev_layer
+        self.size = prev_layer.size
+
+    def output(self, dropout_active=False):
+        x = self.prev_layer.output(dropout_active=dropout_active)
+        return T.max(x, axis=self.pool_dimension)
+
+    def get_params(self):
+        return self.prev_layer.get_params()

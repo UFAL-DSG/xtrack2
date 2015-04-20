@@ -14,6 +14,7 @@ from collections import namedtuple
 
 
 ASRHyp = namedtuple('ASRHyp', ['hyp', 'score'])
+ASRWCNHyp = namedtuple('ASRWCNHyp', ['hyps', 'scores'])
 SLUHyp = namedtuple('SLUHyp', ['acts', 'score'])
 DialogAct = namedtuple('DialogAct', ['act', 'slots'])
 Slot = namedtuple('Slot', ['name', 'value'])
@@ -152,28 +153,35 @@ class Input(object):
 
         """
         self.live_asr = []
+        self.live_asr_wcn = []
         self.live_slu = []
         self.batch_asr = []
+        self.batch_asr_wcn = []
         self.batch_slu = []
 
         self.user_goal = user_goal
         self.requested_slots = requested_slots
         self.method = method
 
-        for fldname, asr_field, slu_field in (
-                ('live', self.live_asr, self.live_slu),
-                # ('batch', self.batch_asr, self.batch_slu)
+        for fldname, asr_field, asr_wcn_field, slu_field in (
+                ('live', self.live_asr, self.live_asr_wcn, self.live_slu),
+                ('batch', self.batch_asr, self.batch_asr_wcn, self.batch_slu)
             ):
             if fldname in input_json:
                 for asr_hyp in input_json[fldname]['asr-hyps']:
                     asr_field.append(ASRHyp(hyp=asr_hyp['asr-hyp'],
                                             score=asr_hyp['score']))
 
-                slu_hyps = input_json[fldname]['slu-hyps']
+                for wcn_item in input_json[fldname].get('cnet', []):
+                    words, scores = zip(*[(item['word'], item['score']) for item in wcn_item['arcs']])
+                    asr_wcn_field.append(ASRWCNHyp(hyps=words, scores=scores))
 
-                slu_scores = [hyp['score'] for hyp in slu_hyps]
+                #import ipdb; ipdb.set_trace()
+                #slu_hyps = input_json[fldname]['slu-hyps']
 
-                for hyp_idx, slu_hyp in enumerate(slu_hyps):
+                #slu_scores = [hyp['score'] for hyp in slu_hyps]
+
+                """for hyp_idx, slu_hyp in enumerate(slu_hyps):
                     dialog_acts = []
                     score = slu_scores[hyp_idx]
 
@@ -197,7 +205,7 @@ class Input(object):
                                                      slots=tuple(slots)))
 
                     slu_field.append(SLUHyp(score=score,
-                                            acts=dialog_acts))
+                                            acts=dialog_acts))"""
 
     @property
     def all_slu(self):
@@ -222,12 +230,20 @@ class Input(object):
         for asr_hyp in self.live_asr:
             repr_str += (indent + 2 * step) * ' ' + repr(asr_hyp) + '\n'
 
+        repr_str += (indent + step) * ' ' + 'Live ASR WCN:\n'
+        for asr_hyp in self.live_asr_wcn:
+            repr_str += (indent + 2 * step) * ' ' + repr(asr_hyp) + '\n'
+
         repr_str += (indent + step) * ' ' + 'Live SLU:\n'
         for slu_hyp in self.live_slu:
             repr_str += (indent + 2 * step) * ' ' + repr(slu_hyp) + '\n'
 
         repr_str += (indent + step) * ' ' + 'Batch ASR:\n'
         for asr_hyp in self.batch_asr:
+            repr_str += (indent + 2 * step) * ' ' + repr(asr_hyp) + '\n'
+
+        repr_str += (indent + step) * ' ' + 'Batch ASR WCN:\n'
+        for asr_hyp in self.batch_asr_wcn:
             repr_str += (indent + 2 * step) * ' ' + repr(asr_hyp) + '\n'
 
         repr_str += (indent + step) * ' ' + 'Batch SLU:\n'

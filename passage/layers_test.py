@@ -111,8 +111,14 @@ def test_verify_exprgrad():
     print tensor.verify_grad(f, [x_val], rng=rng)
 
 
+def test_scalar():
+    x =
+    tt.shared(x)
+
 
 if __name__ == '__main__':
+    test_scalar()
+    exit(0)
     test_unwrapper()
     exit(0)
     rng = np.random.RandomState(23455)
