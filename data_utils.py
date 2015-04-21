@@ -39,35 +39,29 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
     input_dir = os.path.join(data_directory, 'dstc2/data')
     flist = os.path.join(data_directory,
                          'dstc2/scripts/config/dstc2_%s.flist' % dataset)
-    import_dstc.import_dstc(data_dir=input_dir, out_dir=out_dir, flist=flist,
+    return import_dstc.import_dstc(data_dir=input_dir, out_dir=out_dir, flist=flist,
                             constraint_slots='food,area,pricerange,name',
                             requestable_slots='food,area,pricerange,'
                                                        'name,addr,phone,'
                                                        'postcode,signature',
                             use_stringified_system_acts=True)
 
-    return out_dir
 
 
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
-                       ontology, skip_dstc_import_step, builder_opts,
-                       builder_type, use_wcn):
+                       ontology, builder_opts, builder_type, use_wcn):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
     based_on = None
     for dataset in ['train', 'dev', 'test']:
         out_dir = os.path.join(e_root, dataset)
-        if not skip_dstc_import_step:
-            import_dstc_data(data_directory=data_directory,
+        #if not skip_dstc_import_step:
+        dialogs = import_dstc_data(data_directory=data_directory,
                              e_root=e_root,
                              dataset=dataset,
                              data_name=experiment_name,
                              out_dir=out_dir)
-
-        dialogs = load_dialogs(out_dir)
-
-
 
         logging.info('Initializing.')
         if builder_type == 'baseline':

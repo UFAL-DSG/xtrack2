@@ -149,8 +149,8 @@ class SimpleConvModel(NeuralModel):
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
 
-    def prepare_data_train(self, seqs, slots):
-        return self._prepare_data(seqs, slots, with_labels=True)
+    def prepare_data_train(self, seqs, slots, debug_data=False):
+        return self._prepare_data(seqs, slots, with_labels=True, debug_data=debug_data)
 
     def prepare_data_predict(self, seqs, slots):
         return self._prepare_data(seqs, slots, with_labels=False)
@@ -163,7 +163,7 @@ class SimpleConvModel(NeuralModel):
 
         return [token_padding]
 
-    def _prepare_data(self, seqs, slots, with_labels=True):
+    def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False):
         x = []
         x_score = []
         x_actor = []
@@ -194,6 +194,7 @@ class SimpleConvModel(NeuralModel):
         x_score = padded(x_score).transpose(1, 0)
         x_score = np.array(x_score, dtype=np.float32)[:,:]
         x_score = (x_score / 10.0)
+
 
         data = [x]
         if self.x_include_score:

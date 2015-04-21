@@ -187,6 +187,12 @@ class XTrack2DSTCTracker(object):
             last_pos = 0
             state_component_mentioned = False
             for lbl in dialog['labels']:
+                words = dialog['data_debug'][last_pos:lbl['time'] + 1]
+                words_scores = dialog['data_debug'][last_pos:lbl['time'] + 1]
+                for wcn, wcn_score in zip(words, words_scores):
+
+                    self.track_log.write("  ".join(w for ws, w in sorted(zip(wcn_score, wcn), reverse=True)) + "\n")
+                self.track_log.write("\n")
                 #words = dialog['data'][last_pos:lbl['time'] + 1]
                 #if 'data_score' in dialog:
                 #    word_probs = dialog['data_score'][last_pos:lbl['time'] + 1]
@@ -199,12 +205,16 @@ class XTrack2DSTCTracker(object):
                 #        last_word_p = word_p
                 #    self.track_log.write("%s " % self.data.vocab_rev[word_id])
 
+
                 last_pos = lbl['time'] + 1
 
                 out, goals_correct = self.build_output(
                     [pred[i][pred_ptr] for i, _ in enumerate(self.data.slots)],
                     lbl['slots']
                 )
+                self.track_log.write("#" * 100)
+                self.track_log.write("\n\n")
+
                 if dialog['tags']:
                     self._replace_tags(out, dialog['tags'])
                 #self.track_log.write(json.dumps(out))

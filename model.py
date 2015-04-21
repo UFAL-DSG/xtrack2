@@ -44,9 +44,6 @@ class Model(NeuralModel):
         logging.info('We have the following classes:')
         self._log_classes_info()
 
-        self.x_include_score = x_include_score
-        self.token_supervision = token_supervision
-
         x = T.itensor3()
         input_args = [x]
         input_token_layer = Embedding(name="emb",
@@ -182,7 +179,6 @@ class Model(NeuralModel):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
-        y_weight = tt.vector()
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
@@ -195,27 +191,18 @@ class Model(NeuralModel):
         for slot, slot_lstm_mlp in zip(slots, mlps):
             logging.info('Building output classifier for %s.' % slot)
             n_classes = len(slot_classes[slot])
-            if oclf_n_layers > 0:
-                slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers,
-                               [oclf_activation] * oclf_n_layers,
-                               [p_drop         ] * oclf_n_layers,
-                               name="mlp_%s" % slot)
-                #name="mlp_%s" % slot, init=inits.copy(mlp_params))
-                slot_mlp.connect(cpt)
+            slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
+                           [oclf_activation] * oclf_n_layers + ['softmax'],
+                           [p_drop         ] * oclf_n_layers + [0.0      ],
+                           name="mlp_%s" % slot)
+            slot_mlp.connect(cpt)
 
-            slot_softmax = BiasedSoftmax(name='softmax_%s' % slot, size=n_classes)
-            if oclf_n_layers > 0:
-                slot_softmax.connect(slot_mlp)
-            else:
-                slot_softmax.connect(cpt)
+            predictions.append(slot_mlp.output(dropout_active=False))
 
-            predictions.append(slot_softmax.output(dropout_active=False))
-
-            slot_objective = WeightedCrossEntropyObjective()
+            slot_objective = CrossEntropyObjective()
             slot_objective.connect(
-                y_hat_layer=slot_softmax,
-                y_true=y_label[slot],
-                y_weights=y_weight
+                y_hat_layer=slot_mlp,
+                y_true=y_label[slot]
             )
             costs.append(slot_objective)
         if token_supervision:
@@ -234,7 +221,7 @@ class Model(NeuralModel):
         cost_value = cost.output(dropout_active=True)
 
         lr = tt.scalar('lr')
-        clipnorm = 0.5
+        clipnorm = 500.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr, clipnorm=clipnorm)
@@ -254,7 +241,6 @@ class Model(NeuralModel):
 
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time]
-        loss_args += [y_weight]
         loss_args += [y_label[slot] for slot in slots]
         if token_supervision:
             loss_args += [y_tokens_label]
@@ -289,8 +275,8 @@ class Model(NeuralModel):
     def init_word_embeddings(self, w):
         self.input_emb.set_value(w)
 
-    def prepare_data_train(self, seqs, slots):
-        return self._prepare_data(seqs, slots, with_labels=True)
+    def prepare_data_train(self, seqs, slots, debug_data=False):
+        return self._prepare_data(seqs, slots, with_labels=True, debug_data=debug_data)
 
     def prepare_data_predict(self, seqs, slots):
         return self._prepare_data(seqs, slots, with_labels=False)
@@ -303,7 +289,7 @@ class Model(NeuralModel):
 
         return [token_padding]
 
-    def _prepare_data(self, seqs, slots, with_labels=True):
+    def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False):
         x = []
         x_score = []
         x_actor = []
@@ -318,7 +304,7 @@ class Model(NeuralModel):
             for words, scores in zip(item['data'], item['data_score']):
                 new_words = []
                 new_scores = []
-                for word, score in sorted(zip(words, scores))[:wcn_cnt]:
+                for word, score in sorted(zip(words, scores), key=lambda (w, s, ): -s)[:wcn_cnt]:
                     new_words.append(word)
                     new_scores.append(np.exp(score))
 
@@ -346,19 +332,16 @@ class Model(NeuralModel):
                     y_labels[i].append(lbl_val)
                 y_weights.append(label['score'])
 
+
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
         x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)
 
-        #x_score = np.array(x_score, dtype=np.int32)[:,:]
-
-        y_weights = np.array(y_weights, dtype=np.float32)
-
-        y_token_labels_padding = self._prepare_y_token_labels_padding()
+        if debug_data:
+            import ipdb; ipdb.set_trace()
 
         data = [x, x_score]
         data.extend([y_seq_id, y_time])
         if with_labels:
-            data.append(y_weights)
             data.extend(y_labels)
 
         return tuple(data)

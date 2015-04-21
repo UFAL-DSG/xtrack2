@@ -191,6 +191,40 @@ class DataBuilder(object):
             if not self.include_system_utterances and actor_is_system:
                 continue
             else:
+                ## TODO: Hack.
+                #if not actor_is_system:
+                #    msg, msg_score = msgs[1]
+                #    wcn = map(lambda x: ([x], [msg_score]), msg.split())
+                #import ipdb; ipdb.set_trace()
+                if not actor_is_system:
+                    wcn = []
+                    for msg, msg_score in msgs[1:]:
+
+                        words = msg.split()
+                        n_tokens = len(words)
+
+                        if n_tokens > 0:
+                            word_score = np.power(np.exp(msg_score), 1.0 / n_tokens)
+
+                            for i, word in enumerate(words):
+                                if len(wcn) < i + 1:
+                                    wcn.append(collections.defaultdict(float))
+
+                                wcn[i][word] += word_score
+                        else:
+                            for item in wcn:
+                                item['#NOTHING'] += np.exp(msg_score)
+
+                    for cn in wcn:
+                        for k in cn.keys():
+                            if cn[k] > 0:
+                                cn[k] = np.log(cn[k])
+                            else:
+                                cn[k] = -50000.0
+
+                    wcn = map(lambda x: zip(*x.items()), wcn)
+
+
                 self._process_wcn(wcn, state, last_state, actor, seq,
                                   true_msg)
             last_state = state
@@ -241,8 +275,14 @@ class DataBuilder(object):
 
     def _append_wcn_to_seq(self, actor, words, seq, state):
         tokens, token_scores = words
+
+        if actor == data_model.Dialog.ACTOR_SYSTEM:
+            tokens = self._prefix_wcn_by(tokens, "@")
+
         token_ndxs = []
         for token in tokens:
+            if token == '!null':
+                token = "#NOTHING"
             token_ndx = self._get_token_ndx(actor, seq, token)
             token_ndxs.append(token_ndx)
 
@@ -250,6 +290,13 @@ class DataBuilder(object):
         seq.data_score.append(token_scores)
         seq.data_actor.append(actor)
         seq.data_debug.append(tokens)
+
+    def _prefix_wcn_by(self, words, char):
+        word_res = []
+        for word in words:
+            word_res.append("%s%s" % (char, word))
+
+        return word_res
 
     def _dump_msg_info(self, last_state, msg_score, msg_score_bin, state,
                        token_seq, true_msg):

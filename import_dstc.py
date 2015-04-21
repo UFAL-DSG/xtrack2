@@ -317,9 +317,10 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
 
             last_state = state  #turn.input.user_goal
 
-        with open(os.path.join(out_dir, "%d.json" % (i,)
-                 ), "w") as f_out:
-            f_out.write(out_dialog.serialize())
+        #with open(os.path.join(out_dir, "%d.json" % (i,)
+        #         ), "w") as f_out:
+        #    f_out.write(out_dialog.serialize())
+        yield out_dialog
 
 
 

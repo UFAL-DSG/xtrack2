@@ -879,42 +879,40 @@ class ProbLayer(Layer):
     def connect(self, prev_layer):
         self.prev_layer = prev_layer
 
-        self.w = self.init((prev_layer.size, self.size),
-                            layer_width=self.size,
+        #self.w = self.init((prev_layer.size, self.size),
+        #                    layer_width=self.size,
+        #                    scale=1.0,
+        #                    name=self._name_param("W"))
+        #self.b = self.init((self.size, ),
+        #                   layer_width=self.size,
+        #                   name=self._name_param("b"))
+
+        self.wc = self.init((1, prev_layer.size, ),
+                            layer_width=prev_layer.size,
                             scale=1.0,
-                            name=self._name_param("W"))
-        self.b = self.init((self.size, ),
-                           layer_width=self.size,
-                           name=self._name_param("b"))
+                            name=self._name_param("Wc"))
+        #self.wc.set_value(np.ones_like(self.wc.get_value(), dtype='float32'))
 
-        # self.wc = self.init((1, ),
-        #                     layer_width=1,
-        #                     scale=1.0,
-        #                     name=self._name_param("Wc"))
-        #
-        # self.wc.set_value(np.array([1.0], dtype='float32'))
-        #
-        # self.bc = self.init((1, ),
-        #                     layer_width=1,
-        #                     scale=1.0,
-        #                     name=self._name_param("bc"))
-        # self.bc.set_value(np.array([0.0], dtype='float32'))
-        self.wc = theano.shared(np.array(1.0, dtype='float32'), name=self._name_param("Wc"))
-        self.bc = theano.shared(np.array(1.0, dtype='float32'), name=self._name_param("bc"))
+        self.bc = self.init((prev_layer.size, ),
+                             layer_width=1,
+                             scale=1.0,
+                             name=self._name_param("bc"))
+        #self.bc.set_value(np.zeros_like(self.bc.get_value(), dtype='float32'))
+        #self.wc = theano.shared(np.array(1.0, dtype='float32'), name=self._name_param("Wc"))
+        #self.bc = theano.shared(np.array(0.0, dtype='float32'), name=self._name_param("bc"))
 
 
 
-        self.params = [self.w, self.b, self.wc, self.bc]
+        self.params = [self.wc, self.bc]
 
     def output(self, dropout_active=False):
         x = self.prev_layer.output(dropout_active=dropout_active)
 
-        y = activations.sigmoid(T.dot(x, self.w) + self.b)
+        #y = activations.sigmoid(T.dot(x, self.w) + self.b)
 
-        cx = self.input
-        cy = activations.sigmoid(self.wc * cx + self.bc)
+        cy = activations.sigmoid(T.dot(self.input.dimshuffle(0, 1, 2, 'x'), self.wc) + self.bc)
 
-        return y * cy.dimshuffle(0, 1, 2, 'x')
+        return x * cy
 
     def get_params(self):
         return self.prev_layer.get_params().union(self.params)

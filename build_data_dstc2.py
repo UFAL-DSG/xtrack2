@@ -6,7 +6,7 @@ import data_utils
 import xtrack2_config
 
 
-def main(skip_dstc_import_step, builder_type):
+def main(builder_type, only_slot):
     import utils
     utils.pdb_on_error()
 
@@ -22,28 +22,41 @@ def main(skip_dstc_import_step, builder_type):
             method=dstc_ontology['method']
         )
 
+    slots = ['food', 'area', 'pricerange', 'name', 'method', 'req_food',
+             'req_area', 'req_pricerange', 'req_name', 'req_phone',
+             'req_addr', 'req_postcode', 'req_signature']
+
+    slot_groups = dict(
+        food=['food'],
+        area=['area'],
+        pricerange=['pricerange'],
+        name=['name'],
+        method=['method'],
+        goals=['food', 'area', 'pricerange', 'name'],
+        requested=['req_food', 'req_area', 'req_pricerange', 'req_name',
+                   'req_phone', 'req_addr', 'req_postcode', 'req_signature']
+    )
+
+    experiment_name = 'e2_tagged_%s' % builder_type
+
+    if only_slot:
+        slots = [only_slot]
+        slot_groups = {
+            'food': ['food'],
+        }
+        experiment_name += "_%s" % only_slot
+
+
     data_utils.prepare_experiment(
-        experiment_name='e2_tagged_%s' % builder_type,
+        experiment_name=experiment_name,
         data_directory=xtrack2_config.data_directory,
-        slots=['food', 'area', 'pricerange', 'name', 'method', 'req_food',
-               'req_area', 'req_pricerange', 'req_name', 'req_phone',
-               'req_addr', 'req_postcode', 'req_signature'],
-        slot_groups=dict(
-            food=['food'],
-            area=['area'],
-            pricerange=['pricerange'],
-            name=['name'],
-            method=['method'],
-            goals=['food', 'area', 'pricerange', 'name'],
-            requested=['req_food', 'req_area', 'req_pricerange', 'req_name',
-                       'req_phone', 'req_addr', 'req_postcode', 'req_signature']
-        ),
+        slots=slots,
+        slot_groups=slot_groups,
         ontology=ontology,
         builder_opts=dict(
-            tagged=True,
+            tagged=False,
             no_label_weight=True
         ),
-        skip_dstc_import_step=skip_dstc_import_step,
         builder_type=builder_type,
         use_wcn=True
     )
@@ -53,9 +66,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--skip_dstc_import_step', action='store_true',
-                        default=False)
     parser.add_argument('--builder_type', default='xtrack')
+    parser.add_argument('--only_slot', default=None)
 
     args = parser.parse_args()
     main(**vars(args))

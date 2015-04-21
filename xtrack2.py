@@ -17,7 +17,7 @@ theano.config.floatX = 'float32'
 #theano.config.mode = 'FAST_COMPILE'
 #theano.config.linker = 'py'
 theano.config.mode = 'FAST_RUN'
-#theano.config.optimizer = 'fast_compile'
+#theano.config.optimizer = 'None'
 
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
@@ -344,7 +344,7 @@ def get_extreme_examples(mb_loss, minibatches, xtd_t):
 def main(args_lst,
          eid, experiment_path, out, valid_after,
          load_params, save_params,
-         debug, track_log,
+         debug, debug_data, debug_theano, track_log,
          n_cells, emb_size, x_include_score, no_train_emb,
          n_epochs, lr, opt_type, momentum,
          mb_size, mb_mult_data,
@@ -376,6 +376,11 @@ def main(args_lst,
     for arg_name, arg_value in args_lst:
         logging.info('    %s: %s' % (arg_name, arg_value))
     logging.info('Experiment path: %s' % experiment_path)
+
+    if debug_theano:
+        theano.config.mode = 'FAST_COMPILE'
+        theano.config.optimizer = 'None'
+        theano.config.linker = 'py'
 
     train_path = os.path.join(experiment_path, 'train.json')
     xtd_t = Data.load(train_path)
@@ -422,7 +427,8 @@ def main(args_lst,
                       enable_branch_exp=enable_branch_exp,
                       token_supervision=enable_token_supervision,
                       l1=l1,
-                      l2=l2
+                      l2=l2,
+                      build_train=not debug_data
         )
     elif model_type == 'conv':
         model = SimpleConvModel(slots=slots,
@@ -489,7 +495,7 @@ def main(args_lst,
     tracker_valid = XTrack2DSTCTracker(xtd_v, [model])
     tracker_train = XTrack2DSTCTracker(xtd_t, [model])
 
-    valid_data_y = model.prepare_data_train(xtd_v.sequences, slots)
+    valid_data_y = model.prepare_data_train(xtd_v.sequences, slots, debug_data)
     valid_data = model.prepare_data_predict(xtd_v.sequences, slots)
     if not eval_on_full_train:
         selected_train_seqs = []
@@ -644,7 +650,7 @@ def build_argument_parser():
     # Experiment params.
     parser.add_argument('--load_params', default=None)
     parser.add_argument('--save_params', default=None)
-    parser.add_argument('--out', default='xtrack2_out')
+    parser.add_argument('--out', default='/tmp/xtrack2_out')
 
     parser.add_argument('--model_type', default="lstm", type=str)
 
@@ -685,6 +691,10 @@ def build_argument_parser():
 
 
     parser.add_argument('--debug', default=False,
+                        action='store_true')
+    parser.add_argument('--debug_data', default=False,
+                        action='store_true')
+    parser.add_argument('--debug_theano', default=False,
                         action='store_true')
     parser.add_argument('--track_log', default='track_log.txt', type=str)
     parser.add_argument('--eval_on_full_train', default=False,
