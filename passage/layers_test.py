@@ -115,7 +115,9 @@ def test_convscan():
     x = tt.matrix()
 
     def f(x_tm2, x_tm1, x):
-        return tt.concatenate([[x_tm2], [x_tm1], [x]])
+        #return tt.concatenate([[x_tm2], [x_tm1], [x]])
+        return tt.concatenate([x_tm2, x_tm1, x])
+
 
 
     sf, _ = theano.scan(f, sequences=[dict(input=x, taps=[-2, -1, 0])])

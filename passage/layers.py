@@ -959,6 +959,26 @@ class NGramLSTM(Layer):
         self.enable_branch_exp = enable_branch_exp
         self.lagged = []
 
+    def connect(self, l_in):
+        self.l_in = l_in
+
+        self._init_input_connections(l_in.size)
+        self._init_recurrent_connections()
+        self._init_peephole_connections()  # TODO: Make also conditional.
+        self._init_initial_states()
+
+        self.filters = self.init((l_in.size * 3, self.size * 4),
+                                 layer_width=self.size * 4,
+                                 name=self._name_param("filters"))
+
+        #self.params = [self.w, self.u, self.b]
+        self.params = [self.u]
+        self.params += [self.init_c, self.init_h]
+        self.params += [self.filters]
+
+        if self.peepholes:
+            self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
+
     def _init_input_connections(self, n_in):
         self.w = self.init((n_in, self.size * 4),
                            layer_width=self.size,
@@ -1003,19 +1023,7 @@ class NGramLSTM(Layer):
                                 layer_width=self.size,
                                 name=self._name_param("init_h"))
 
-    def connect(self, l_in):
-        self.l_in = l_in
 
-        self._init_input_connections(l_in.size)
-        self._init_recurrent_connections()
-        self._init_peephole_connections()  # TODO: Make also conditional.
-        self._init_initial_states()
-
-        self.params = [self.w, self.u, self.b]
-        self.params += [self.init_c, self.init_h]
-
-        if self.peepholes:
-            self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
 
     def connect_lagged(self, l_in):
         self.lagged.append(l_in)
@@ -1025,7 +1033,10 @@ class NGramLSTM(Layer):
 
     def step(self, x_tm2, x_tm1, x_tm0, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o,
              dropout_active):
-        x_t = T.max(T.concatenate([[x_tm2], [x_tm1], [x_tm0]]), axis=0)
+        #x_t = T.max(T.concatenate([[x_tm2], [x_tm1], [x_tm0]]), axis=0)
+        x_t = T.dot(T.concatenate([x_tm2, x_tm1, x_tm0], axis=1), self.filters)
+        #x_t = T.dot(x_tm0, self.filters)
+
         h_tm1_dot_u = T.dot(h_tm1, u)
         gates_fiom = x_t + h_tm1_dot_u
 
@@ -1061,8 +1072,9 @@ class NGramLSTM(Layer):
             dropout_corr = 1.0
         else:
             dropout_corr = 1.0 - self.p_drop
-        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
-        return x_dot_w
+        #x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
+        #return x_dot_w
+        return X
 
     def _reverse_if_backward(self, cells, out):
         if self.backward:

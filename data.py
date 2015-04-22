@@ -198,7 +198,7 @@ class DataBuilder(object):
                 #import ipdb; ipdb.set_trace()
                 if not actor_is_system:
                     wcn = []
-                    for msg, msg_score in msgs[1:]:
+                    for msg, msg_score in msgs[1:2]:
 
                         words = msg.split()
                         n_tokens = len(words)
