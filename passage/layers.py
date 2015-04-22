@@ -933,3 +933,199 @@ class MaxPooling(Layer):
 
     def get_params(self):
         return self.prev_layer.get_params()
+
+
+
+class NGramLSTM(Layer):
+
+    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
+                 seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
+                 peepholes=False, enable_branch_exp=False, backward=False):
+        if name:
+            self.name = name
+        self.init = init
+        self.init_scale = init_scale
+        self.size = size
+        self.truncate_gradient = truncate_gradient
+        self.seq_output = seq_output
+        self.out_cells = out_cells
+        self.p_drop = p_drop
+        self.peepholes = peepholes
+        self.backward = backward
+
+        self.gate_act = activations.sigmoid
+        self.modul_act = activations.tanh
+
+        self.enable_branch_exp = enable_branch_exp
+        self.lagged = []
+
+    def _init_input_connections(self, n_in):
+        self.w = self.init((n_in, self.size * 4),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("W"))
+        self.b = self.init((self.size * 4, ),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("b"))
+
+        # Initialize forget gates to large values.
+        b = self.b.get_value()
+        b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
+        #b[self.size:] = 0.0
+        self.b.set_value(b)
+
+    def _init_recurrent_connections(self):
+        self.u = self.init((self.size, self.size * 4),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("U"))
+
+    def _init_peephole_connections(self):
+        self.p_vec_f = self.init((self.size, ),
+                                 layer_width=self.size,
+                                 scale=self.init_scale,
+                                 name=self._name_param("peep_f"))
+        self.p_vec_i = self.init((self.size, ),
+                                 layer_width=self.size,
+                                 scale=self.init_scale,
+                                 name=self._name_param("peep_i"))
+        self.p_vec_o = self.init((self.size, ),
+                                 layer_width=self.size,
+                                 scale=self.init_scale,
+                                 name=self._name_param("peep_o"))
+
+    def _init_initial_states(self):
+        self.init_c = self.init((self.size, ),
+                                layer_width=self.size,
+                                name=self._name_param("init_c"))
+        self.init_h = self.init((self.size, ),
+                                layer_width=self.size,
+                                name=self._name_param("init_h"))
+
+    def connect(self, l_in):
+        self.l_in = l_in
+
+        self._init_input_connections(l_in.size)
+        self._init_recurrent_connections()
+        self._init_peephole_connections()  # TODO: Make also conditional.
+        self._init_initial_states()
+
+        self.params = [self.w, self.u, self.b]
+        self.params += [self.init_c, self.init_h]
+
+        if self.peepholes:
+            self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
+
+    def connect_lagged(self, l_in):
+        self.lagged.append(l_in)
+
+    def _slice(self, x, n):
+            return x[:, n * self.size:(n + 1) * self.size]
+
+    def step(self, x_tm2, x_tm1, x_tm0, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o,
+             dropout_active):
+        x_t = T.max(T.concatenate([[x_tm2], [x_tm1], [x_tm0]]), axis=0)
+        h_tm1_dot_u = T.dot(h_tm1, u)
+        gates_fiom = x_t + h_tm1_dot_u
+
+        g_f = self._slice(gates_fiom, 0)
+        g_i = self._slice(gates_fiom, 1)
+        g_m = self._slice(gates_fiom, 3)
+
+        if self.peepholes:
+            g_f += c_tm1 * p_vec_f
+            g_i += c_tm1 * p_vec_i
+
+        g_f = self.gate_act(g_f)
+        g_i = self.gate_act(g_i)
+        g_m = self.modul_act(g_m)
+
+        c_t = g_f * c_tm1 + g_i * g_m
+
+        g_o = self._slice(gates_fiom, 2)
+
+        if self.peepholes:
+            g_o += c_t * p_vec_o
+
+        g_o = self.gate_act(g_o)
+
+        h_t = g_o * T.tanh(c_t)
+
+        return h_t, c_t
+
+    def _compute_x_dot_w(self, dropout_active):
+        X = self.l_in.output(dropout_active=dropout_active)
+        if self.p_drop > 0. and dropout_active:
+            X = dropout(X, self.p_drop)
+            dropout_corr = 1.0
+        else:
+            dropout_corr = 1.0 - self.p_drop
+        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
+        return x_dot_w
+
+    def _reverse_if_backward(self, cells, out):
+        if self.backward:
+            out = out[::-1, ]
+            cells = cells[::-1, ]
+        return cells, out
+
+    def _prepare_result(self, cells, out):
+        if self.seq_output:
+            if self.out_cells:
+                return cells
+            else:
+                return out
+        else:
+            if self.out_cells:
+                return cells[-1]
+            else:
+                return out[-1]
+
+    def _prepare_outputs_info(self, x_dot_w):
+        outputs_info = [
+            T.repeat(self.init_c.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
+            T.repeat(self.init_h.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
+        ]
+        return outputs_info
+
+    def _process_scan_output(self, res):
+        (out, cells), _ = res
+
+        return out, cells
+
+    def _compute_seq(self, x_dot_w, dropout_active):
+        outputs_info = self._prepare_outputs_info(x_dot_w)
+        x_dot_w = T.concatenate(
+            [
+                T.zeros((2, x_dot_w.shape[1], x_dot_w.shape[2])),
+                x_dot_w
+            ]
+        )
+
+        res = theano.scan(self.step,
+                                      sequences=[
+                                          dict(input=x_dot_w, taps=[-2, -1, 0])
+                                      ],
+                                      outputs_info=outputs_info,
+                                      non_sequences=[self.u, self.p_vec_f,
+                                                     self.p_vec_i,
+                                                     self.p_vec_o,
+                                                     1 if dropout_active else
+                                                     0],
+                                      truncate_gradient=self.truncate_gradient,
+                                      go_backwards=self.backward
+        )
+        out, cells = self._process_scan_output(res)
+        return cells, out
+
+    def output(self, dropout_active=False):
+        x_dot_w = self._compute_x_dot_w(dropout_active)
+
+        cells, out = self._compute_seq(x_dot_w, dropout_active)
+        cells, out = self._reverse_if_backward(cells, out)
+
+        return self._prepare_result(cells, out)
+
+    def get_params(self):
+        return self.l_in.get_params().union(self.params)

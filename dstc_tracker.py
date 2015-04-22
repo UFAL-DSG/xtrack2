@@ -274,7 +274,8 @@ class XTrack2DSTCTracker(object):
                 except IndexError:
                     # This happens when the we predict a tag that
                     # does not exist.
-                    new_res['_null_'] = p
+                    #new_res['_null_'] = p
+                    pass
             else:
                 new_res[slot_val] = p
         values.clear()

@@ -118,62 +118,25 @@ class Model(NeuralModel):
             mlps.append(slot_mlp)
             mlp_params.extend(slot_mlp.get_params())
 
+        # Forward LSTM layer.
+        logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
+        lstm_layer = NGramLSTM(name="lstm",
+                               size=n_cells,
+                               seq_output=True,
+                               out_cells=False,
+                               peepholes=lstm_peepholes,
+                               p_drop=p_drop,
+                               enable_branch_exp=enable_branch_exp
+        )
 
-        for i in range(rnn_n_layers):
-            # Forward LSTM layer.
-            logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
-            if x_include_mlp:
-                f_lstm_layer = LstmWithMLP(name="flstm_%d" % i,
-                                       size=n_cells,
-                                       seq_output=True,
-                                       out_cells=False,
-                                       peepholes=lstm_peepholes,
-                                       p_drop=p_drop,
-                                       enable_branch_exp=enable_branch_exp,
-                                       mlps=mlps)
-            else:
-                f_lstm_layer = LstmRecurrent(name="flstm_%d" % i,
-                                       size=n_cells,
-                                       seq_output=True,
-                                       out_cells=False,
-                                       peepholes=lstm_peepholes,
-                                       p_drop=p_drop,
-                                       enable_branch_exp=enable_branch_exp
-                )
+        lstm_layer.connect(prev_layer)
 
-            f_lstm_layer.connect(prev_layer)
+        if debug:
+            self._lstm_output = theano.function(input_args,
+                                                [prev_layer.output(),
+                                                 lstm_layer.output()])
 
-
-
-
-
-            if lstm_bidi:
-                b_lstm_layer = LstmRecurrent(name="blstm_%d" % i,
-                                       size=n_cells,
-                                       seq_output=True,
-                                       out_cells=False,
-                                       backward=True,
-                                       peepholes=lstm_peepholes,
-                                       p_drop=p_drop,
-                                       enable_branch_exp=enable_branch_exp)
-                b_lstm_layer.connect(prev_layer)
-
-                lstm_zip = ZipLayer(concat_axis=2, layers=[f_lstm_layer,
-                                                         b_lstm_layer])
-                prev_layer = lstm_zip
-                if debug:
-                    self._lstm_output = theano.function(input_args,
-                                                   [prev_layer.output(),
-                                                    f_lstm_layer.output(),
-                                                    b_lstm_layer.output()])
-            else:
-
-                if debug:
-                    self._lstm_output = theano.function(input_args,
-                                                        [prev_layer.output(),
-                                                         f_lstm_layer.output()])
-
-                prev_layer = f_lstm_layer
+        prev_layer = lstm_layer
 
         assert prev_layer is not None
 

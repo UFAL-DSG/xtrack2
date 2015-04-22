@@ -111,13 +111,23 @@ def test_verify_exprgrad():
     print tensor.verify_grad(f, [x_val], rng=rng)
 
 
-def test_scalar():
-    x =
-    tt.shared(x)
+def test_convscan():
+    x = tt.matrix()
+
+    def f(x_tm2, x_tm1, x):
+        return tt.concatenate([[x_tm2], [x_tm1], [x]])
+
+
+    sf, _ = theano.scan(f, sequences=[dict(input=x, taps=[-2, -1, 0])])
+
+    sf_fun = theano.function([x], sf)
+
+    print sf_fun([[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0,10]])
+
 
 
 if __name__ == '__main__':
-    test_scalar()
+    test_convscan()
     exit(0)
     test_unwrapper()
     exit(0)
