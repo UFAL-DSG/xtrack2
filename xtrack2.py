@@ -219,6 +219,7 @@ def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
                best_acc, best_acc_train, tracker_valid, tracker_train,
                track_log):
     prediction_valid = model._predict(*valid_data)
+    import ipdb; ipdb.set_trace()
     visualize_prediction(xtd_v, prediction_valid)
 
     eval_train = train_data is not None
@@ -610,6 +611,34 @@ def main(args_lst,
             logging.info('Epoch:              %10d (%d mb remain)' % (epoch,
                                                                      len(mb_to_go)))
             logging.info('Example:            %10d' % example_cntr)
+
+            preds = model._predict(*valid_data)
+            pred = preds[0]
+            #pred_bin = np.zeros_like(pred[0])
+            #pred_bin[:,pred[0].argmax(axis=1)] = 1
+
+            #pred_bin = np.zeros((1, pred.shape[1]), dtype='float32')
+            #pred_bin[0] = 1.0
+            #pred_bin[:,pred[0].argmin()] = 1
+
+            pred_bin = [pred[0].argmin()]
+
+            # first dialog that is long only 90
+            dlg = valid_data[0][:90, 0:1, :]
+            dlg_seq_id = [0]
+            dlg_time = [89] #valid_data[2][0]]
+            explain = model.f(dlg, dlg_seq_id, dlg_time, pred_bin)
+
+            vocab_rev = {val: key for key, val in model.vocab.iteritems()}
+            embds = model.input_emb.get_value()
+            logging.info('# start of saliency')
+            for i, (t, et) in enumerate(zip(dlg, explain)):
+                logging.info('  ----- time: %d' % i)
+                for w, ew in zip(t[0, :], et[0,:]):
+                    sal = np.dot(embds[w], ew)
+                    logging.info('     %s %15.2e' % (vocab_rev[w], sal, ))
+
+            logging.info('# end of saliency')
 
 
             mon_train.insert(

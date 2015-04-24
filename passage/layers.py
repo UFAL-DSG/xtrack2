@@ -929,6 +929,7 @@ class MaxPooling(Layer):
 
     def output(self, dropout_active=False):
         x = self.prev_layer.output(dropout_active=dropout_active)
+        self.input_var = x
         return T.max(x, axis=self.pool_dimension)
 
     def get_params(self):
@@ -954,7 +955,7 @@ class NGramLSTM(Layer):
         self.backward = backward
 
         self.gate_act = activations.sigmoid
-        self.modul_act = activations.tanh
+        self.modul_act = activations.sigmoid #tanh
 
         self.enable_branch_exp = enable_branch_exp
         self.lagged = []

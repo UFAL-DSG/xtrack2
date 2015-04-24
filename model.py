@@ -61,13 +61,15 @@ class Model(NeuralModel):
 
         prev_layer = input_token_layer
 
-        x_score = tt.tensor3()
-        input_args.append(x_score)
-        input_score_layer = ProbLayer(name="confidence_layer",
-                                      size=emb_size,
-                                      input=x_score)
-        input_score_layer.connect(prev_layer)
-        prev_layer = input_score_layer
+        self.x_include_score = x_include_score
+        if x_include_score:
+            x_score = tt.tensor3()
+            input_args.append(x_score)
+            input_score_layer = ProbLayer(name="confidence_layer",
+                                          size=emb_size,
+                                          input=x_score)
+            input_score_layer.connect(prev_layer)
+            prev_layer = input_score_layer
 
         input_maxpooling = MaxPooling(name="maxpool", pool_dimension=2)
         input_maxpooling.connect(prev_layer)
@@ -160,7 +162,8 @@ class Model(NeuralModel):
                            name="mlp_%s" % slot)
             slot_mlp.connect(cpt)
 
-            predictions.append(slot_mlp.output(dropout_active=False))
+            pred = slot_mlp.output(dropout_active=False)
+            predictions.append(pred)
 
             slot_objective = CrossEntropyObjective()
             slot_objective.connect(
@@ -168,6 +171,27 @@ class Model(NeuralModel):
                 y_true=y_label[slot]
             )
             costs.append(slot_objective)
+
+            sg = theano.grad(slot_objective.output(dropout_active=False),
+                        wrt=[input_maxpooling.input_var])
+
+            #xx = tt.matrix()
+            #start_dict = {pred: xx}
+
+            #sg = theano.subgraph_grad(
+            #    start=start_dict,
+            #    wrt=[input_maxpooling.input_var],
+            #    end=[input_maxpooling.input_var]
+            #)
+
+            logging.info('Creating understanding function.')
+
+            self.f = theano.function(
+                input_args + [y_seq_id, y_time, y_label[slot]],
+                sg[0]
+            )
+
+
         if token_supervision:
             costs.append(token_supervision_loss_layer)
 
@@ -231,6 +255,8 @@ class Model(NeuralModel):
             predictions
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
+
+
 
     def init_loaded(self):
         pass
@@ -302,7 +328,9 @@ class Model(NeuralModel):
         if debug_data:
             import ipdb; ipdb.set_trace()
 
-        data = [x, x_score]
+        data = [x]
+        if self.x_include_score:
+            data.append(x_score)
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)
