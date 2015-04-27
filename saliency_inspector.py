@@ -23,21 +23,28 @@ def inspect(model, data):
     vocab_rev = {val: key for key, val in model.vocab.iteritems()}
 
     pred_inv = pred.argmin(axis=1)
+    pred_inv_score = pred.min(axis=1)
+    pred_sort = pred.argsort(axis=1)
     pred_max = pred.argmax(axis=1)
+    pred_max_score = pred.max(axis=1)
+
     x = valid_data[0]
 
-    for (seq_id, seq_time), y_inv, lbl, lbl_pred in zip(zip(*valid_data[1:]), pred_inv, labels, pred_max):
-        print '# seq(%d) until_time(%d) lbl(%s) pred(%s)' % (seq_id, seq_time, inv_cls[lbl], inv_cls[lbl_pred] )
+    for (seq_id, seq_time), y_inv, y_inv_score, y_sort, lbl, lbl_pred, lbl_pred_score in zip(zip(*valid_data[1:]), pred_inv, pred_inv_score, pred_sort, labels, pred_max, pred_max_score):
+        print '# seq(%d) until_time(%d) lbl(%s) pred(%s; %.2f) pred_inv(%s; %.2f)' % (seq_id, seq_time, inv_cls[lbl], inv_cls[lbl_pred], lbl_pred_score, inv_cls[y_inv], y_inv_score )
         dlg = x[:seq_time + 1, seq_id:seq_id+1, :]
         dlg_seq_id = [0]
         dlg_time = [seq_time]
+        #explain = model.f(dlg, dlg_seq_id, dlg_time, [y_inv])
         explain = model.f(dlg, dlg_seq_id, dlg_time, [y_inv])
+        explain2 = model.f2(dlg, dlg_seq_id, dlg_time, [lbl_pred])
 
-        for i, (t, et) in enumerate(zip(dlg, explain)):
+        for i, (t, et, et2) in enumerate(zip(dlg, explain, explain2)):
             print '   . ', 't=%d' % i
-            for w, ew in zip(t[0, :], et[0,:]):
+            for w, ew, ew2 in zip(t[0, :], et[0,:], et2[0,:]):
                 sal = np.dot(embds[w], ew)
-                print '     %15s %10.4f' % (vocab_rev[w], sal, )
+                sal2 = np.dot(embds[w], ew2)
+                print '     %35s sal(%10.4f) sal2(%10.4f) errnorm(%10.4f) embnorm(%10.4f)' % (vocab_rev[w], sal, sal2, np.linalg.norm(ew, 2), np.linalg.norm(embds[w], 2))
 
 
 

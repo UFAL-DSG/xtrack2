@@ -175,6 +175,14 @@ class Model(NeuralModel):
             sg = theano.grad(slot_objective.output(dropout_active=False),
                         wrt=[input_maxpooling.input_var])
 
+            inv_slot_objective = InvCrossEntropyObjective()
+            inv_slot_objective.connect(
+                y_hat_layer=slot_mlp,
+                y_true=y_label[slot]
+            )
+            sg2 = theano.grad(inv_slot_objective.output(dropout_active=False),
+                        wrt=[input_maxpooling.input_var])
+
             #xx = tt.matrix()
             #start_dict = {pred: xx}
 
@@ -187,6 +195,10 @@ class Model(NeuralModel):
             logging.info('Creating understanding function.')
 
             self.f = theano.function(
+                input_args + [y_seq_id, y_time, y_label[slot]],
+                sg[0]
+            )
+            self.f2 = theano.function(
                 input_args + [y_seq_id, y_time, y_label[slot]],
                 sg[0]
             )

@@ -621,6 +621,20 @@ class CrossEntropyObjective(Layer):
     def get_params(self):
         return set(self.y_hat_layer.get_params())
 
+class InvCrossEntropyObjective(Layer):
+    def connect(self, y_hat_layer, y_true):
+        self.y_hat_layer = y_hat_layer
+        self.y_true = y_true
+
+    def output(self, dropout_active=False):
+        y_hat_out = self.y_hat_layer.output(dropout_active=dropout_active)
+
+        return costs.CategoricalCrossEntropy(self.y_true,
+                                             (1 - y_hat_out))
+
+    def get_params(self):
+        return set(self.y_hat_layer.get_params())
+
 
 class WeightedCrossEntropyObjective(Layer):
     def connect(self, y_hat_layer, y_true, y_weights):
