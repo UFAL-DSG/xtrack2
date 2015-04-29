@@ -103,7 +103,7 @@ class Model(NeuralModel):
             preds = self._predict(data[:, pos:pos + seq_length])[0]
 
             for pred, y in zip(preds, data[:, pos + 1: pos + seq_length]):
-                res += np.log(pred[y])
+                res += np.log(pred[y]).sum()
 
             pos += seq_length
 
@@ -139,7 +139,8 @@ def main(train, valid, final_params, seq_length, mb_size,
         epoch += 1
         pos = 0
         model.save_params(final_params)
-        logging.info('valid_perplexity(%.5f)' % model.measure_perplexity(data_valid_x))
+        logging.info('Measuring perplexity.')
+        logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x))
         while pos < data_train_x.shape[1]:
             x = data_train_x[:, pos:pos + seq_length]
             y = data_train_x[:, pos + 1:pos + seq_length + 1]
@@ -151,8 +152,6 @@ def main(train, valid, final_params, seq_length, mb_size,
             )
 
             pos += seq_length
-
-        logging.info('valid_perplexity(%.5f)' % model.measure_perplexity(data_valid_x))
 
         if epoch > 6:
             model.set_lr(model.get_lr() / 1.2)
