@@ -35,6 +35,13 @@ class NeuralModel(object):
         with open(f_name, 'w') as f_out:
             cPickle.dump(obj, f_out, -1)
 
+    def store_init_args(self, loc):
+        args = self.__init__.func_code.co_varnames[:self.__init__.func_code.co_argcount]
+        self.init_args = {}
+        for arg in args:
+            if arg != 'self':
+                self.init_args[arg] = loc[arg]
+
     @classmethod
     def load(cls, f_name, **kwargs):
         with open(f_name) as f_in:

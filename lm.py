@@ -3,6 +3,7 @@ import time
 import numpy as np
 from passage.layers import *
 from passage import updates
+from passage.model import NeuralModel
 
 
 def print_data(data, d):
@@ -38,8 +39,9 @@ def prepare_data(data, mb_size, vocab):
     return res2.T
 
 
-class Model:
+class Model(NeuralModel):
     def __init__(self, rnn_size, rnn_layers, vocab_size, lr):
+        self.store_init_args(locals())
         x = T.imatrix()
         input_token_layer = Embedding(name="emb",
                                       size=rnn_size,
@@ -70,7 +72,7 @@ class Model:
         loss.connect(ux, uy.output())
         loss_value = loss.output()
 
-        params = list(loss.get_params())
+        self.params = params = list(loss.get_params())
 
         self.curr_lr = theano.shared(lr)
         updater = updates.SGD(lr=self.curr_lr)
@@ -98,7 +100,7 @@ class Model:
         res = 0.0
         pos = 0
         while pos < data.shape[1]:
-            preds = self._predict(data[:, pos:pos + seq_length])
+            preds = self._predict(data[:, pos:pos + seq_length])[0]
 
             for pred, y in zip(preds, data[:, pos + 1: pos + seq_length]):
                 res += np.log(pred[y])
@@ -110,7 +112,7 @@ class Model:
 
 
 
-def main(train, valid, seq_length, mb_size,
+def main(train, valid, final_params, seq_length, mb_size,
          rnn_size, rnn_layers, lr):
 
     theano.config.floatX = 'float32'
@@ -136,9 +138,13 @@ def main(train, valid, seq_length, mb_size,
     while True:
         epoch += 1
         pos = 0
+        model.save_params(final_params)
+        logging.info('valid_perplexity(%.5f)' % model.measure_perplexity(data_valid_x))
         while pos < data_train_x.shape[1]:
             x = data_train_x[:, pos:pos + seq_length]
             y = data_train_x[:, pos + 1:pos + seq_length + 1]
+            if x.shape != y.shape:
+                x = x[:, :y.shape[1]]
             loss, ur = model._train(x, y)
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) %d%%' %
                         (epoch, pos, loss, ur, pos * 100.0 / data_train_x.shape[1])
@@ -164,6 +170,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train')
     parser.add_argument('--valid')
+    parser.add_argument('--final_params', default='lm_params.p')
     parser.add_argument('--seq_length', type=int, default=20)
     parser.add_argument('--mb_size', type=int, default=20)
 

@@ -45,10 +45,14 @@ def intX(X):
 def floatX(X):
     return np.asarray(X, dtype=theano.config.floatX)
 
-def sharedX(X, dtype=theano.config.floatX, name=None):
+def sharedX(X, dtype=None, name=None):
+    if not dtype:
+        dtype = theano.config.floatX
     return theano.shared(np.asarray(X, dtype=dtype), name=name)
 
-def shared0s(shape, dtype=theano.config.floatX, name=None):
+def shared0s(shape, dtype=None, name=None):
+    if not dtype:
+        dtype = theano.config.floatX
     return sharedX(np.zeros(shape), dtype=dtype, name=name)
 
 def downcast_float(X):
