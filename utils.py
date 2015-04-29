@@ -12,7 +12,11 @@ def pdb_on_error():
         # device, so we call the default hook
             sys.__excepthook__(type, value, tb)
         else:
-            import traceback, pdb
+            try:
+                import ipdb as pdb
+            except ImportError:
+                import pdb
+            import traceback
             # we are NOT in interactive mode, print the exception
             traceback.print_exception(type, value, tb)
             print

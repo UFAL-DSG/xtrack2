@@ -194,14 +194,21 @@ class Model(NeuralModel):
 
             logging.info('Creating understanding function.')
 
+            #self.fi = theano.function(
+            #    [input_maxpooling.input_var] + [y_seq_id, y_time, y_label[slot]],
+            #    sg[0]
+            #)
+
             self.f = theano.function(
                 input_args + [y_seq_id, y_time, y_label[slot]],
                 sg[0]
             )
             self.f2 = theano.function(
                 input_args + [y_seq_id, y_time, y_label[slot]],
-                sg[0]
+                sg2[0]
             )
+
+
 
 
         if token_supervision:

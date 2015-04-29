@@ -87,6 +87,22 @@ class ZipLayer(object):
         return set(flatten([layer.get_params() for layer in self.layers]))
 
 
+class UnBatch(object):
+    def connect(self, layer_x):
+        self.layer_x = layer_x
+        self.size = layer_x.size
+
+    def output(self, dropout_active=False):
+        x = self.layer_x.output(dropout_active=dropout_active)
+        new_shape = list(x.shape)
+        new_shape[1] = new_shape[0] * new_shape[1]
+        new_shape = tuple(new_shape[1:])
+        return x.reshape(new_shape)
+
+    def get_params(self):
+        return self.layer_x.get_params()
+
+
 class SumLayer(object):
     def __init__(self, layers):
         self.layers = layers
@@ -936,13 +952,21 @@ class MaxPooling(Layer):
     def __init__(self, name, pool_dimension):
         self.name = name
         self.pool_dimension = pool_dimension
+        self.dummy_input = False
+
+    def set_dummy_input(self, x):
+        self.dummy_input = x
 
     def connect(self, prev_layer):
         self.prev_layer = prev_layer
         self.size = prev_layer.size
 
     def output(self, dropout_active=False):
-        x = self.prev_layer.output(dropout_active=dropout_active)
+        if not self.dummy_input:
+            x = self.prev_layer.output(dropout_active=dropout_active)
+        else:
+            x = self.dummy_input
+
         self.input_var = x
         return T.max(x, axis=self.pool_dimension)
 
