@@ -73,7 +73,7 @@ class SGD(Update):
             #g = self.regularizer.gradient_regularize(p, g)
             updated_p = p - self.lr * g
             #updated_p = self.regularizer.weight_regularize(updated_p)
-            updates.append((p, updated_p))
+            updates.append((p, T.cast(updated_p, dtype=theano.config.floatX)))
 
         return updates
 
