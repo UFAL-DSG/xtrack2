@@ -88,6 +88,9 @@ class ZipLayer(object):
 
 
 class UnBatch(object):
+    def __init__(self, dtype=None):
+        self.dtype = dtype
+
     def connect(self, layer_x):
         self.layer_x = layer_x
         self.size = layer_x.size
@@ -97,7 +100,13 @@ class UnBatch(object):
         new_shape = list(x.shape)
         new_shape[1] = new_shape[0] * new_shape[1]
         new_shape = tuple(new_shape[1:])
-        return x.reshape(new_shape)
+        res = x.reshape(new_shape)
+
+        dtype = theano.config.floatX
+        if self.dtype:
+            dtype = self.dtype
+
+        return T.cast(res, dtype=dtype)
 
     def get_params(self):
         return self.layer_x.get_params()

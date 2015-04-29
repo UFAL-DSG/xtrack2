@@ -63,7 +63,7 @@ class Model:
         ux = UnBatch()
         ux.connect(out)
 
-        uy = UnBatch()
+        uy = UnBatch(dtype='int32')
         uy.connect(IdentityInput(y, 1))
 
         loss = CrossEntropyObjective()
@@ -112,6 +112,9 @@ class Model:
 
 def main(train, valid, seq_length, mb_size,
          rnn_size, rnn_layers, lr):
+
+    theano.config.floatX = 'float32'
+
     data_train = load_data(train)
     data_valid = load_data(valid)
 
