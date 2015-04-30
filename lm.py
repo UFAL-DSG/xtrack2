@@ -103,11 +103,11 @@ class Model(NeuralModel):
             preds = self._predict(data[:, pos:pos + seq_length])[0]
 
             for pred, y in zip(preds, data[:, pos + 1: pos + seq_length]):
-                res += -np.log(pred[y]).sum()
+                res += -np.log(pred[y]).sum()/ np.log(2)
 
             pos += seq_length
 
-        return np.exp(res / (data.shape[1] - 1))
+        return np.pow(2, res / (data.shape[1] - 1))
 
 
 
