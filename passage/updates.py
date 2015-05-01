@@ -68,7 +68,7 @@ class SGD(Update):
     def get_updates(self, params, cost):
         updates = []
         grads = T.grad(cost, params)
-        #grads = clip_norms(grads, self.clipnorm)
+        grads = clip_norms(grads, self.clipnorm)
         for p, g in zip(params, grads):
             #g = self.regularizer.gradient_regularize(p, g)
             updated_p = p - self.lr * g
