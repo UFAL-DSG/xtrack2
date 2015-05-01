@@ -48,7 +48,7 @@ class Model(NeuralModel):
         input_token_layer = Embedding(name="emb",
                                       size=rnn_size,
                                       n_features=vocab_size,
-                                      input=x)
+                                      input=x.T)
 
         lstms = []
         lstm_init_states = []
@@ -128,7 +128,7 @@ class Model(NeuralModel):
         while pos < data.shape[1]:
             pred_res = self._predict(data[:, pos:pos + seq_length], *init_states)
             preds = pred_res[0][0]
-            init_states = [x[:, -1, :] for x in pred_res[1:]]
+            init_states = [x[-1, :, :] for x in pred_res[1:]]
 
             for pred, y in zip(preds, data[:, pos + 1: pos + seq_length + 1]):
                 res += -np.log(pred[y]).sum()/ np.log(2)
@@ -179,7 +179,7 @@ def main(train, valid, final_params, seq_length, mb_size,
                 init_states = [i[:y.shape[1], :] for i in init_states]
             train_res = model._train(x, y, *init_states)
             loss, ur = train_res[:2]
-            init_states = [x[:, -1, :] for x in train_res[2:]]
+            init_states = [x[-1, :, :] for x in train_res[2:]]
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) %d%%' %
                         (epoch, pos, loss, ur, pos * 100.0 / data_train_x.shape[1])
             )
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid')
     parser.add_argument('--final_params', default='lm_params.p')
     parser.add_argument('--seq_length', type=int, default=20)
-    parser.add_argument('--mb_size', type=int, default=20)
+    parser.add_argument('--mb_size', type=int, default=15)
 
     parser.add_argument('--rnn_size', type=int, default=200)
     parser.add_argument('--rnn_layers', type=int, default=2)
