@@ -5,6 +5,8 @@ from passage.layers import *
 from passage import updates
 from passage.model import NeuralModel
 
+import theano.tensor as tt
+
 
 def print_data(data, d):
     for x in data:
@@ -32,9 +34,9 @@ def prepare_data(data, mb_size, vocab):
 
     res2 = np.zeros((np.floor(len(data) * 1.0 / mb_size), mb_size, ), dtype='int32')
     for i in range(mb_size):
-        start = np.round((i - 1) * len(data) * 1.0 / mb_size)
-        finish = start + res2.shape[0] - 1
-        res2[0:(res2.shape[0] - 1), i] = res[start:finish]
+        start = np.round((i) * len(data) * 1.0 / mb_size)
+        finish = start + res2.shape[0]
+        res2[0:res2.shape[0], i] = res[start:finish]
 
     return res2.T
 
@@ -48,15 +50,23 @@ class Model(NeuralModel):
                                       n_features=vocab_size,
                                       input=x)
 
+        lstms = []
+        lstm_init_states = []
         prev_layer = input_token_layer
         for i in range(rnn_layers):
             lstm = LstmRecurrent(name='lstm_%d' % i,
                           size=rnn_size,
                           seq_output=True,
                           peepholes=True,
+                          learn_init_state=False
                           )
-            lstm.connect(prev_layer)
+            init_c = tt.matrix()
+            init_h = tt.matrix()
+            lstm.connect(prev_layer, init_c, init_h)
+            lstms.append(lstm)
             prev_layer = lstm
+            lstm_init_states.extend([init_c, init_h])
+
 
         out = Dense(name='output', size=vocab_size, activation='softmax')
         out.connect(prev_layer)
@@ -72,6 +82,11 @@ class Model(NeuralModel):
         loss.connect(ux, uy.output())
         loss_value = loss.output()
 
+        lstm_states = []
+        for lstm in lstms:
+            lstm_states.extend(lstm.outputs)
+
+
         self.params = params = list(loss.get_params())
 
         self.curr_lr = theano.shared(lr)
@@ -80,14 +95,14 @@ class Model(NeuralModel):
         model_updates = updater.get_updates(params, loss_value)
         update_ratio = updater.get_update_ratio(params, model_updates)
         self._train = theano.function(
-            [x, y],
-            [loss_value, update_ratio],
+            [x, y] + lstm_init_states,
+            [loss_value, update_ratio] + lstm_states,
             updates=model_updates
         )
 
         self._predict = theano.function(
-            [x],
-            out.output()
+            [x] + lstm_init_states,
+            [out.output()] + lstm_states
         )
 
     def set_lr(self, lr):
@@ -96,18 +111,31 @@ class Model(NeuralModel):
     def get_lr(self):
         return self.curr_lr.get_value()
 
+    def prepare_zero_states(self, data):
+        n_states = data.shape[0]
+        res = []
+        for i in range(self.init_args['rnn_layers']):
+            cells = np.zeros((n_states, self.init_args['rnn_size']), dtype='float32')
+            hiddens = np.zeros((n_states, self.init_args['rnn_size']), dtype='float32')
+            res.extend([cells, hiddens])
+
+        return res
+
     def measure_perplexity(self, data, seq_length=20):
         res = 0.0
         pos = 0
+        init_states = self.prepare_zero_states(data)
         while pos < data.shape[1]:
-            preds = self._predict(data[:, pos:pos + seq_length])[0]
+            pred_res = self._predict(data[:, pos:pos + seq_length], *init_states)
+            preds = pred_res[0][0]
+            init_states = [x[:, -1, :] for x in pred_res[1:]]
 
-            for pred, y in zip(preds, data[:, pos + 1: pos + seq_length]):
+            for pred, y in zip(preds, data[:, pos + 1: pos + seq_length + 1]):
                 res += -np.log(pred[y]).sum()/ np.log(2)
 
             pos += seq_length
 
-        return np.pow(2, res / (data.shape[1] - 1))
+        return np.power(2, res / (data.shape[1] - 1))
 
 
 
@@ -139,14 +167,18 @@ def main(train, valid, final_params, seq_length, mb_size,
         epoch += 1
         pos = 0
         model.save_params(final_params)
-        logging.info('Measuring perplexity.')
-        logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x))
+        #logging.info('Measuring perplexity.')
+        #logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x))
+        init_states = model.prepare_zero_states(data_train_x)
+        logging.info("Starting epoch %d" % epoch)
         while pos < data_train_x.shape[1]:
             x = data_train_x[:, pos:pos + seq_length]
             y = data_train_x[:, pos + 1:pos + seq_length + 1]
             if x.shape != y.shape:
                 x = x[:, :y.shape[1]]
-            loss, ur = model._train(x, y)
+            train_res = model._train(x, y, *init_states)
+            loss, ur = train_res[:2]
+            init_states = [x[:, -1, :] for x in train_res[2:]]
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) %d%%' %
                         (epoch, pos, loss, ur, pos * 100.0 / data_train_x.shape[1])
             )

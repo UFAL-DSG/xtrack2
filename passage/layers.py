@@ -252,7 +252,8 @@ class LstmRecurrent(Layer):
 
     def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
                  seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
-                 peepholes=False, enable_branch_exp=False, backward=False):
+                 peepholes=False, enable_branch_exp=False, backward=False,
+                 learn_init_state=True):
         if name:
             self.name = name
         self.init = init
@@ -264,6 +265,7 @@ class LstmRecurrent(Layer):
         self.p_drop = p_drop
         self.peepholes = peepholes
         self.backward = backward
+        self.learn_init_state = learn_init_state
 
         self.gate_act = activations.sigmoid
         self.modul_act = activations.tanh
@@ -307,24 +309,30 @@ class LstmRecurrent(Layer):
                                  scale=self.init_scale,
                                  name=self._name_param("peep_o"))
 
-    def _init_initial_states(self):
-        self.init_c = self.init((self.size, ),
-                                layer_width=self.size,
-                                name=self._name_param("init_c"))
-        self.init_h = self.init((self.size, ),
-                                layer_width=self.size,
-                                name=self._name_param("init_h"))
+    def _init_initial_states(self, init_c=None, init_h=None):
+        if self.learn_init_state:
+            self.init_c = self.init((self.size, ),
+                                    layer_width=self.size,
+                                    name=self._name_param("init_c"))
+            self.init_h = self.init((self.size, ),
+                                    layer_width=self.size,
+                                    name=self._name_param("init_h"))
+        else:
+            self.init_c = init_c
+            self.init_h = init_h
 
-    def connect(self, l_in):
+    def connect(self, l_in, init_c=None, init_h=None):
         self.l_in = l_in
 
         self._init_input_connections(l_in.size)
         self._init_recurrent_connections()
         self._init_peephole_connections()  # TODO: Make also conditional.
-        self._init_initial_states()
 
         self.params = [self.w, self.u, self.b]
-        self.params += [self.init_c, self.init_h]
+
+        self._init_initial_states(init_c, init_h)
+        if self.learn_init_state:
+            self.params += [self.init_c, self.init_h]
 
         if self.peepholes:
             self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
@@ -394,10 +402,16 @@ class LstmRecurrent(Layer):
                 return out[-1]
 
     def _prepare_outputs_info(self, x_dot_w):
-        outputs_info = [
-            T.repeat(self.init_c.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
-            T.repeat(self.init_h.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
-        ]
+        if self.learn_init_state:
+            outputs_info = [
+                T.repeat(self.init_c.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
+                T.repeat(self.init_h.dimshuffle('x', 0), x_dot_w.shape[1], axis=0),
+            ]
+        else:
+            outputs_info = [
+                self.init_c,
+                self.init_h
+            ]
         return outputs_info
 
     def _process_scan_output(self, res):
@@ -427,6 +441,8 @@ class LstmRecurrent(Layer):
 
         cells, out = self._compute_seq(x_dot_w, dropout_active)
         cells, out = self._reverse_if_backward(cells, out)
+
+        self.outputs = [cells, out]
 
         return self._prepare_result(cells, out)
 
