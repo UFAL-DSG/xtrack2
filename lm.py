@@ -167,8 +167,8 @@ def main(train, valid, final_params, seq_length, mb_size,
         epoch += 1
         pos = 0
         model.save_params(final_params)
-        #logging.info('Measuring perplexity.')
-        #logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x))
+        logging.info('Measuring perplexity.')
+        logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x))
         init_states = model.prepare_zero_states(data_train_x)
         logging.info("Starting epoch %d" % epoch)
         while pos < data_train_x.shape[1]:
