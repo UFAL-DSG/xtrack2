@@ -1205,3 +1205,33 @@ class NGramLSTM(Layer):
 
     def get_params(self):
         return self.l_in.get_params().union(self.params)
+
+
+class TurnSquasher(Layer):
+    def __init__(self, n_features):
+        self.n_features = n_features
+
+    def connect(self, prev_layer, y_time, y_seq_id):
+        self.prev_layer = prev_layer
+        self.y_time = y_time
+        self.y_seq_id = y_seq_id
+
+        self.size = self.n_features
+
+    def output(self, dropout_active=False):
+        out = self.prev_layer.output(dropout_active=dropout_active)
+
+        res, _ = theano.scan(self._step,
+                          sequences=[self.y_time, self.y_seq_id],
+                          non_sequences=[out]
+        )
+        return res
+
+    def _step(self, y_t, y_seq_id, x):
+        ivec = T.zeros((self.n_features,))
+        res = x[0:y_t + 1, y_seq_id]
+        res = theano.tensor.set_subtensor(ivec[res], 1.0)
+        return res
+
+    def get_params(self):
+        return self.prev_layer.get_params()

@@ -27,6 +27,7 @@ from utils import (get_git_revision_hash, pdb_on_error, ConfusionMatrix, P,
 from model import Model
 from model_simple_conv import SimpleConvModel
 from model_baseline import BaselineModel
+from model_turn_based import TurnBasedModel
 from dstc_tracker import XTrack2DSTCTracker
 
 
@@ -355,7 +356,10 @@ def main(args_lst,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
-         x_include_mlp, enable_token_supervision, model_type):
+         x_include_mlp, enable_token_supervision, model_type,
+         mlp_n_hidden, mlp_n_layers, mlp_activation
+
+         ):
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -484,6 +488,18 @@ def main(args_lst,
                       l1=l1,
                       l2=l2
         )
+    elif model_type == 'turn':
+        model = TurnBasedModel(slots=slots,
+                               slot_classes=xtd_t.classes,
+                               opt_type=opt_type,
+                               mlp_n_hidden=mlp_n_hidden,
+                               mlp_n_layers=mlp_n_layers,
+                               mlp_activation=mlp_activation,
+                               debug=debug,
+                               p_drop=p_drop,
+                               vocab=xtd_t.vocab,
+                               l1=l1,
+                               l2=l2)
     else:
         raise Exception()
 
@@ -612,35 +628,6 @@ def main(args_lst,
                                                                      len(mb_to_go)))
             logging.info('Example:            %10d' % example_cntr)
 
-            preds = model._predict(*valid_data)
-            pred = preds[0]
-            #pred_bin = np.zeros_like(pred[0])
-            #pred_bin[:,pred[0].argmax(axis=1)] = 1
-
-            #pred_bin = np.zeros((1, pred.shape[1]), dtype='float32')
-            #pred_bin[0] = 1.0
-            #pred_bin[:,pred[0].argmin()] = 1
-
-            pred_bin = [pred[0].argmin()]
-
-            # first dialog that is long only 90
-            dlg = valid_data[0][:90, 0:1, :]
-            dlg_seq_id = [0]
-            dlg_time = [89] #valid_data[2][0]]
-            explain = model.f(dlg, dlg_seq_id, dlg_time, pred_bin)
-
-            vocab_rev = {val: key for key, val in model.vocab.iteritems()}
-            embds = model.input_emb.get_value()
-            logging.info('# start of saliency')
-            for i, (t, et) in enumerate(zip(dlg, explain)):
-                logging.info('  ----- time: %d' % i)
-                for w, ew in zip(t[0, :], et[0,:]):
-                    sal = np.dot(embds[w], ew)
-                    logging.info('     %s %15.2e' % (vocab_rev[w], sal, ))
-
-            logging.info('# end of saliency')
-
-
             mon_train.insert(
                 time=time.time(),
                 example=example_cntr,
@@ -688,7 +675,7 @@ def build_argument_parser():
     parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
-    parser.add_argument('--opt_type', default='rprop', type=str)
+    parser.add_argument('--opt_type', default='sgd', type=str)
     parser.add_argument('--mb_size', default=16, type=int)
     parser.add_argument('--mb_mult_data', default=1, type=int)
     parser.add_argument('--l1', default=0.0, type=float)
@@ -706,6 +693,10 @@ def build_argument_parser():
     parser.add_argument('--input_n_hidden', default=32, type=int)
     parser.add_argument('--input_n_layers', default=0, type=int)
     parser.add_argument('--input_activation', default="sigmoid", type=str)
+
+    parser.add_argument('--mlp_n_hidden', default=32, type=int)
+    parser.add_argument('--mlp_n_layers', default=0, type=int)
+    parser.add_argument('--mlp_activation', default="tanh", type=str)
 
     parser.add_argument('--oclf_n_hidden', default=32, type=int)
     parser.add_argument('--oclf_n_layers', default=0, type=int)
