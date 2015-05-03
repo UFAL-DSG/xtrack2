@@ -176,7 +176,7 @@ def main(train, valid, final_params, seq_length, mb_size,
             y = data_train_x[:, pos + 1:pos + seq_length + 1]
             if x.shape != y.shape:
                 x = x[:, :y.shape[1]]
-                init_states = [i[:y.shape[1], :] for i in init_states]
+                #init_states = [i[:y.shape[1], :] for i in init_states]
             train_res = model._train(x, y, *init_states)
             loss, ur = train_res[:2]
             init_states = [x[-1, :, :] for x in train_res[2:]]
