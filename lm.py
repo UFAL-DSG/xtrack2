@@ -95,7 +95,7 @@ class Model(NeuralModel):
         self.params = params = list(loss.get_params())
 
         self.curr_lr = theano.shared(lr)
-        updater = updates.SGD(lr=self.curr_lr, clip=0.5)
+        updater = updates.SGD(lr=self.curr_lr)
 
         model_updates = updater.get_updates(params, loss_value)
         update_ratio = updater.get_update_ratio(params, model_updates)
