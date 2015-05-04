@@ -6,7 +6,7 @@ import data_utils
 import xtrack2_config
 
 
-def main(builder_type, only_slot):
+def main(builder_type, only_slot, tagged, concat_whole_nbest):
     import utils
     utils.pdb_on_error()
 
@@ -37,7 +37,14 @@ def main(builder_type, only_slot):
                    'req_phone', 'req_addr', 'req_postcode', 'req_signature']
     )
 
-    experiment_name = 'e2_tagged_%s' % builder_type
+    experiment_name = 'e2'
+    if tagged:
+        experiment_name += '_tagged'
+    if concat_whole_nbest:
+        experiment_name += '_nbest'
+    else:
+        experiment_name += '_1best'
+    experiment_name += '_%s' % builder_type
 
     if only_slot:
         slots = [only_slot]
@@ -54,12 +61,15 @@ def main(builder_type, only_slot):
         slot_groups=slot_groups,
         ontology=ontology,
         builder_opts=dict(
-            tagged=False,
+            tagged=tagged,
             no_label_weight=True
         ),
         builder_type=builder_type,
-        use_wcn=True
+        use_wcn=False,
+        concat_whole_nbest=concat_whole_nbest
     )
+
+    print experiment_name
 
 
 if __name__ == '__main__':
@@ -68,6 +78,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--builder_type', default='xtrack')
     parser.add_argument('--only_slot', default=None)
+    parser.add_argument('--tagged', action='store_true', default=False)
+    parser.add_argument('--concat_whole_nbest', action='store_true', default=False)
 
     args = parser.parse_args()
     main(**vars(args))

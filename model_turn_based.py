@@ -82,7 +82,7 @@ class TurnBasedModel(NeuralModel):
 
         assert opt_type == 'sgd'
         lr = tt.scalar('lr')
-        clipnorm = 0.5
+        clipnorm = 0.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
 
@@ -136,8 +136,11 @@ class TurnBasedModel(NeuralModel):
         y_weights = []
         for item in seqs:
             data = item['data']
-            assert len(data[0]) == 1
-            data = [i[0] for i in data]
+
+            if type(data[0]) is list:
+                assert len(data[0]) == 1
+                data = [i[0] for i in data]
+
             x.append(data)
 
             labels = item['labels']

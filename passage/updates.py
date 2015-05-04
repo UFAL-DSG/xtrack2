@@ -61,14 +61,16 @@ class Update(object):
 
 class SGD(Update):
 
-    def __init__(self, lr=0.01, *args, **kwargs):
+    def __init__(self, lr=0.01, clip=0.0, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
         self.lr = lr
+        self.clip = clip
 
     def get_updates(self, params, cost):
         updates = []
         grads = T.grad(cost, params)
-        grads = clip_norms(grads, self.clipnorm)
+        grads = [T.clip(g, -self.clip, self.clip) for g in grads]
+        #grads = clip_norms(grads, self.clipnorm)
         for p, g in zip(params, grads):
             #g = self.regularizer.gradient_regularize(p, g)
             updated_p = p - self.lr * g

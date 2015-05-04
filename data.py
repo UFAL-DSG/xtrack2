@@ -10,7 +10,6 @@ import math
 import data_model
 
 
-
 word_re = re.compile(r'([A-Za-z0-9_]+)')
 
 
@@ -76,7 +75,8 @@ class DataBuilder(object):
     def _open_dump_files(self, debug_dir):
         if debug_dir:
             if not os.path.exists(debug_dir):
-                os.mkdir(debug_dir)
+
+                os.makedirs(debug_dir)
             fname_dump_text = os.path.join(debug_dir, 'dump.text')
             fname_dump_cca = os.path.join(debug_dir, 'dump.cca')
         else:
@@ -88,7 +88,8 @@ class DataBuilder(object):
 
     def __init__(self, slots, slot_groups, based_on, include_base_seqs,
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
-              score_bins, debug_dir, tagged, ontology, no_label_weight):
+              score_bins, debug_dir, tagged, ontology, no_label_weight,
+              concat_whole_nbest):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -101,6 +102,7 @@ class DataBuilder(object):
         self.nth_best = nth_best
         self.debug_dir = debug_dir
         self.tagged = tagged
+        self.concat_whole_nbest = concat_whole_nbest
         if tagged:
             self.tagger = Tagger()
         else:
@@ -151,13 +153,18 @@ class DataBuilder(object):
         return seq
 
     def _flatten_nbest_list(self, actor_is_system, msgs):
-        if actor_is_system:
-            msg_id = 0
-        else:
-            msg_id = self.nth_best
+        if not self.concat_whole_nbest or actor_is_system:
+            if actor_is_system:
+                msg_id = 0
+            else:
+                msg_id = self.nth_best
 
-        msg, msg_score = msgs[msg_id]
-        return msg, msg_score
+            msg, msg_score = msgs[msg_id]
+            return msg, msg_score
+        else:
+            all_msgs, _ = zip(*msgs[1:])
+            return " _ ".join(all_msgs), 0.0
+
 
     def _process_dialog(self, dialog, seq):
         last_state = None

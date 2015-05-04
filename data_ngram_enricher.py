@@ -5,7 +5,10 @@ from itertools import count
 import json
 
 
-def main(dataset, fixed_dataset, ngram):
+def main(dataset, fixed_dataset, ngram, outdir):
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
     ngram_order_lst = []
     ngram_cnt_lst = []
     for spec in ngram:
@@ -14,7 +17,7 @@ def main(dataset, fixed_dataset, ngram):
         ngram_cnt_lst.append(ngram_cnt)
 
     enricher = DataNGramEnricher(ngram_order_lst, ngram_cnt_lst)
-    enricher.enrich(dataset, fixed_dataset)
+    enricher.enrich(dataset, fixed_dataset, outdir)
 
 
 class DataNGramEnricher:
@@ -23,7 +26,7 @@ class DataNGramEnricher:
         self.ngram_cnt = ngram_cnt
 
 
-    def enrich(self, dataset, fixed_dataset):
+    def enrich(self, dataset, fixed_dataset, outdir):
         data = self._load_data(dataset)
         data_fixed = self._load_data(fixed_dataset)
 
@@ -34,8 +37,8 @@ class DataNGramEnricher:
         self._add_ngrams(data, ngram_map)
         self._add_ngrams(data_fixed, ngram_map)
 
-        self._save_data(data, dataset, ngram_map)
-        self._save_data(data_fixed, fixed_dataset, ngram_map)
+        self._save_data(data, dataset, ngram_map, outdir)
+        self._save_data(data_fixed, fixed_dataset, ngram_map, outdir)
 
     def _load_data(self, dataset):
         data = []
@@ -52,8 +55,11 @@ class DataNGramEnricher:
                 for seq in d['sequences']:
                     curr_ngram = deque([0] * order, maxlen=order)
                     for w in seq['data']:
-                        assert len(w) == 1
-                        curr_ngram.append(w[0])
+                        if type(w) is list:
+                            assert len(w) == 1
+                            w = w[0]
+
+                        curr_ngram.append(w)
                         ngrams[tuple(curr_ngram)] += 1
 
             hist = self._build_cummul(ngrams)
@@ -85,12 +91,20 @@ class DataNGramEnricher:
                     i = 0
                     while i < len(seq['data']):
                         w = seq['data'][i]
-                        assert len(w) == 1
-                        curr_ngram.append(w[0])
+                        wcn = False
+                        if type(w) is list:
+                            wcn = True
+                            assert len(w) == 1
+                            w = w[0]
+
+                        curr_ngram.append(w)
 
                         ngram_tuple = tuple(curr_ngram)
                         if ngram_tuple in ngram_map:
-                            seq['data'].insert(i + 1, [ngram_map[ngram_tuple]])
+                            new_item = ngram_map[ngram_tuple]
+                            if wcn:
+                                new_item = [new_item]
+                            seq['data'].insert(i + 1, new_item)
                             i += 1
                             for label in seq['labels']:
                                 if label['time'] >= i:
@@ -134,12 +148,15 @@ class DataNGramEnricher:
                         if not ftr in intersect_ftrs:
                             del ftrs[ftr]
 
-    def _save_data(self, data, dataset, ngram_map):
-        ngram_map = {"~" + "#".join(map(str, key)): val for key, val in ngram_map.iteritems()}
+    def _save_data(self, data, dataset, ngram_map, outdir):
         for d, dataset_fn in zip(data, dataset):
+            vocab_rev = {val: key for key, val in d['vocab'].iteritems()}
+            ngram_map = {"~" + "#".join(vocab_rev.get(i, "$$" + str(i)) for i in key): val for key, val in ngram_map.iteritems()}
             d['vocab'].update(ngram_map)
-            print 'writing', dataset_fn
-            with open(dataset_fn, 'w') as f_out:
+
+            out_dataset_fn = os.path.join(outdir, os.path.basename(dataset_fn))
+            print 'writing', out_dataset_fn
+            with open(out_dataset_fn, 'w') as f_out:
                 json.dump(d, f_out, indent=4, sort_keys=True)
 
 
@@ -154,6 +171,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', action='append')
     parser.add_argument('--fixed_dataset', action='append', default=[])
     parser.add_argument('--ngram', action='append', required=True)
+    parser.add_argument('--outdir', required=True)
+
     #parser.add_argument('--cutoff_thresh', type=int, required=True)
 
     args = parser.parse_args()

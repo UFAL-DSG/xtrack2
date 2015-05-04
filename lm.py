@@ -15,7 +15,7 @@ def print_data(data, d):
 
 def load_data(fname):
     with open(fname) as f_in:
-        return f_in.read().replace('\n', '<eos>').split()
+        return f_in.read().replace('\n', '<eos> ').split()
 
 
 def build_dict(data):
@@ -55,10 +55,11 @@ class Model(NeuralModel):
         prev_layer = input_token_layer
         for i in range(rnn_layers):
             lstm = LstmRecurrent(name='lstm_%d' % i,
-                          size=rnn_size,
-                          seq_output=True,
-                          peepholes=True,
-                          learn_init_state=False
+                                 init=inits.uniform,
+                                 size=rnn_size,
+                                 seq_output=True,
+                                 peepholes=False,
+                                 learn_init_state=False
                           )
             init_c = tt.matrix()
             init_h = tt.matrix()
@@ -75,6 +76,9 @@ class Model(NeuralModel):
         ux = UnBatch()
         ux.connect(out)
 
+        ux2 = UnBatch()
+        ux2.connect(IdentityInput(x.T, 1))
+
         uy = UnBatch(dtype='int32')
         uy.connect(IdentityInput(y.T, 1))
 
@@ -82,28 +86,40 @@ class Model(NeuralModel):
         loss.connect(ux, uy.output())
         loss_value = loss.output()
 
-        lstm_states = []
+        lstm_final_states = []
         for lstm in lstms:
-            lstm_states.extend(lstm.outputs)
+            for state in lstm.outputs:
+                lstm_final_states.append(state[-1, :, :])
 
 
         self.params = params = list(loss.get_params())
 
         self.curr_lr = theano.shared(lr)
-        updater = updates.SGD(lr=self.curr_lr)
+        updater = updates.SGD(lr=self.curr_lr, clip=0.5)
 
         model_updates = updater.get_updates(params, loss_value)
         update_ratio = updater.get_update_ratio(params, model_updates)
         self._train = theano.function(
             [x, y] + lstm_init_states,
-            [loss_value, update_ratio] + lstm_states,
+            [loss_value, update_ratio] + lstm_final_states,
             updates=model_updates
         )
 
+        pred_out = out.output()
+        lstm_final_states = []
+        for lstm in lstms:
+            for state in lstm.outputs:
+                lstm_final_states.append(state[-1, :, :])
+
         self._predict = theano.function(
             [x] + lstm_init_states,
-            [out.output()] + lstm_states
+            [pred_out] + lstm_final_states
         )
+
+        #self._predictx = theano.function(
+        #    [x, y] + lstm_init_states,
+        #    [out.output(), ux2.output(), uy.output()] + lstm_final_states
+        #)
 
     def set_lr(self, lr):
         self.curr_lr.set_value(lr)
@@ -126,16 +142,22 @@ class Model(NeuralModel):
         pos = 0
         init_states = self.prepare_zero_states(data)
         while pos < data.shape[1]:
-            pred_res = self._predict(data[:, pos:pos + seq_length], *init_states)
-            preds = pred_res[0][0]
-            init_states = [x[-1, :, :] for x in pred_res[1:]]
+            x = data[:, pos:pos + seq_length]
+            y = np.squeeze(data[:, pos + 1:pos + seq_length + 1])
+            if x.shape != y.shape:
+                x = x[:, :y.shape[0]]
 
-            for pred, y in zip(preds, data[:, pos + 1: pos + seq_length + 1]):
-                res += -np.log(pred[y]).sum()/ np.log(2)
+            pred_res = self._predict(x, *init_states)
+            preds = np.squeeze(pred_res[0])
+            init_states = pred_res[1:]
+
+            assert len(preds) == len(y)
+            for pred, y in zip(preds, y):
+                res += np.log(pred[y])
 
             pos += seq_length
 
-        return np.power(2, res / (data.shape[1] - 1))
+        return np.exp(- res / (data.shape[1] - 1))
 
 
 
@@ -168,7 +190,7 @@ def main(train, valid, final_params, seq_length, mb_size,
         pos = 0
         model.save_params(final_params)
         logging.info('Measuring perplexity.')
-        logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x))
+        logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x, seq_length))
         init_states = model.prepare_zero_states(data_train_x)
         logging.info("Starting epoch %d" % epoch)
         while pos < data_train_x.shape[1]:
@@ -179,15 +201,16 @@ def main(train, valid, final_params, seq_length, mb_size,
                 #init_states = [i[:y.shape[1], :] for i in init_states]
             train_res = model._train(x, y, *init_states)
             loss, ur = train_res[:2]
-            init_states = [x[-1, :, :] for x in train_res[2:]]
+            init_states = train_res[2:]
+            #init_states = [x[-1, :, :] for x in train_res[2:]]
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) %d%%' %
                         (epoch, pos, loss, ur, pos * 100.0 / data_train_x.shape[1])
             )
 
             pos += seq_length
 
-        if epoch > 6:
-            model.set_lr(model.get_lr() / 1.2)
+        #if epoch > 6:
+        #    model.set_lr(model.get_lr() / 1.2)
 
     import ipdb; ipdb.set_trace()
 
@@ -213,3 +236,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(**vars(args))
+
+# x=model._predict(data_valid_x, *model.prepare_zero_states(data_valid_x))

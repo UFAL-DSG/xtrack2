@@ -284,10 +284,10 @@ class LstmRecurrent(Layer):
                            name=self._name_param("b"))
 
         # Initialize forget gates to large values.
-        b = self.b.get_value()
-        b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
+        #b = self.b.get_value()
+        #b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
         #b[self.size:] = 0.0
-        self.b.set_value(b)
+        #self.b.set_value(b)
 
     def _init_recurrent_connections(self):
         self.u = self.init((self.size, self.size * 4),
@@ -443,6 +443,8 @@ class LstmRecurrent(Layer):
         cells, out = self._reverse_if_backward(cells, out)
 
         self.outputs = [cells, out]
+
+        print 'calling lstm output'
 
         return self._prepare_result(cells, out)
 

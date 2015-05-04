@@ -7,7 +7,7 @@ from utils import sharedX, floatX, intX
 
 
 
-def uniform(shape, scale=0.1, name=None):
+def uniform(shape, layer_width, scale=0.1, name=None):
     return sharedX(np.random.uniform(low=-scale, high=scale, size=shape),
                    name=name)
 
