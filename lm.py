@@ -76,7 +76,7 @@ class Model(NeuralModel):
         ux.connect(out)
 
         uy = UnBatch(dtype='int32')
-        uy.connect(IdentityInput(y, 1))
+        uy.connect(IdentityInput(y.T, 1))
 
         loss = CrossEntropyObjective()
         loss.connect(ux, uy.output())
@@ -112,11 +112,11 @@ class Model(NeuralModel):
         return self.curr_lr.get_value()
 
     def prepare_zero_states(self, data):
-        n_states = data.shape[0]
+        n_seqs = data.shape[0]
         res = []
         for i in range(self.init_args['rnn_layers']):
-            cells = np.zeros((n_states, self.init_args['rnn_size']), dtype='float32')
-            hiddens = np.zeros((n_states, self.init_args['rnn_size']), dtype='float32')
+            cells = np.zeros((n_seqs, self.init_args['rnn_size']), dtype='float32')
+            hiddens = np.zeros((n_seqs, self.init_args['rnn_size']), dtype='float32')
             res.extend([cells, hiddens])
 
         return res
