@@ -5,6 +5,7 @@ from passage.layers import *
 from passage import updates
 from passage.model import NeuralModel
 
+import theano
 import theano.tensor as tt
 
 
@@ -86,13 +87,68 @@ class Model(NeuralModel):
         loss.connect(ux, uy.output())
         loss_value = loss.output()
 
+        self.params = params = list(loss.get_params())
+
+        print sum([np.prod(p.get_value().shape) for p in params])
+
+
+
+        self._gc_grad = theano.function(
+            [x, y] + lstm_init_states,
+            tt.grad(loss_value, wrt=params),
+        )
+
+        self._gc = theano.function(
+            [x, y] + lstm_init_states,
+            [loss_value]
+        )
+
+        x_init = [np.array(np.random.randn(1, 200), dtype='float32') for i in range(4)]
+        x_in = [range(10)]
+        x_out = [range(10)]
+
+        def check(p):
+            dw_true = self._gc_grad(x_in, x_out, *x_init)[p]
+
+            xd = 0.0001
+
+            myw = params[p].get_value()
+            sel_dims = []
+            for i in range(myw.ndim):
+                sel_dims.append(np.random.randint(myw.shape[i]))
+            sel_dims = tuple(sel_dims)
+
+            myw[sel_dims] += xd
+            params[p].set_value(myw)
+            loss_res = self._gc(x_in, x_out, *x_init)[0]
+
+            myw[sel_dims] -= xd * 2
+            params[p].set_value(myw)
+            loss_res2 = self._gc(x_in, x_out, *x_init)[0]
+            myw[sel_dims] += xd
+            params[p].set_value(myw)
+
+            dloss = (loss_res - loss_res2) / (2 * xd)
+
+            print sel_dims, (dloss - dw_true[sel_dims]), dloss, dw_true[sel_dims]
+
+        def gradchecks():
+            for i in range(9):
+                if len(params[i].get_value().shape) == 2:
+                    print params[i].name
+                    for ii in range(10):
+                        check(i)
+                    print '--'
+
+        self.gradchecks = gradchecks
+
         lstm_final_states = []
         for lstm in lstms:
             for state in lstm.outputs:
                 lstm_final_states.append(state[-1, :, :])
 
 
-        self.params = params = list(loss.get_params())
+
 
         self.curr_lr = theano.shared(lr)
         updater = updates.SGD(lr=self.curr_lr)
@@ -104,6 +160,8 @@ class Model(NeuralModel):
             [loss_value, update_ratio] + lstm_final_states,
             updates=model_updates
         )
+
+
 
         pred_out = out.output()
         lstm_final_states = []
@@ -209,6 +267,7 @@ def main(train, valid, final_params, seq_length, mb_size,
 
             pos += seq_length
 
+        #model.gradchecks()
         #if epoch > 6:
         #    model.set_lr(model.get_lr() / 1.2)
 

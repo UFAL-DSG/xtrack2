@@ -283,6 +283,11 @@ class LstmRecurrent(Layer):
                            scale=self.init_scale,
                            name=self._name_param("b"))
 
+        self.br = self.init((self.size * 4, ),
+                           layer_width=self.size,
+                           scale=self.init_scale,
+                           name=self._name_param("br"))
+
         # Initialize forget gates to large values.
         #b = self.b.get_value()
         #b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
@@ -328,7 +333,7 @@ class LstmRecurrent(Layer):
         self._init_recurrent_connections()
         self._init_peephole_connections()  # TODO: Make also conditional.
 
-        self.params = [self.w, self.u, self.b]
+        self.params = [self.w, self.u, self.b, self.br]
 
         self._init_initial_states(init_c, init_h)
         if self.learn_init_state:
@@ -345,7 +350,7 @@ class LstmRecurrent(Layer):
 
     def step(self, x_t, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o,
              dropout_active):
-        h_tm1_dot_u = T.dot(h_tm1, u)
+        h_tm1_dot_u = T.dot(h_tm1, u) + self.br
         gates_fiom = x_t + h_tm1_dot_u
 
         g_f = self._slice(gates_fiom, 0)
