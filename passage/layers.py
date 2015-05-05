@@ -333,7 +333,7 @@ class LstmRecurrent(Layer):
         self._init_recurrent_connections()
         self._init_peephole_connections()  # TODO: Make also conditional.
 
-        self.params = [self.w, self.u, self.b, self.br]
+        self.params = [self.w, self.u, self.b]
 
         self._init_initial_states(init_c, init_h)
         if self.learn_init_state:
