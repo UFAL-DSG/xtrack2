@@ -273,8 +273,8 @@ def main(train, valid, final_params, seq_length, mb_size,
                 x = x[:, :y.shape[1]]
                 #init_states = [i[:y.shape[1], :] for i in init_states]
             train_res = model._train(x, y, *init_states)
-            loss, dw_norm, dw, ur = train_res[:3]
-            init_states = train_res[3:]
+            loss, dw_norm, dw, ur = train_res[:4]
+            init_states = train_res[4:]
             #init_states = [x[-1, :, :] for x in train_res[2:]]
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) dw(%.5f) %d%%' %
                         (epoch, pos, loss, ur, dw_norm, pos * 100.0 / data_train_x.shape[1])
