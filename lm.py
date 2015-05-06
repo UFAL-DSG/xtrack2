@@ -149,7 +149,7 @@ class Model(NeuralModel):
 
 
         self.curr_lr = theano.shared(lr)
-        updater = updates.SGD(lr=self.curr_lr)
+        updater = updates.SGD(lr=self.curr_lr, clipnorm=5.0)
 
         model_updates = updater.get_updates(params, loss_value)
         update_ratio = updater.get_update_ratio(params, model_updates)
@@ -259,8 +259,9 @@ def main(train, valid, final_params, seq_length, mb_size,
         epoch += 1
         pos = 0
         model.save_params(final_params)
-        logging.info('Measuring perplexity.')
-        logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x, seq_length))
+        if epoch > 1:
+            logging.info('Measuring perplexity.')
+            logging.info('Valid perplexity: %.5f' % model.measure_perplexity(data_valid_x, seq_length))
         init_states = model.prepare_zero_states(data_train_x)
         logging.info("Starting epoch %d" % epoch)
         while pos < data_train_x.shape[1]:
@@ -273,9 +274,11 @@ def main(train, valid, final_params, seq_length, mb_size,
             loss, dw_norm, dw, ur = train_res[:4]
             init_states = train_res[4:]
             #init_states = [x[-1, :, :] for x in train_res[2:]]
+            loss /= np.prod(x.shape)
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) dw(%.5f) %d%%' %
                         (epoch, pos, loss, ur, dw_norm, pos * 100.0 / data_train_x.shape[1])
             )
+            logging.info('   %.4f %.4f %s' % (dw.min(), dw.max(), dw[:10]))
 
             pos += seq_length
 

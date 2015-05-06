@@ -6,7 +6,7 @@ def WeightedCategoricalCrossEntropy(y_true, y_pred, weights):
     return (weights.dimshuffle('x', 0) * ce).mean()
 
 def CategoricalCrossEntropy(y_true, y_pred):
-    return T.nnet.categorical_crossentropy(y_pred, y_true).mean()
+    return T.nnet.categorical_crossentropy(y_pred, y_true).sum()
 
 def BinaryCrossEntropy(y_true, y_pred):
     return T.nnet.binary_crossentropy(y_pred, y_true).mean()
