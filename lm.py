@@ -90,7 +90,7 @@ class Model(NeuralModel):
 
         self.params = params = list(loss.get_params())
 
-        print sum([np.prod(p.get_value().shape) for p in params])
+        logging.info("# of parameters: %d" % sum([np.prod(p.get_value().shape) for p in params]))
 
 
 
@@ -198,25 +198,30 @@ class Model(NeuralModel):
 
     def measure_perplexity(self, data, seq_length=20):
         res = 0.0
+        cnt = 0.0
         pos = 0
         init_states = self.prepare_zero_states(data)
         while pos < data.shape[1]:
             x = data[:, pos:pos + seq_length]
-            y = np.squeeze(data[:, pos + 1:pos + seq_length + 1])
+            y = data[:, pos + 1:pos + seq_length + 1]
             if x.shape != y.shape:
-                x = x[:, :y.shape[0]]
+                x = x[:, :y.shape[1]]
+
+            assert x.shape == y.shape
 
             pred_res = self._predict(x, *init_states)
-            preds = np.squeeze(pred_res[0])
+            preds = pred_res[0].swapaxes(0, 1)
             init_states = pred_res[1:]
 
-            assert len(preds) == len(y)
-            for pred, y in zip(preds, y):
-                res += np.log(pred[y])
+            assert preds.shape[:-1] == y.shape #len(preds) == len(y)
+            for bpred, by in zip(preds, y):
+                for pred, y in zip(bpred, by):
+                    res += np.log(pred[y])
+                    cnt += 1
 
             pos += seq_length
 
-        return np.exp(- res / (data.shape[1] - 1))
+        return np.exp(- res / cnt)
 
 
 
@@ -231,9 +236,11 @@ def main(train, valid, final_params, seq_length, mb_size,
 
     d = build_dict(data_train)
     d_rev = {val: key for key, val in d.iteritems()}
+    logging.info("Size of vocabulary: %d" % len(d))
 
     data_train_x = prepare_data(data_train, mb_size, d)
-    data_valid_x = prepare_data(data_valid, 1, d)
+    data_valid_x = prepare_data(data_valid, mb_size, d)
+
 
     logging.info('Size of training data: %10d' % data_train_x.shape[1])
     logging.info('Size of valid data:    %10d' % data_valid_x.shape[1])

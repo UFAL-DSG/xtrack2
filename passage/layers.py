@@ -449,8 +449,6 @@ class LstmRecurrent(Layer):
 
         self.outputs = [cells, out]
 
-        print 'calling lstm output'
-
         return self._prepare_result(cells, out)
 
     def get_params(self):
