@@ -49,6 +49,7 @@ class Model(NeuralModel):
         input_token_layer = Embedding(name="emb",
                                       size=rnn_size,
                                       n_features=vocab_size,
+                                      init=inits.uniform,
                                       input=x.T)
 
         lstms = []
@@ -70,7 +71,7 @@ class Model(NeuralModel):
             lstm_init_states.extend([init_c, init_h])
 
 
-        out = Dense(name='output', size=vocab_size, activation='softmax')
+        out = Dense(name='output', size=vocab_size, activation='softmax', init=inits.uniform)
         out.connect(prev_layer)
 
         y = T.imatrix()

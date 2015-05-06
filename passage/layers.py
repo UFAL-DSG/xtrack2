@@ -350,7 +350,7 @@ class LstmRecurrent(Layer):
 
     def step(self, x_t, h_tm1, c_tm1, u, p_vec_f, p_vec_i, p_vec_o,
              dropout_active):
-        h_tm1_dot_u = T.dot(h_tm1, u) + self.b
+        h_tm1_dot_u = T.dot(h_tm1, u)
         gates_fiom = x_t + h_tm1_dot_u
 
         g_f = self._slice(gates_fiom, 0)
@@ -385,7 +385,7 @@ class LstmRecurrent(Layer):
             dropout_corr = 1.0
         else:
             dropout_corr = 1.0 - self.p_drop
-        x_dot_w = T.dot(X, self.w * dropout_corr) #+ self.b
+        x_dot_w = T.dot(X, self.w * dropout_corr) + self.b
         return x_dot_w
 
     def _reverse_if_backward(self, cells, out):
