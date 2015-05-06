@@ -204,6 +204,11 @@ class Model(NeuralModel):
         while pos < data.shape[1]:
             x = data[:, pos:pos + seq_length]
             y = data[:, pos + 1:pos + seq_length + 1]
+
+            if y.shape[1] == 0:
+                assert pos == data.shape[1] - 1
+                break
+
             if x.shape != y.shape:
                 x = x[:, :y.shape[1]]
 
