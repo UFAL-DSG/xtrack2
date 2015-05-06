@@ -58,6 +58,14 @@ class Update(object):
         res = res / len(updates)
         return res
 
+    def get_grad_norm(self):
+        res = 0.0
+        for grad in self.grads:
+            res += (grad**2).sum()
+
+        return T.sqrt(res)
+
+
 
 class SGD(Update):
 
@@ -69,6 +77,7 @@ class SGD(Update):
     def get_updates(self, params, cost):
         updates = []
         grads = T.grad(cost, params)
+        self.grads = grads
         assert self.clip == 0.0
         #grads = [T.clip(g, -self.clip, self.clip) for g in grads]
         #grads = clip_norms(grads, self.clipnorm)

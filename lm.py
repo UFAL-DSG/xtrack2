@@ -156,9 +156,10 @@ class Model(NeuralModel):
 
         model_updates = updater.get_updates(params, loss_value)
         update_ratio = updater.get_update_ratio(params, model_updates)
+        grad_norm = updater.get_grad_norm()
         self._train = theano.function(
             [x, y] + lstm_init_states,
-            [loss_value, update_ratio] + lstm_final_states,
+            [loss_value, grad_norm, update_ratio] + lstm_final_states,
             updates=model_updates
         )
 
@@ -271,11 +272,11 @@ def main(train, valid, final_params, seq_length, mb_size,
                 x = x[:, :y.shape[1]]
                 #init_states = [i[:y.shape[1], :] for i in init_states]
             train_res = model._train(x, y, *init_states)
-            loss, ur = train_res[:2]
-            init_states = train_res[2:]
+            loss, ur, dw = train_res[:3]
+            init_states = train_res[3:]
             #init_states = [x[-1, :, :] for x in train_res[2:]]
-            logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) %d%%' %
-                        (epoch, pos, loss, ur, pos * 100.0 / data_train_x.shape[1])
+            logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) dw(%.5f) %d%%' %
+                        (epoch, pos, loss, ur, dw, pos * 100.0 / data_train_x.shape[1])
             )
 
             pos += seq_length
