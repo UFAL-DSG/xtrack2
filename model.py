@@ -259,7 +259,7 @@ class Model(NeuralModel):
 
             logging.info('Preparing %s train function.' % opt_type)
             t = time.time()
-            self._train = theano.function(train_args, [cost_value, update_ratio],
+            self._train = theano.function(train_args, [cost_value / y_time.shape[0], update_ratio],
                                           updates=model_updates)
             logging.info('Preparation done. Took: %.1f' % (time.time() - t))
 
@@ -312,13 +312,17 @@ class Model(NeuralModel):
             for words, scores in zip(item['data'], item['data_score']):
                 new_words = []
                 new_scores = []
-                for word, score in sorted(zip(words, scores), key=lambda (w, s, ): -s)[:wcn_cnt]:
-                    new_words.append(word)
-                    new_scores.append(np.exp(score))
+                if type(words) is list:
+                    for word, score in sorted(zip(words, scores), key=lambda (w, s, ): -s)[:wcn_cnt]:
+                        new_words.append(word)
+                        new_scores.append(np.exp(score))
 
-                n_missing = max(0, wcn_cnt - len(words))
-                new_words.extend(n_missing * [0])
-                new_scores.extend(n_missing * [0.0])
+                    n_missing = max(0, wcn_cnt - len(words))
+                    new_words.extend(n_missing * [0])
+                    new_scores.extend(n_missing * [0.0])
+                else:
+                    new_words = [words]
+                    new_scores = [scores]
 
                 data.append(new_words)
                 data_score.append(new_scores)
