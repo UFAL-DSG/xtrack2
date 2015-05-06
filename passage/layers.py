@@ -144,7 +144,7 @@ class Embedding(Layer):
         self.input = input
         self.wv = self.init((self.n_features, self.size),
                             layer_width=self.size,
-                            scale=1.0,
+                            scale=0.1,
                             name=self._name_param("emb"))
         if static:
             self.params = set()
