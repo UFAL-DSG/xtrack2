@@ -227,7 +227,7 @@ class Model(NeuralModel):
         cost_value = cost.output(dropout_active=True)
 
         lr = tt.scalar('lr')
-        clipnorm = 500.0
+        clipnorm = 5.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr, clipnorm=clipnorm)
