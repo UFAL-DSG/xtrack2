@@ -78,9 +78,6 @@ class Model(NeuralModel):
         ux = UnBatch()
         ux.connect(out)
 
-        ux2 = UnBatch()
-        ux2.connect(IdentityInput(x.T, 1))
-
         uy = UnBatch(dtype='int32')
         uy.connect(IdentityInput(y.T, 1))
 
