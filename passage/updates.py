@@ -65,6 +65,9 @@ class Update(object):
 
         return T.sqrt(res)
 
+    def get_grad_vector(self):
+        return T.concatenate([T.flatten(x) for x in self.grads])
+
 
 
 class SGD(Update):
