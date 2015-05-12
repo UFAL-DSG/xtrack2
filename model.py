@@ -199,14 +199,14 @@ class Model(NeuralModel):
             #    sg[0]
             #)
 
-            self.f = theano.function(
-                input_args + [y_seq_id, y_time, y_label[slot]],
-                sg[0]
-            )
-            self.f2 = theano.function(
-                input_args + [y_seq_id, y_time, y_label[slot]],
-                sg2[0]
-            )
+            #self.f = theano.function(
+            #    input_args + [y_seq_id, y_time, y_label[slot]],
+            #    sg[0]
+            #)
+            #self.f2 = theano.function(
+            #    input_args + [y_seq_id, y_time, y_label[slot]],
+            #    sg2[0]
+            #)
 
 
 
