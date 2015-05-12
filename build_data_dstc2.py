@@ -6,7 +6,7 @@ import data_utils
 import xtrack2_config
 
 
-def main(builder_type, only_slot, tagged, concat_whole_nbest):
+def main(builder_type, only_slot, tagged, concat_whole_nbest, use_wcn):
     import utils
     utils.pdb_on_error()
 
@@ -44,6 +44,12 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest):
         experiment_name += '_nbest'
     else:
         experiment_name += '_1best'
+
+    if use_wcn:
+        experiment_name += '_wcn'
+    else:
+        experiment_name += '_nowcn'
+
     experiment_name += '_%s' % builder_type
 
     if only_slot:
@@ -65,7 +71,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest):
             no_label_weight=True
         ),
         builder_type=builder_type,
-        use_wcn=False,
+        use_wcn=use_wcn,
         concat_whole_nbest=concat_whole_nbest
     )
 
@@ -80,6 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('--only_slot', default=None)
     parser.add_argument('--tagged', action='store_true', default=False)
     parser.add_argument('--concat_whole_nbest', action='store_true', default=False)
+    parser.add_argument('--use_wcn', action='store_true', default=False)
 
     args = parser.parse_args()
     main(**vars(args))

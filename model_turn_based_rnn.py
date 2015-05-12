@@ -13,14 +13,14 @@ from passage.layers import *
 from passage.model import NeuralModel
 
 
-class TurnBasedModel(NeuralModel):
+class TurnBasedRNNModel(NeuralModel):
     def _log_classes_info(self):
         for slot, vals in self.slot_classes.iteritems():
             logging.info('  %s:' % slot)
             for val, val_ndx in sorted(vals.iteritems(), key=lambda x: x[1]):
                 logging.info('    - %s (%d)' % (val, val_ndx))
 
-    def __init__(self, slots, slot_classes, opt_type, mlp_n_hidden,
+    def __init__(self, slots, slot_classes, opt_type, n_cells, mlp_n_hidden,
                  mlp_n_layers, mlp_activation, debug, p_drop, vocab,
                  l1, l2, build_train=True):
         self.store_init_args(locals())
@@ -32,7 +32,7 @@ class TurnBasedModel(NeuralModel):
         logging.info('We have the following classes:')
         self._log_classes_info()
 
-        x = T.imatrix()
+        x = T.tensor3()
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
         y_label = {}
@@ -40,14 +40,26 @@ class TurnBasedModel(NeuralModel):
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
         input_args = [x]
-        turns = TurnSquasher(len(self.vocab))
-        turns.connect(IdentityInput(x, 1), y_time, y_seq_id)
+
+        input_layer = IdentityInput(x, len(self.vocab))
+
+        lstm_layer = LstmRecurrent(name="lstm",
+                               size=n_cells,
+                               seq_output=True,
+                               out_cells=False,
+                               peepholes=False,
+                               p_drop=p_drop
+        )
+        lstm_layer.connect(input_layer)
+
+        cpt = CherryPick()
+        cpt.connect(lstm_layer, y_time, y_seq_id)
 
         global_mlp = MLP([mlp_n_hidden  ] * mlp_n_layers,
                          [mlp_activation] * mlp_n_layers,
                          [p_drop        ] * mlp_n_layers,
                          name="global_mlp")
-        global_mlp.connect(turns)
+        global_mlp.connect(cpt)
 
         costs = []
         predictions = []
@@ -82,7 +94,7 @@ class TurnBasedModel(NeuralModel):
 
         assert opt_type == 'sgd'
         lr = tt.scalar('lr')
-        clipnorm = 0.0
+        clipnorm = 5.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
 
@@ -134,20 +146,28 @@ class TurnBasedModel(NeuralModel):
         y_time = []
         y_labels = [[] for slot in slots]
         y_weights = []
-        for item in seqs:
-            data = item['data']
+        for dlg in seqs:
+            data = dlg['data']
+            labels = dlg['labels']
+
+            turn_bounds = [-1] + [label['time'] for label in labels]
 
             if type(data[0]) is list:
                 assert len(data[0]) == 1
                 data = [i[0] for i in data]
 
-            x.append(data)
+            turns = []
+            for turn_start, turn_end in zip(turn_bounds, turn_bounds[1:]):
+                turn_vec = np.zeros((len(self.vocab), ))
+                turn_vec[data[turn_start + 1:turn_end + 1]] = 1.0
+                turns.append(turn_vec)
+            x.append(turns)
 
-            labels = item['labels']
 
-            for label in labels:
+
+            for label_id, label in enumerate(labels):
                 y_seq_id.append(len(x) - 1)
-                y_time.append(label['time'])
+                y_time.append(label_id)
 
                 for i, slot in enumerate(slots):
                     lbl_val = label['slots'][slot]
@@ -156,8 +176,7 @@ class TurnBasedModel(NeuralModel):
                     y_labels[i].append(lbl_val)
                 y_weights.append(label['score'])
 
-        x = padded(x, is_int=True).transpose(1, 0)
-
+        x = padded(x, pad_by=[np.zeros((len(self.vocab), ))]).transpose(1, 0, 2)
 
         data = [x]
         data.extend([y_seq_id, y_time])

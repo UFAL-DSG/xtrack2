@@ -1240,3 +1240,36 @@ class TurnSquasher(Layer):
 
     def get_params(self):
         return self.prev_layer.get_params()
+
+
+class TurnSplitter(Layer):
+    def __init__(self, n_features):
+        self.n_features = n_features
+
+    def connect(self, prev_layer, bounds):
+        self.prev_layer = prev_layer
+        self.bounds = bounds
+
+        self.size = self.n_features
+
+    def output(self, dropout_active=False):
+        out = self.prev_layer.output(dropout_active=dropout_active)
+
+        #y_time_ex = T.concatenate([[0], self.y_time])
+        #y_seq_id_ex = T.concatenate([[0], self.y_seq_id])
+
+        res, _ = theano.scan(self._step,
+                          sequences=[dict(input=self.bounds, taps=[-1, 0])],
+                          non_sequences=[out]
+        )
+        return res
+
+    def _step(self, b_tm1, b_t, x):
+        ivec = T.zeros((self.n_features,))
+        ndxs = T.arange(b_t.shape[0])
+        res = x[b_tm1:b_t + 1, ndxs]
+        res = theano.tensor.set_subtensor(ivec[res], 1.0)
+        return res
+
+    def get_params(self):
+        return self.prev_layer.get_params()

@@ -127,8 +127,41 @@ def test_convscan():
     print sf_fun([[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0,10]])
 
 
+def test_seqlen():
+    x = tt.matrix()
+    b = tt.matrix()
+
+    def f(b_tm1, b_t, x):
+        ivec = T.zeros((10, x.shape[1]))
+        ndxs = T.arange(b_t.shape[0])
+        import ipdb; ipdb.set_trace()
+        res = x[b_tm1:b_t, ndxs]
+        return res
+
+    sf, _ = theano.scan(f, sequences=[dict(input=b, taps=[-1, 0])], non_sequences=[x])
+
+    sf_fun = theano.function([b, x], sf)
+
+    print sf_fun(
+        [
+            [0, 0],
+            [1, 2],
+            [3, 3],
+        ],
+        [
+            [1, 2],
+            [3, 4],
+            [5, 6],
+            [7, 8],
+            [9, 10],
+        ]
+    )
+
+
 
 if __name__ == '__main__':
+    test_seqlen()
+    exit(0)
     test_convscan()
     exit(0)
     test_unwrapper()

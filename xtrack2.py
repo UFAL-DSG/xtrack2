@@ -28,6 +28,7 @@ from model import Model
 from model_simple_conv import SimpleConvModel
 from model_baseline import BaselineModel
 from model_turn_based import TurnBasedModel
+from model_turn_based_rnn import TurnBasedRNNModel
 from dstc_tracker import XTrack2DSTCTracker
 
 
@@ -500,6 +501,19 @@ def main(args_lst,
                                vocab=xtd_t.vocab,
                                l1=l1,
                                l2=l2)
+    elif model_type == 'turn_rnn':
+        model = TurnBasedRNNModel(slots=slots,
+                               slot_classes=xtd_t.classes,
+                               opt_type=opt_type,
+                               n_cells=n_cells,
+                               mlp_n_hidden=mlp_n_hidden,
+                               mlp_n_layers=mlp_n_layers,
+                               mlp_activation=mlp_activation,
+                               debug=debug,
+                               p_drop=p_drop,
+                               vocab=xtd_t.vocab,
+                               l1=l1,
+                               l2=l2)
     else:
         raise Exception()
 
@@ -534,6 +548,7 @@ def main(args_lst,
     random.shuffle(seqs)
     minibatches = prepare_minibatches(seqs, mb_size, model, slots)
     minibatches = zip(itertools.count(), minibatches)
+    minibatches_valid = minibatches[:int(len(minibatches) * 1.0 / 20)]
     logging.info('We have %d minibatches.' % len(minibatches))
 
     example_cntr = 0
@@ -563,6 +578,15 @@ def main(args_lst,
             epoch += 1
 
             if n_epochs > 0 and n_epochs < epoch:
+                break
+
+
+
+            if n_valid_not_increased >= 5:
+                lr = lr / 2.0
+                logging.info('New learning rate: %.5f' % lr)
+
+            if lr < 0.000001:
                 break
 
         mb_ndx = random.choice(mb_to_go)
@@ -617,7 +641,16 @@ def main(args_lst,
                                           key=lambda (g, _): g):
                 logging.info('Valid acc %15s: %10.2f %%'
                              % (group, accuracy * 100))
+
+
+                if group == "food":
+                    if accuracy <= best_track_acc[group]:
+                        n_valid_not_increased += 1
+                    else:
+                        n_valid_not_increased = 0
+
                 best_track_acc[group] = max(accuracy, best_track_acc[group])
+
             for group in sorted(track_score, key=lambda g: g):
                 logging.info('Best acc %15s:  %10.2f %%'
                              % (group, best_track_acc[group] * 100))
