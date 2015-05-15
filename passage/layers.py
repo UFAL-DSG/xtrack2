@@ -597,7 +597,7 @@ class Dense(Layer):
 class MLP(Layer):
     def __init__(self, sizes, activations, p_drop=itertools.repeat(0.0),
                  name=None, init=inits.normal):
-        layers = []
+        self.layers = layers = []
         for layer_id, (size, activation, l_p_drop) in enumerate(zip(sizes,
                                                            activations, p_drop)):
             layer = Dense(size=size, activation=activation, name="%s_%d" % (
@@ -605,11 +605,15 @@ class MLP(Layer):
             layers.append(layer)
 
         self.stack = Stack(layers, name=name)
-        self.size = layers[-1].size
 
     def connect(self, l_in):
         self.l_in = l_in
         self.stack.connect(l_in)
+
+        if len(self.layers) != 0:
+            self.size = self.layers[-1].size
+        else:
+            self.size = self.l_in.size
 
     def output(self, dropout_active=False):
         return self.stack.output(dropout_active=dropout_active)
@@ -623,13 +627,18 @@ class Stack(Layer):
         if name:
             self.name = name
         self.layers = layers
-        self.size = layers[-1].size
-
 
     def connect(self, l_in):
-        self.layers[0].connect(l_in)
-        for i in range(1, len(self.layers)):
-            self.layers[i].connect(self.layers[i-1])
+        self.l_in = l_in
+        if len(self.layers) > 0:
+            self.layers[0].connect(l_in)
+            for i in range(1, len(self.layers)):
+                self.layers[i].connect(self.layers[i-1])
+
+            self.size = self.layers[-1].size
+        else:
+            self.size = l_in.size
+            self.layers = [l_in]
 
     def output(self, dropout_active=False):
         return self.layers[-1].output(dropout_active=dropout_active)

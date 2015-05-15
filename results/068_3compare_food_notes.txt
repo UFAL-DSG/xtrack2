@@ -1,0 +1,37 @@
+data/xtrack/e2_1best_wcn_xtrack_food         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack_food         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack_food         --lr 0.1 --oclf_n_layers 0 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack_food         --lr 0.1 --oclf_n_layers 0 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack_food         --lr 0.1 --mb_size 1 --model_type turn_rnn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+data/xtrack/e2_1best_wcn_xtrack_food         --lr 0.1 --mb_size 1 --model_type turn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack_food         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack_food         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack_food         --lr 0.1 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack_food         --lr 0.1 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack_food         --lr 0.1 --mb_size 1 --model_type turn_rnn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack_food         --lr 0.1 --mb_size 1 --model_type turn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+
+
+
+
+# Untagged
+ # LSTM + 0 output layers
+   xtrack.068_3compare_food_cfg3med(   74.09) std(    1.07) max(   76.36)
+   xtrack.068_3compare_food_cfg4med(   73.45) std(   15.38) max(   75.10)
+ # TURN-LSTM
+   xtrack.068_3compare_food_cfg5med(   70.80) std(    0.74) max(   72.52)
+ # TURN
+ xtrack.069_3compare_food_x_cfg1med(   71.59) std(    0.39) max(   72.18)
+
+# Tagged
+ # LSTM + 0 output layers
+   xtrack.068_3compare_food_cfg9med(   74.94) std(    0.62) max(   75.84)
+  xtrack.068_3compare_food_cfg10med(   74.83) std(    0.54) max(   75.73)
+ # TURN-LSTM
+  xtrack.068_3compare_food_cfg11med(   73.92) std(   14.21) max(   75.14)
+ # TURN
+ xtrack.069_3compare_food_x_cfg2med(   73.57) std(    0.38) max(   73.99)
+
+
+  xtrack.068_3compare_food_cfg6med(   20.30) std(   20.73) max(   62.38)
+ xtrack.068_3compare_food_cfg12med(   62.05) std(   12.50) max(   69.39)

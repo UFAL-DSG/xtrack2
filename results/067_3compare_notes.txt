@@ -1,0 +1,29 @@
+data/xtrack/e2_1best_wcn_xtrack         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack         --lr 0.1 --oclf_n_layers 0 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack         --lr 0.1 --oclf_n_layers 0 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_1best_wcn_xtrack         --lr 0.1 --mb_size 1 --model_type turn_rnn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+data/xtrack/e2_1best_wcn_xtrack         --lr 0.1 --mb_size 1 --model_type turn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack         --lr 0.1 --oclf_n_hidden 96 --oclf_n_layers 1 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack         --lr 0.1 --emb_size 50 --n_cells 50 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack         --lr 0.1 --emb_size 150 --n_cells 150 --opt sgd --mb_size 1 --oclf_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack         --lr 0.1 --mb_size 1 --model_type turn_rnn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+data/xtrack/e2_tagged_1best_wcn_xtrack         --lr 0.1 --mb_size 1 --model_type turn --mlp_n_hidden 150 --mlp_n_layers 1 --mlp_activation rectify
+
+
+# non-tagged
+      xtrack.067_3compare_cfg1med(   58.89) std(    1.74) max(   60.54)
+      xtrack.067_3compare_cfg2med(   54.41) std(   16.04) max(   56.40)
+      xtrack.067_3compare_cfg3med(   58.16) std(    0.94) max(   59.83)
+      xtrack.067_3compare_cfg4med(   57.70) std(    1.22) max(   59.30)
+      xtrack.067_3compare_cfg5med(   37.84) std(    1.64) max(   41.38)
+      xtrack.067_3compare_cfg6med(    1.74) std(    5.01) max(   18.32)
+
+# tagged
+      xtrack.067_3compare_cfg7med(   59.19) std(    1.12) max(   61.76)
+      xtrack.067_3compare_cfg8med(   57.66) std(    1.56) max(   59.62)
+      xtrack.067_3compare_cfg9med(   60.27) std(    0.55) max(   61.02)
+     xtrack.067_3compare_cfg10med(   60.04) std(    1.07) max(   60.78)
+     xtrack.067_3compare_cfg11med(   55.14) std(    2.05) max(   56.45)
+     xtrack.067_3compare_cfg12med(   11.32) std(    4.30) max(   24.91)
