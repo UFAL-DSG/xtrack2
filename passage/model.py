@@ -23,14 +23,19 @@ class NeuralModel(object):
         self.params = []
         self.init_args = {}
 
-    def save_params(self, f_name):
+    def dump_params(self):
         obj = {}
         model_params = {}
         for param in self.params:
-            model_params[param.name] = param.get_value()
+            model_params[param.name] = param.get_value().copy()
 
         obj['model_params'] = model_params
         obj['init_args'] = self.init_args
+
+        return obj
+
+    def save_params(self, f_name):
+        obj = self.dump_params()
 
         with open(f_name, 'w') as f_out:
             cPickle.dump(obj, f_out, -1)
@@ -70,6 +75,9 @@ class NeuralModel(object):
         with open(f_name) as f_in:
             obj = cPickle.load(f_in)
 
+        self.push_params(obj)
+
+    def push_params(self, obj):
         model_params = obj['model_params']
         self.update_params(model_params)
 

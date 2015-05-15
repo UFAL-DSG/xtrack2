@@ -349,11 +349,12 @@ def main(args_lst,
          load_params, save_params,
          debug, debug_data, debug_theano, track_log,
          n_cells, emb_size, x_include_score, no_train_emb,
-         n_epochs, lr, opt_type, momentum,
+         n_epochs, lr, lr_anneal_factor, opt_type, momentum,
+         n_early_stopping, early_stopping_group,
          mb_size, mb_mult_data,
          oclf_n_hidden, oclf_n_layers, oclf_activation,
          rnn_n_layers,
-         lstm_peepholes, lstm_bidi,
+         lstm_type, lstm_peepholes, lstm_bidi,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
@@ -419,6 +420,7 @@ def main(args_lst,
                       oclf_activation=oclf_activation,
                       debug=debug,
                       rnn_n_layers=rnn_n_layers,
+                      lstm_type=lstm_type,
                       lstm_peepholes=lstm_peepholes,
                       lstm_bidi=lstm_bidi,
                       opt_type=opt_type,
@@ -572,6 +574,7 @@ def main(args_lst,
     last_inline_print = time.time()
     last_inline_print_cnt = 0
     best_track_acc = defaultdict(float)
+    best_params = model.dump_params()
     while True:
         if len(mb_to_go) == 0:
             mb_to_go = list(mb_ids)
@@ -580,11 +583,10 @@ def main(args_lst,
             if n_epochs > 0 and n_epochs < epoch:
                 break
 
-
-
-            if n_valid_not_increased >= 5:
-                lr = lr / 2.0
+            if n_valid_not_increased >= n_early_stopping:
+                lr = lr / lr_anneal_factor
                 logging.info('New learning rate: %.5f' % lr)
+                model.push_params(best_params)
 
             if lr < 0.000001:
                 break
@@ -643,9 +645,10 @@ def main(args_lst,
                              % (group, accuracy * 100))
 
 
-                if group == "food":
+                if group == early_stopping_group:
                     if accuracy <= best_track_acc[group]:
                         n_valid_not_increased += 1
+                        best_params = model.dump_params()
                     else:
                         n_valid_not_increased = 0
 
@@ -705,7 +708,10 @@ def build_argument_parser():
 
     # XTrack params.
     parser.add_argument('--n_epochs', default=0, type=int)
+    parser.add_argument('--n_early_stopping', default=5, type=int)
+    parser.add_argument('--early_stopping_group', default="goals", type=str)
     parser.add_argument('--lr', default=0.1, type=float)
+    parser.add_argument('--lr_anneal_factor', default=2.0, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='sgd', type=str)
@@ -737,6 +743,7 @@ def build_argument_parser():
 
     parser.add_argument('--rnn_n_layers', default=1, type=int)
 
+    parser.add_argument('--lstm_type', default='vanilla')
     parser.add_argument('--lstm_peepholes', default=False,
                         action='store_true')
     parser.add_argument('--lstm_bidi', default=False,

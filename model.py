@@ -22,7 +22,7 @@ class Model(NeuralModel):
                  x_include_score, x_include_token_ftrs, x_include_mlp,
                  n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
-                 lstm_peepholes, lstm_bidi, opt_type,
+                 lstm_type, lstm_peepholes, lstm_bidi, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
                  debug, p_drop,
                  init_emb_from, vocab,
@@ -122,7 +122,13 @@ class Model(NeuralModel):
 
         # Forward LSTM layer.
         logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
-        lstm_layer = NGramLSTM(name="lstm",
+        if lstm_type == 'ngram':
+            lstm_cls = NGramLSTM
+        elif lstm_type == 'vanilla':
+            lstm_cls = LstmRecurrent
+        else:
+            raise Exception('Unknown LSTM type: %s' % lstm_type)
+        lstm_layer = lstm_cls(name="lstm",
                                size=n_cells,
                                seq_output=True,
                                out_cells=False,
