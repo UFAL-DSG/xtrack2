@@ -1053,6 +1053,7 @@ class NGramLSTM(Layer):
         self.params = [self.u]
         self.params += [self.init_c, self.init_h]
         self.params += [self.filters]
+        self.params += [self.b]
 
         if self.peepholes:
             self.params += [self.p_vec_f, self.p_vec_i, self.p_vec_o]
@@ -1068,10 +1069,10 @@ class NGramLSTM(Layer):
                            name=self._name_param("b"))
 
         # Initialize forget gates to large values.
-        b = self.b.get_value()
-        b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
+        #b = self.b.get_value()
+        #b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
         #b[self.size:] = 0.0
-        self.b.set_value(b)
+        #self.b.set_value(b)
 
     def _init_recurrent_connections(self):
         self.u = self.init((self.size, self.size * 4),
@@ -1116,7 +1117,7 @@ class NGramLSTM(Layer):
         #x_t = T.dot(x_tm0, self.filters)
 
         h_tm1_dot_u = T.dot(h_tm1, u)
-        gates_fiom = x_t + h_tm1_dot_u
+        gates_fiom = x_t + h_tm1_dot_u + self.b
 
         g_f = self._slice(gates_fiom, 0)
         g_i = self._slice(gates_fiom, 1)
