@@ -105,13 +105,13 @@ class Momentum(Update):
         grads = T.grad(cost, params)
         grads = clip_norms(grads, self.clipnorm)
         for p,g in zip(params,grads):
-            g = self.regularizer.gradient_regularize(p, g)
+            #g = self.regularizer.gradient_regularize(p, g)
             m = theano.shared(p.get_value() * 0.)
             v = (self.momentum * m) - (self.lr * g)
             updates.append((m, v))
 
             updated_p = p + v
-            updated_p = self.regularizer.weight_regularize(updated_p)
+            #updated_p = self.regularizer.weight_regularize(updated_p)
             updates.append((p, updated_p))
         return updates
 
@@ -275,21 +275,21 @@ class RProp(Update):
             )
 
             # Create variables where rprop rates will be stored.
-            grad_rprop = theano.shared(param.get_value() * 0.0 + self.lr,
+            grad_rprop = theano.shared(param.get_value() * 0.0 + 0.1,
                                        name="rprop_%s" % param)
             grads_rprop.append(grad_rprop)
 
             # Compute the new RProp coefficients.
             rprop_sign = T.sgn(grad_hist * grad)
-            grad_rprop_new = grad_rprop * (
-                T.eq(rprop_sign, 1) * self.plus
+            grad_rprop_new = (grad_rprop) * (
+                   T.eq(rprop_sign, 1) * self.plus
                 + T.neq(rprop_sign, 1) * self.minus
             )
             grads_rprop_new.append(grad_rprop_new)
 
         updates = [
             # Update parameters according to the RProp update rule.
-            (p, p - rg * T.sgn(g))
+            (p, p - rg * T.sgn(g) + 0 * self.lr)
             for p, g, rg in zip(params, grads, grads_rprop_new)
         ] + [
             # Save current gradient for the next step..

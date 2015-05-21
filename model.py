@@ -8,6 +8,7 @@ import theano.tensor as tt
 from passage import updates
 from passage.iterators import padded
 from passage.layers import *
+from passage.lstm_with_confidence import LstmWithConfidence
 from passage.model import NeuralModel
 
 
@@ -22,7 +23,7 @@ class Model(NeuralModel):
                  x_include_score, x_include_token_ftrs, x_include_mlp,
                  n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
-                 lstm_type, lstm_peepholes, lstm_bidi, opt_type,
+                 lstm_type, lstm_update_thresh, lstm_peepholes, lstm_bidi, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
                  debug, p_drop,
                  init_emb_from, vocab,
@@ -44,8 +45,9 @@ class Model(NeuralModel):
         logging.info('We have the following classes:')
         self._log_classes_info()
 
-        x = T.itensor3()
-        input_args = [x]
+        x = T.itensor3(name='x')
+        x_conf = T.matrix(name='x_conf')
+        input_args = [x, x_conf]
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
@@ -122,10 +124,13 @@ class Model(NeuralModel):
 
         # Forward LSTM layer.
         logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
+        assert lstm_type == 'with_conf'
         if lstm_type == 'ngram':
             lstm_cls = NGramLSTM
         elif lstm_type == 'vanilla':
             lstm_cls = LstmRecurrent
+        elif lstm_type == 'with_conf':
+            lstm_cls = LstmWithConfidence
         else:
             raise Exception('Unknown LSTM type: %s' % lstm_type)
         lstm_layer = lstm_cls(name="lstm",
@@ -134,10 +139,11 @@ class Model(NeuralModel):
                                out_cells=False,
                                peepholes=lstm_peepholes,
                                p_drop=p_drop,
-                               enable_branch_exp=enable_branch_exp
+                               enable_branch_exp=enable_branch_exp,
+                               update_thresh=lstm_update_thresh
         )
 
-        lstm_layer.connect(prev_layer)
+        lstm_layer.connect(prev_layer, x_conf)
 
         if debug:
             self._lstm_output = theano.function(input_args,
@@ -178,16 +184,16 @@ class Model(NeuralModel):
             )
             costs.append(slot_objective)
 
-            sg = theano.grad(slot_objective.output(dropout_active=False),
-                        wrt=[input_maxpooling.input_var])
-
-            inv_slot_objective = InvCrossEntropyObjective()
-            inv_slot_objective.connect(
-                y_hat_layer=slot_mlp,
-                y_true=y_label[slot]
-            )
-            sg2 = theano.grad(inv_slot_objective.output(dropout_active=False),
-                        wrt=[input_maxpooling.input_var])
+            # sg = theano.grad(slot_objective.output(dropout_active=False),
+            #             wrt=[input_maxpooling.input_var])
+            #
+            # inv_slot_objective = InvCrossEntropyObjective()
+            # inv_slot_objective.connect(
+            #     y_hat_layer=slot_mlp,
+            #     y_true=y_label[slot]
+            # )
+            # sg2 = theano.grad(inv_slot_objective.output(dropout_active=False),
+            #             wrt=[input_maxpooling.input_var])
 
             #xx = tt.matrix()
             #start_dict = {pred: xx}
@@ -352,14 +358,14 @@ class Model(NeuralModel):
 
 
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
-        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)
+        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)[:, :, 0]
 
         if debug_data:
             import ipdb; ipdb.set_trace()
 
         data = [x]
-        if self.x_include_score:
-            data.append(x_score)
+        #if self.x_include_score:
+        data.append(x_score)
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)

@@ -354,7 +354,7 @@ def main(args_lst,
          mb_size, mb_mult_data,
          oclf_n_hidden, oclf_n_layers, oclf_activation,
          rnn_n_layers,
-         lstm_type, lstm_peepholes, lstm_bidi,
+         lstm_type, lstm_update_thresh, lstm_peepholes, lstm_bidi,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
@@ -421,6 +421,7 @@ def main(args_lst,
                       debug=debug,
                       rnn_n_layers=rnn_n_layers,
                       lstm_type=lstm_type,
+                      lstm_update_thresh=lstm_update_thresh,
                       lstm_peepholes=lstm_peepholes,
                       lstm_bidi=lstm_bidi,
                       opt_type=opt_type,
@@ -648,9 +649,10 @@ def main(args_lst,
                 if group == early_stopping_group:
                     if accuracy <= best_track_acc[group]:
                         n_valid_not_increased += 1
-                        best_params = model.dump_params()
                     else:
                         n_valid_not_increased = 0
+                        best_params = model.dump_params()
+                        logging.info('Noting the best params for later.')
 
                 best_track_acc[group] = max(accuracy, best_track_acc[group])
 
@@ -744,6 +746,7 @@ def build_argument_parser():
     parser.add_argument('--rnn_n_layers', default=1, type=int)
 
     parser.add_argument('--lstm_type', default='vanilla')
+    parser.add_argument('--lstm_update_thresh', default=0.0, type=float)
     parser.add_argument('--lstm_peepholes', default=False,
                         action='store_true')
     parser.add_argument('--lstm_bidi', default=False,

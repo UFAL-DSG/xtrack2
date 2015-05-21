@@ -157,9 +157,35 @@ def test_seqlen():
         ]
     )
 
+def test_update():
+    x = tt.matrix()
+    xn = tt.matrix()
+    score = tt.vector()
+
+    y = tt.gt(score, 0.7).dimshuffle(0, 'x')
+
+    res = y * x + (1 - y) * xn
+
+    f = theano.function([x, xn, score], res)
+
+    print f(
+        [
+            [1, 2, 3],
+            [4, 5, 6],
+            [7, 8, 9],
+        ],
+        [
+            [0, 0, 0],
+            [0, 0, 0],
+            [0, 0, 0],
+        ],
+        [0.1, 0.69, 0.9]
+    )
 
 
 if __name__ == '__main__':
+    test_update()
+    exit(0)
     test_seqlen()
     exit(0)
     test_convscan()
