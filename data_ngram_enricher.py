@@ -62,6 +62,8 @@ class DataNGramEnricher:
                         curr_ngram.append(w)
                         ngrams[tuple(curr_ngram)] += 1
 
+                        #print map({val: key for key, val in d['vocab'].iteritems()}.__getitem__, curr_ngram)
+
             hist = self._build_cummul(ngrams)
 
             thresh = 0
@@ -82,35 +84,47 @@ class DataNGramEnricher:
     def _add_ngrams(self, data, ngram_map):
         max_ngram_order = max(len(x) for x in ngram_map)
 
-
-
         for d in data:
-            for d in data:
-                for seq in d['sequences']:
-                    curr_ngram = deque([0] * max_ngram_order, maxlen=max_ngram_order)
-                    i = 0
-                    while i < len(seq['data']):
-                        w = seq['data'][i]
-                        wcn = False
-                        if type(w) is list:
-                            wcn = True
-                            assert len(w) == 1
-                            w = w[0]
+            print 'processing data'
+            for seq in d['sequences']:
+                new_seq = []
+                #print '----------------------------------------'
+                #print seq['data_debug']
+                curr_ngram = deque([0] * max_ngram_order, maxlen=max_ngram_order)
 
-                        curr_ngram.append(w)
+                y = 0
+                for w in seq['data']:
+                    new_seq.append(w)
 
-                        ngram_tuple = tuple(curr_ngram)
+                    wcn = False
+                    if type(w) is list:
+                        wcn = True
+                        assert len(w) == 1
+                        w = w[0]
+
+                    curr_ngram.append(w)
+
+                    #print map({val: key for key, val in d['vocab'].iteritems()}.__getitem__, curr_ngram)
+
+                    for ngram_order in xrange(2, max_ngram_order + 1):
+                        ngram_tuple = tuple(curr_ngram)[-ngram_order:]
+                        #if 295 in ngram_tuple and 129 in ngram_tuple:
+                        #    import ipdb; ipdb.set_trace()
+
                         if ngram_tuple in ngram_map:
                             new_item = ngram_map[ngram_tuple]
+
                             if wcn:
                                 new_item = [new_item]
-                            seq['data'].insert(i + 1, new_item)
-                            i += 1
+                            new_seq.insert(y + 1, new_item)
+                            y += 1
                             for label in seq['labels']:
-                                if label['time'] >= i:
+                                if label['time'] >= y:
                                     label['time'] += 1
 
-                        i += 1
+                    y += 1
+
+                seq['data'] = new_seq
 
 
     def _build_cummul(self, ngrams):

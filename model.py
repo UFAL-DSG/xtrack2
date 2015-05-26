@@ -51,7 +51,7 @@ class Model(NeuralModel):
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
-                                      input=x,
+                                      input=x[:, :, 0],
                                       static=no_train_emb)
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
@@ -73,14 +73,19 @@ class Model(NeuralModel):
             input_score_layer.connect(prev_layer)
             prev_layer = input_score_layer
 
-        input_maxpooling = MaxPooling(name="maxpool", pool_dimension=2)
-        input_maxpooling.connect(prev_layer)
-        prev_layer = input_maxpooling
+        #input_maxpooling = MaxPooling(name="maxpool", pool_dimension=2)
+        #input_maxpooling.connect(prev_layer)
+        #prev_layer = input_maxpooling
+
+        conf_layer = Dense(name="conf", size=emb_size, activation='tanh')
+        conf_layer.connect(IdentityInput(x_conf.dimshuffle(0, 1, 'x'), 1))
+        prev_layer = ZipLayer(2, [conf_layer, prev_layer])
+
 
         if input_n_layers > 0:
             input_transform = MLP([input_n_hidden  ] * input_n_layers,
                                   [input_activation] * input_n_layers,
-                                  p_drop=p_drop)
+                                  p_drop=[p_drop] * input_n_layers)
             input_transform.connect(prev_layer)
             prev_layer = input_transform
 
@@ -366,6 +371,7 @@ class Model(NeuralModel):
         data = [x]
         #if self.x_include_score:
         data.append(x_score)
+
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)

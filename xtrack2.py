@@ -540,6 +540,7 @@ def main(args_lst,
         selected_train_seqs = xtd_t.sequences
 
     train_data = model.prepare_data_train(selected_train_seqs, slots)
+
     joint_slots = ['joint_%s' % str(grp) for grp in class_groups.keys()]
     best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}

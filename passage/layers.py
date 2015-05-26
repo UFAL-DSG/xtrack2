@@ -87,6 +87,21 @@ class ZipLayer(object):
         return set(flatten([layer.get_params() for layer in self.layers]))
 
 
+class Broadcast(object):
+    def __init__(self, n_times):
+        self.n_times = n_times
+
+    def connect(self, layer):
+        self.layer = layer
+
+    def output(self, dropout_active=False):
+        out = self.layer.output(dropout_active=dropout_active)
+        return T.concatenate([out] * self.n_times, axis=len(out.shape) - 1)
+
+    def get_params(self):
+        return self.layer.get_params()
+
+
 class UnBatch(object):
     def __init__(self, dtype=None):
         self.dtype = dtype
@@ -133,7 +148,6 @@ class SumLayer(object):
 
 
 class Embedding(Layer):
-
     def __init__(self, name=None, size=128, n_features=256, init=inits.normal,
                  static=False, input=None):
         if name:
@@ -185,6 +199,8 @@ class Embedding(Layer):
                     emb[word_id,:] = map(float, ln[1:])
 
         self.wv.set_value(emb)
+
+
 
 
 class Recurrent(Layer):

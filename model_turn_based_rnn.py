@@ -163,8 +163,6 @@ class TurnBasedRNNModel(NeuralModel):
                 turns.append(turn_vec)
             x.append(turns)
 
-
-
             for label_id, label in enumerate(labels):
                 y_seq_id.append(len(x) - 1)
                 y_time.append(label_id)
@@ -179,6 +177,7 @@ class TurnBasedRNNModel(NeuralModel):
         x = padded(x, pad_by=[np.zeros((len(self.vocab), ))]).transpose(1, 0, 2)
 
         data = [x]
+
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)
