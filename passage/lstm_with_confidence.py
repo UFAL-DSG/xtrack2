@@ -43,13 +43,11 @@ class LstmWithConfidence(Layer):
 
     def _init_input_connections(self, n_in):
         self.w = self.init((n_in, self.size * 4),
-                           layer_width=self.size,
-                           scale=self.init_scale,
+                           fan_in=n_in,
                            name=self._name_param("W"))
-        self.b = self.init((self.size * 4, ),
-                           layer_width=self.size,
-                           scale=self.init_scale,
-                           name=self._name_param("b"))
+        self.b = inits.const((self.size * 4, ),
+                             val=0.1,
+                             name=self._name_param("b"))
 
         #self.br = self.init((self.size * 4, ),
         #                   layer_width=self.size,
@@ -61,43 +59,37 @@ class LstmWithConfidence(Layer):
         #b[:self.size] = np.random.uniform(low=40.0, high=50.0, size=self.size)
         #b[self.size:] = 0.0
         #self.b.set_value(b)
-        self.conf_a = self.init((1, ),
-                                 layer_width=self.size,
-                                 scale=self.init_scale,
+        self.conf_a = inits.const((1, ),
+                                 val=1.0,
                                  name=self._name_param("conf_a"))[0]
 
-        self.conf_b = self.init((1, ),
-                                 layer_width=self.size,
-                                 scale=self.init_scale,
-                                 name=self._name_param("conf_a"))[0]
+        self.conf_b = inits.const((1, ),
+                                  val=0.0,
+                                  name=self._name_param("conf_a"))[0]
 
     def _init_recurrent_connections(self):
         self.u = self.init((self.size, self.size * 4),
-                           layer_width=self.size,
-                           scale=self.init_scale,
+                           fan_in=self.size,
                            name=self._name_param("U"))
 
     def _init_peephole_connections(self):
         self.p_vec_f = self.init((self.size, ),
-                                 layer_width=self.size,
-                                 scale=self.init_scale,
+                                 fan_in=self.size,
                                  name=self._name_param("peep_f"))
         self.p_vec_i = self.init((self.size, ),
-                                 layer_width=self.size,
-                                 scale=self.init_scale,
+                                 fan_in=self.size,
                                  name=self._name_param("peep_i"))
         self.p_vec_o = self.init((self.size, ),
-                                 layer_width=self.size,
-                                 scale=self.init_scale,
+                                 fan_in=self.size,
                                  name=self._name_param("peep_o"))
 
     def _init_initial_states(self, init_c=None, init_h=None):
         if self.learn_init_state:
             self.init_c = self.init((self.size, ),
-                                    layer_width=self.size,
+                                    fan_in=self.size,
                                     name=self._name_param("init_c"))
             self.init_h = self.init((self.size, ),
-                                    layer_width=self.size,
+                                    fan_in=self.size,
                                     name=self._name_param("init_h"))
         else:
             self.init_c = init_c

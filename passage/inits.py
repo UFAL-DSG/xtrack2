@@ -11,14 +11,17 @@ def uniform(shape, layer_width, scale=0.1, name=None):
     return sharedX(np.random.uniform(low=-scale, high=scale, size=shape),
                    name=name)
 
-def normal(shape, layer_width, scale=0.1, name=None):
-    scale = scale / np.sqrt(layer_width)
+def normal(shape, fan_in, name=None):
+    scale = np.sqrt(2.0 / fan_in)
     return sharedX(np.random.randn(*shape) * scale, name=name)
 
 
-def normal_relu(shape, layer_width, scale=0.1, name=None):
-    scale = np.sqrt(2.0 / layer_width)
-    return sharedX(np.random.randn(*shape) * scale, name=name)
+#def normal_relu(shape, layer_width, scale=0.1, name=None):
+#    scale = np.sqrt(2.0 / layer_width)
+#    return sharedX(np.random.randn(*shape) * scale, name=name)
+
+def const(shape, val, name=None):
+    return sharedX(np.ones(*shape) * val, name=name)
 
 
 def copy(params):

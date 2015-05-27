@@ -62,6 +62,7 @@ class TurnBasedModel(NeuralModel):
             predictions.append(slot_mlp.output(dropout_active=False))
 
             slot_objective = CrossEntropyObjective()
+            #slot_objective = SVMObjective()
             slot_objective.connect(
                 y_hat_layer=slot_mlp,
                 y_true=y_label[slot]

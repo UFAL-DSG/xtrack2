@@ -157,8 +157,7 @@ class Embedding(Layer):
         self.n_features = n_features
         self.input = input
         self.wv = self.init((self.n_features, self.size),
-                            layer_width=self.size,
-                            scale=0.1,
+                            fan_in=self.n_features,
                             name=self._name_param("emb"))
         if static:
             self.params = set()
@@ -291,13 +290,11 @@ class LstmRecurrent(Layer):
 
     def _init_input_connections(self, n_in):
         self.w = self.init((n_in, self.size * 4),
-                           layer_width=self.size,
-                           scale=self.init_scale,
+                           fan_in=n_in,
                            name=self._name_param("W"))
-        self.b = self.init((self.size * 4, ),
-                           layer_width=self.size,
-                           scale=self.init_scale,
-                           name=self._name_param("b"))
+        self.b = inits.const((self.size * 4, ),
+                             0.1,
+                             name=self._name_param("b"))
 
         #self.br = self.init((self.size * 4, ),
         #                   layer_width=self.size,
@@ -312,31 +309,30 @@ class LstmRecurrent(Layer):
 
     def _init_recurrent_connections(self):
         self.u = self.init((self.size, self.size * 4),
-                           layer_width=self.size,
-                           scale=self.init_scale,
+                           fan_in=self.size,
                            name=self._name_param("U"))
 
     def _init_peephole_connections(self):
         self.p_vec_f = self.init((self.size, ),
-                                 layer_width=self.size,
+                                 fan_in=self.size,
                                  scale=self.init_scale,
                                  name=self._name_param("peep_f"))
         self.p_vec_i = self.init((self.size, ),
-                                 layer_width=self.size,
+                                 fan_in=self.size,
                                  scale=self.init_scale,
                                  name=self._name_param("peep_i"))
         self.p_vec_o = self.init((self.size, ),
-                                 layer_width=self.size,
+                                 fan_in=self.size,
                                  scale=self.init_scale,
                                  name=self._name_param("peep_o"))
 
     def _init_initial_states(self, init_c=None, init_h=None):
         if self.learn_init_state:
             self.init_c = self.init((self.size, ),
-                                    layer_width=self.size,
+                                    fan_in=self.size,
                                     name=self._name_param("init_c"))
             self.init_h = self.init((self.size, ),
-                                    layer_width=self.size,
+                                    fan_in=self.size,
                                     name=self._name_param("init_h"))
         else:
             self.init_c = init_c
@@ -471,92 +467,6 @@ class LstmRecurrent(Layer):
         return self.l_in.get_params().union(self.params)
 
 
-class LstmWithMLP(LstmRecurrent):
-
-    def __init__(self, name=None, size=256, init=inits.normal, truncate_gradient=-1,
-                 seq_output=False, p_drop=0., init_scale=0.1, out_cells=False,
-                 peepholes=False, enable_branch_exp=False, backward=False,
-                 mlps=None):
-        super(LstmWithMLP, self).__init__(name, size, init, truncate_gradient,
-                                          seq_output, p_drop, init_scale,
-                                          out_cells, peepholes,
-                                          enable_branch_exp, backward)
-        self.mlps = mlps
-
-    def connect(self, l_in):
-        super(LstmWithMLP, self).connect(l_in)
-
-        self.mlp_inits = []
-        n_mlp_inputs = 0
-        for i, mlp in enumerate(self.mlps):
-            mlp_init = self.init((mlp.size, ), layer_width=mlp.size,
-                                 name=self._name_param("mlp_init_%d" % i))
-            self.mlp_inits.append(mlp_init)
-            n_mlp_inputs += mlp.size
-
-        self.params.extend(self.mlp_inits)
-
-        self.w_mlp = self.init((n_mlp_inputs, self.size * 4),
-                           layer_width=self.size,
-                           scale=self.init_scale,
-                           name=self._name_param("Wmlp"))
-        self.params.append(self.w_mlp)
-
-    def _prepare_outputs_info(self, x_dot_w):
-        outputs_info = super(LstmWithMLP, self)._prepare_outputs_info(x_dot_w)
-        for mlp_init in self.mlp_inits:
-            outputs_info.append(
-                T.repeat(mlp_init.dimshuffle('x', 0), x_dot_w.shape[1],
-                         axis=0),
-            )
-        return outputs_info
-
-    def _compute_seq(self, x_dot_w, dropout_active):
-        res = super(LstmWithMLP, self)._compute_seq(x_dot_w, dropout_active)
-        res = list(res)
-        h_t = res.pop(0)
-        c_t = res.pop(0)
-        return h_t, c_t
-
-    def _process_scan_output(self, res):
-        out = res[0][0]
-        cells = res[0][1]
-
-        return out, cells
-
-    def step(self, *args):
-        i = 0
-        args = list(args)
-
-        x_t = args.pop(0)
-        h_tm1 = args.pop(0)
-        c_tm1 = args.pop(0)
-        mlp_tm1 = []
-        for mlp in self.mlps:
-            mlp_tm1.append(args.pop(0))
-        xmlp_t_concat = T.concatenate(mlp_tm1, axis=1)
-        x_t += T.dot(xmlp_t_concat, self.w_mlp)
-
-        u = args.pop(0)
-        p_vec_f = args.pop(0)
-        p_vec_i = args.pop(0)
-        p_vec_o = args.pop(0)
-        dropout_active = args.pop(0)
-
-        h_t, c_t = super(LstmWithMLP, self).step(x_t, h_tm1, c_tm1, u, p_vec_f,
-                                                 p_vec_i, p_vec_o, dropout_active)
-
-        outs = [h_t, c_t]
-
-        #h_t_layer = IdentityInput(h_t, self.size)
-
-        for mlp in self.mlps:
-            #mlp.connect(h_t_layer)
-            mlp.l_in.set_val(h_t)
-            outs.append(mlp.output(dropout_active=bool(dropout_active)))
-
-        return tuple(outs)
-
 
 class Dense(Layer):
     def __init__(self, name=None, size=256, activation='rectify', init=inits.normal,
@@ -575,12 +485,12 @@ class Dense(Layer):
 
         self.w = self.init(
             (self.n_in, self.size),
-            layer_width=self.size,
+            fan_in=self.n_in,
             name=self._name_param("w")
         )
-        self.b = self.init(
+        self.b = inits.const(
             (self.size, ),
-            layer_width=self.size,
+            val=0.1,
             name=self._name_param("b")
         )
         self.params = [self.w, self.b]
@@ -678,6 +588,26 @@ class CherryPick(Layer):
         return set(self.data_layer.get_params())
 
 
+
+class SVMObjective(Layer):
+    def connect(self, y_hat_layer, y_true):
+        self.y_hat_layer = y_hat_layer
+        self.y_true = y_true
+
+    def output(self, dropout_active=False):
+        y_hat_out = self.y_hat_layer.output(dropout_active=dropout_active)
+        f_yi = y_hat_out[T.arange(self.y_true.shape[0]), self.y_true]
+
+        res = (y_hat_out - f_yi.dimshuffle(0, 'x') + 1)
+
+        res = res * (res > 0)
+
+        return res.sum()
+
+    def get_params(self):
+        return set(self.y_hat_layer.get_params())
+
+
 class CrossEntropyObjective(Layer):
     def connect(self, y_hat_layer, y_true):
         self.y_hat_layer = y_hat_layer
@@ -725,25 +655,6 @@ class WeightedCrossEntropyObjective(Layer):
     def get_params(self):
         return set(self.y_hat_layer.get_params())
 
-
-
-class TokenSupervisionLossLayer(object):
-    def connect(self, y_hat_layer, y_true):
-        self.y_hat_layer = y_hat_layer
-        self.y_true = y_true
-        self.size = 1
-
-    def output(self, dropout_active=False):
-        y_tokens_pred = self.y_hat_layer.output(dropout_active=dropout_active)
-        token_supervision_loss = self.y_true * T.log(y_tokens_pred)
-        token_supervision_loss += self.y_true * T.log(1 - y_tokens_pred)
-        token_supervision_loss = - token_supervision_loss.sum() / \
-                                 token_supervision_loss.shape[0]
-
-        return T.cast(token_supervision_loss, dtype=theano.config.floatX)
-
-    def get_params(self):
-        return set(self.y_hat_layer.get_params())
 
 
 class SumOut(Layer):
@@ -908,50 +819,6 @@ class LeNetConvPoolLayer(object):
         res = T.tanh(pooled_out + self.b.dimshuffle('x', 0, 'x', 'x'))
 
         return res.flatten(2)
-
-
-class BiasedSoftmax(Layer):
-    def __init__(self, name=None, size=256, init=inits.normal):
-        if name:
-            self.name = name
-        self.init = init
-        self.size = size
-
-
-    def connect(self, l_in):
-        self.l_in = l_in
-        self.n_in = l_in.size
-
-        self.w = self.init(
-            (self.n_in, self.size - 1),
-            layer_width=self.size - 1,
-            name=self._name_param("w")
-        )
-        self.b = self.init(
-            (self.size, ),
-            layer_width=self.size,
-            name=self._name_param("b")
-        )
-        self.params = [self.w, self.b]
-
-    def output(self, pre_act=False, dropout_active=False):
-        X = self.l_in.output(dropout_active=dropout_active)
-
-        is_tensor3_softmax = X.ndim > 2
-
-        shape = X.shape
-        if is_tensor3_softmax: #reshape for tensor3 softmax
-            X = X.reshape((shape[0]*shape[1], self.n_in))
-
-        out =  activations.softmax(T.concatenate([T.zeros((X.shape[0], 1)), T.dot(X, self.w)], axis=1) + self.b)
-
-        if is_tensor3_softmax: #reshape for tensor3 softmax
-            out = out.reshape((shape[0], shape[1], self.size))
-
-        return out
-
-    def get_params(self):
-        return set(self.params).union(set(self.l_in.get_params()))
 
 
 class ProbLayer(Layer):

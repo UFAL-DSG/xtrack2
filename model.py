@@ -333,6 +333,7 @@ class Model(NeuralModel):
                     for word, score in sorted(zip(words, scores), key=lambda (w, s, ): -s)[:wcn_cnt]:
                         new_words.append(word)
                         new_scores.append(np.exp(score))
+                        #new_scores.append([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0][score])
 
                     n_missing = max(0, wcn_cnt - len(words))
                     new_words.extend(n_missing * [0])
