@@ -178,6 +178,16 @@ class TurnBasedRNNModel(NeuralModel):
 
         data = [x]
 
+        #vocab_rev = {val: key for key, val in self.vocab.iteritems()}
+        #for x_t in x:
+        #    for x_td in x_t:
+        #        for i, x_tdw in enumerate(x_td):
+        #            if x_tdw > 0:
+        #                print vocab_rev[i],
+        #        print
+        #    print
+
+
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)

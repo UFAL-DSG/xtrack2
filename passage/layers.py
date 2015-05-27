@@ -315,15 +315,12 @@ class LstmRecurrent(Layer):
     def _init_peephole_connections(self):
         self.p_vec_f = self.init((self.size, ),
                                  fan_in=self.size,
-                                 scale=self.init_scale,
                                  name=self._name_param("peep_f"))
         self.p_vec_i = self.init((self.size, ),
                                  fan_in=self.size,
-                                 scale=self.init_scale,
                                  name=self._name_param("peep_i"))
         self.p_vec_o = self.init((self.size, ),
                                  fan_in=self.size,
-                                 scale=self.init_scale,
                                  name=self._name_param("peep_o"))
 
     def _init_initial_states(self, init_c=None, init_h=None):
