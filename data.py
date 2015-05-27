@@ -434,6 +434,9 @@ class Data(object):
     vocab = None
     slot_groups = None
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+
     def _build_initial_classes(self, ontology):
         classes = {}
         for slot in self.slots:
@@ -459,7 +462,10 @@ class Data(object):
         self.tagger = tagger
 
         if based_on:
-            data = Data.load(based_on)
+            if type(based_on) is str:
+                data = Data.load(based_on)
+            else:
+                data = based_on
             self.vocab = data.vocab
             self.classes = data.classes
             self.vocab_fixed = True

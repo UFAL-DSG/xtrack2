@@ -49,13 +49,17 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 
 
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
-                       ontology, builder_opts, builder_type, use_wcn,
+                       ontology, builder_opts, builder_type, use_wcn, ngrams,
                        concat_whole_nbest):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
     based_on = None
-    for dataset in ['train', 'dev', 'test']:
+    datasets = ['train', 'dev', 'test']
+    dataset_objs = []
+    dataset_objs_nonfixed = []
+    dataset_objs_fixed = []
+    for dataset in datasets:
         out_dir = os.path.join(e_root, dataset)
         #if not skip_dstc_import_step:
         dialogs = import_dstc_data(data_directory=data_directory,
@@ -89,13 +93,32 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
         )
         logging.info('Building.')
         xtd = xtd_builder.build(dialogs, use_wcn=use_wcn)
-
-        logging.info('Saving.')
         out_file = os.path.join(e_root, '%s.json' % dataset)
-        xtd.save(out_file)
+
+        dataset_objs.append((xtd, out_file))
 
         if dataset == 'train':
-            based_on = out_file
+            based_on = xtd
+            dataset_objs_nonfixed.append(xtd)
+        else:
+            dataset_objs_fixed.append(xtd)
+
+    if ngrams:
+        from data_ngram_enricher import DataNGramEnricher
+
+        ngram_order = []
+        ngram_cnt = []
+        for ngram_spec in ngrams.split(','):
+            order, cnt = map(int, ngram_spec.split(':'))
+            ngram_order.append(order)
+            ngram_cnt.append(cnt)
+
+        ngram_e = DataNGramEnricher(ngram_order, ngram_cnt)
+        ngram_e.enrich_data(dataset_objs_nonfixed, dataset_objs_fixed)
+
+    for xtd, out_file in dataset_objs:
+        logging.info('Saving.')
+        xtd.save(out_file)
 """
 
 def main():

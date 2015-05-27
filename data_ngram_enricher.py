@@ -30,6 +30,13 @@ class DataNGramEnricher:
         data = self._load_data(dataset)
         data_fixed = self._load_data(fixed_dataset)
 
+        self.enrich_data(data, data_fixed)
+
+        self._save_data(data, dataset, outdir)
+        self._save_data(data_fixed, fixed_dataset, outdir)
+
+    def enrich_data(self, data, data_fixed):
+
         ngrams = self._get_ngrams(data)
         ngram_first_index = len(data[0]['vocab'])
         ngram_map = {ngram: i + ngram_first_index for i, ngram  in enumerate(ngrams)}
@@ -37,8 +44,13 @@ class DataNGramEnricher:
         self._add_ngrams(data, ngram_map)
         self._add_ngrams(data_fixed, ngram_map)
 
-        self._save_data(data, dataset, ngram_map, outdir)
-        self._save_data(data_fixed, fixed_dataset, ngram_map, outdir)
+        self._update_dict(data + data_fixed, ngram_map)
+
+    def _update_dict(self, data, ngrams):
+        for d in data:
+            vocab_rev = {val: key for key, val in d['vocab'].iteritems()}
+            ngram_map = {"~" + "#".join(vocab_rev.get(i, "$$" + str(i)) for i in key): val for key, val in ngrams.iteritems()}
+            d['vocab'].update(ngram_map)
 
     def _load_data(self, dataset):
         data = []
@@ -162,12 +174,8 @@ class DataNGramEnricher:
                         if not ftr in intersect_ftrs:
                             del ftrs[ftr]
 
-    def _save_data(self, data, dataset, ngram_map, outdir):
+    def _save_data(self, data, dataset, outdir):
         for d, dataset_fn in zip(data, dataset):
-            vocab_rev = {val: key for key, val in d['vocab'].iteritems()}
-            ngram_map = {"~" + "#".join(vocab_rev.get(i, "$$" + str(i)) for i in key): val for key, val in ngram_map.iteritems()}
-            d['vocab'].update(ngram_map)
-
             out_dataset_fn = os.path.join(outdir, os.path.basename(dataset_fn))
             print 'writing', out_dataset_fn
             with open(out_dataset_fn, 'w') as f_out:
