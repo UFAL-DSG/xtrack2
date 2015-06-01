@@ -162,8 +162,9 @@ class DataBuilder(object):
             msg, msg_score = msgs[msg_id]
             return msg, msg_score
         else:
-            all_msgs, _ = zip(*msgs[1:])
-            return " _ ".join(all_msgs), 0.0
+            all_msgs, all_msg_scores = zip(*msgs[1:])
+
+            return all_msgs, all_msg_scores
 
 
     def _process_dialog(self, dialog, seq):
@@ -243,24 +244,29 @@ class DataBuilder(object):
             self.f_dump_text.write('%s ' % token_str)
         self.f_dump_text.write('\n')
 
-    def _process_msg(self, msg, msg_score, state, last_state, actor, seq,
+    def _process_msg(self, msgs, msgs_score, state, last_state, actor, seq,
                      true_msg):
 
-        msg_score_bin = self.xd.get_score_bin(msg_score)
-        token_seq = self._tokenize_msg(actor, msg)
-        self._dump_msg_info(last_state, msg_score, msg_score_bin, state,
-                            token_seq, true_msg)
+        if type(msgs) in (str, unicode, ):
+            msgs = (msgs, )
+            msgs_score = (msgs_score, )
 
-        for i, token in enumerate(token_seq):
-            if self.word_drop_p > random.random():
-                continue
+        for msg, msg_score in zip(msgs, msgs_score):
+            #msg_score_bin = self.xd.get_score_bin(msg_score)
+            token_seq = self._tokenize_msg(actor, msg)
+            self._dump_msg_info(last_state, msg_score, msg_score, state,
+                                token_seq, true_msg)
 
-            self.word_freq[token] += 1
+            for i, token in enumerate(token_seq):
+                if self.word_drop_p > random.random():
+                    continue
 
-            if random.random() < self.oov_ins_p:
-                token = '#OOV'
+                self.word_freq[token] += 1
 
-            self._append_token_to_seq(actor, msg_score_bin, seq, token, state)
+                if random.random() < self.oov_ins_p:
+                    token = '#OOV'
+
+                self._append_token_to_seq(actor, msg_score, seq, token, state)
 
         seq.true_input.append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:

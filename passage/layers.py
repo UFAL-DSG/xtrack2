@@ -147,6 +147,27 @@ class SumLayer(object):
 
 
 
+class OneHot(Layer):
+    def __init__(self, name=None, n_features=256, input=None):
+        if name:
+            self.name = name
+        self.input = input
+        self.size = n_features
+
+    def output(self, dropout_active=False):
+        inp = T.flatten(self.input)
+
+        res = T.zeros((self.input.shape[0] * self.input.shape[1], self.size, ))
+        res = T.set_subtensor(res[T.arange(inp.shape[0]), inp], 1.0)
+
+        res = T.reshape(res, (self.input.shape[0], self.input.shape[1], self.size, ))
+
+        return res
+
+    def get_params(self):
+        return set()
+
+
 class Embedding(Layer):
     def __init__(self, name=None, size=128, n_features=256, init=inits.normal,
                  static=False, input=None):
@@ -580,6 +601,24 @@ class CherryPick(Layer):
     def output(self, dropout_active=False):
         out = self.data_layer.output(dropout_active=dropout_active)
         return out[self.indices, self.indices2]
+
+    def get_params(self):
+        return set(self.data_layer.get_params())
+
+
+class CherryPickDelta(Layer):
+    def connect(self, data, indices, indices2):
+        self.data_layer = data
+        self.indices = indices
+        self.indices2 = indices2
+        self.size = data.size * 2
+
+    def output(self, dropout_active=False):
+        out = self.data_layer.output(dropout_active=dropout_active)
+        res = out[self.indices, self.indices2]
+        res_delta = T.concatenate([T.zeros_like(out[0, 0]).dimshuffle('x', 0), out[self.indices[1:], self.indices2[1:]]])
+
+        return T.concatenate([res, res_delta], axis=1)
 
     def get_params(self):
         return set(self.data_layer.get_params())
@@ -1106,8 +1145,9 @@ class TurnSquasher(Layer):
     def __init__(self, n_features):
         self.n_features = n_features
 
-    def connect(self, prev_layer, y_time, y_seq_id):
+    def connect(self, prev_layer, scores, y_time, y_seq_id):
         self.prev_layer = prev_layer
+        self.scores = scores
         self.y_time = y_time
         self.y_seq_id = y_seq_id
 
@@ -1125,7 +1165,8 @@ class TurnSquasher(Layer):
     def _step(self, y_t, y_seq_id, x):
         ivec = T.zeros((self.n_features,))
         res = x[0:y_t + 1, y_seq_id]
-        res = theano.tensor.set_subtensor(ivec[res], 1.0)
+        scores = self.scores[0:y_t + 1, y_seq_id]
+        res = theano.tensor.set_subtensor(ivec[res], scores)
         return res
 
     def get_params(self):

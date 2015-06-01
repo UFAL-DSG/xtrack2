@@ -33,15 +33,16 @@ class TurnBasedModel(NeuralModel):
         self._log_classes_info()
 
         x = T.imatrix()
+        x_scores = T.matrix()
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-        input_args = [x]
+        input_args = [x, x_scores]
         turns = TurnSquasher(len(self.vocab))
-        turns.connect(IdentityInput(x, 1), y_time, y_seq_id)
+        turns.connect(IdentityInput(x, 1), x_scores * 0 + 1, y_time, y_seq_id)
 
         global_mlp = MLP([mlp_n_hidden  ] * mlp_n_layers,
                          [mlp_activation] * mlp_n_layers,
@@ -83,7 +84,7 @@ class TurnBasedModel(NeuralModel):
 
         assert opt_type == 'sgd'
         lr = tt.scalar('lr')
-        clipnorm = 0.0
+        clipnorm = 5.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
 
@@ -129,20 +130,78 @@ class TurnBasedModel(NeuralModel):
 
         return [token_padding]
 
+    def visualize(self, seqs, slots):
+        model_data = self._prepare_data(seqs, slots, with_labels=False)
+        preds = self._predict(*model_data)
+        pred_ptr = 0
+
+        vocab_rev = {val: key for key, val in self.vocab.iteritems()}
+        slot_classes_rev = {}
+        for slot in slots:
+            slot_classes_rev[slot] = {ndx: val for val, ndx in self.slot_classes[slot].iteritems()}
+
+        with open('/tmp/vis.html', 'w') as f_out:
+            for i, dialog in enumerate(seqs):
+                d_id = dialog['id']
+                true_data = dialog['true_input']
+                data = dialog['data']
+                lbls = {}
+                for lbl in dialog['labels']:
+                    lbls[lbl['time']] = lbl
+
+                print >>f_out, "<h1>Dialog %d: %s</h1>" % (i, d_id)
+                print >>f_out, "<p>"
+                print >>f_out, "<ul>"
+                for s in true_data:
+                    print >>f_out, "<li>%s</li>" % s
+                print >>f_out, "</ul>"
+                print >>f_out, "</p>"
+
+                print >>f_out, "<h2>Data</h2>"
+                print >>f_out, "<ul>"
+                for t, w in enumerate(data):
+                    print >>f_out, "<li>%s</li>" % vocab_rev[w]
+
+                    if t in lbls:
+                        for slot_ndx, slot in enumerate(slots):
+                            curr_pred = preds[slot_ndx][pred_ptr].argmax()
+                            curr_pred_p = preds[slot_ndx][pred_ptr].max()
+                            print >>f_out, "<li>PRD: %s %.2f</li>" % (slot_classes_rev[slot][curr_pred], curr_pred_p, )
+
+                            true_val = lbls[t]['slots'][slot]
+                            print >>f_out, "<li>LBL: %s</li>" % slot_classes_rev[slot][true_val]
+
+                            if curr_pred == true_val or (true_val == 0 and curr_pred_p < 0.5):
+                                print >>f_out, "<li>PRED_GOOD</li>"
+                            else:
+                                print >>f_out, "<li>PRED_BAD</li>"
+
+                        pred_ptr += 1
+                print >>f_out, "</ul>"
+
+
+
+
+
+
+
     def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False):
         x = []
+        x_scores = []
         y_seq_id = []
         y_time = []
         y_labels = [[] for slot in slots]
         y_weights = []
         for item in seqs:
             data = item['data']
+            score = item['data_score']
 
             if type(data[0]) is list:
                 assert len(data[0]) == 1
                 data = [i[0] for i in data]
 
             x.append(data)
+            x_scores.append(score)
 
             labels = item['labels']
 
@@ -158,9 +217,10 @@ class TurnBasedModel(NeuralModel):
                 y_weights.append(label['score'])
 
         x = padded(x, is_int=True).transpose(1, 0)
+        x_scores = padded(x_scores).transpose(1, 0)
+        x_scores = np.exp(x_scores)
 
-
-        data = [x]
+        data = [x, x_scores]
         data.extend([y_seq_id, y_time])
         if with_labels:
             data.extend(y_labels)

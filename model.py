@@ -47,85 +47,38 @@ class Model(NeuralModel):
 
         x = T.itensor3(name='x')
         x_conf = T.matrix(name='x_conf')
-        input_args = [x, x_conf]
-        input_token_layer = Embedding(name="emb",
-                                      size=emb_size,
+        input_args = [x]
+        input_args.append(x_conf)
+        #input_token_layer = Embedding(name="emb",
+        #                              size=emb_size,
+        #                              n_features=n_input_tokens,
+        #                              input=x[:, :, 0],
+        #                              static=no_train_emb)
+        input_token_layer = OneHot(name="emb",
                                       n_features=n_input_tokens,
-                                      input=x[:, :, 0],
-                                      static=no_train_emb)
+                                      input=x[:, :, 0])
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
             logging.info('Initializing token embeddings from: %s'
                          % init_emb_from)
         else:
             logging.info('Initializing token embedding randomly.')
-        self.input_emb = input_token_layer.wv
+        #self.input_emb = input_token_layer.wv
 
         prev_layer = input_token_layer
 
         self.x_include_score = x_include_score
-        if x_include_score:
-            x_score = tt.tensor3()
-            input_args.append(x_score)
-            input_score_layer = ProbLayer(name="confidence_layer",
-                                          size=emb_size,
-                                          input=x_score)
-            input_score_layer.connect(prev_layer)
-            prev_layer = input_score_layer
-
-        #input_maxpooling = MaxPooling(name="maxpool", pool_dimension=2)
-        #input_maxpooling.connect(prev_layer)
-        #prev_layer = input_maxpooling
 
         conf_layer = Dense(name="conf", size=emb_size, activation='tanh')
         conf_layer.connect(IdentityInput(x_conf.dimshuffle(0, 1, 'x'), 1))
+
         prev_layer = ZipLayer(2, [conf_layer, prev_layer])
-
-
-        if input_n_layers > 0:
-            input_transform = MLP([input_n_hidden  ] * input_n_layers,
-                                  [input_activation] * input_n_layers,
-                                  p_drop=[p_drop] * input_n_layers)
-            input_transform.connect(prev_layer)
-            prev_layer = input_transform
-
-        if token_supervision:
-            slot_value_pred = MLP([len(slots) * 2], ['sigmoid'],
-                                  p_drop=[p_drop], name='ts')
-            slot_value_pred.connect(prev_layer)
-
-            y_tokens_label = tt.itensor3()
-            token_supervision_loss_layer = TokenSupervisionLossLayer()
-            token_supervision_loss_layer.connect(slot_value_pred, y_tokens_label)
-
-            if debug:
-                self._token_supervision_loss = theano.function(input_args + [
-                    y_tokens_label], token_supervision_loss_layer.output())
-
-        else:
-            token_supervision_loss_layer = None
-            y_tokens_label = None
-
-
 
 
         logging.info('There are %d input layers.' % input_n_layers)
 
         if debug:
             self._lstm_input = theano.function(input_args, prev_layer.output())
-
-        h_t_layer = IdentityInput(None, n_cells)
-        mlps = []
-        mlp_params = []
-        for slot in slots:
-            n_classes = len(slot_classes[slot])
-            slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
-                           [oclf_activation] * oclf_n_layers + ['softmax'],
-                           [0.0            ] * oclf_n_layers + [0.0      ],
-                           name="mlp_%s" % slot)
-            slot_mlp.connect(h_t_layer)
-            mlps.append(slot_mlp)
-            mlp_params.extend(slot_mlp.get_params())
 
         # Forward LSTM layer.
         logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
@@ -165,12 +118,12 @@ class Model(NeuralModel):
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-        cpt = CherryPick()
+        cpt = CherryPickDelta()
         cpt.connect(prev_layer, y_time, y_seq_id)
 
         costs = []
         predictions = []
-        for slot, slot_lstm_mlp in zip(slots, mlps):
+        for slot in slots:
             logging.info('Building output classifier for %s.' % slot)
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
@@ -189,47 +142,7 @@ class Model(NeuralModel):
             )
             costs.append(slot_objective)
 
-            # sg = theano.grad(slot_objective.output(dropout_active=False),
-            #             wrt=[input_maxpooling.input_var])
-            #
-            # inv_slot_objective = InvCrossEntropyObjective()
-            # inv_slot_objective.connect(
-            #     y_hat_layer=slot_mlp,
-            #     y_true=y_label[slot]
-            # )
-            # sg2 = theano.grad(inv_slot_objective.output(dropout_active=False),
-            #             wrt=[input_maxpooling.input_var])
-
-            #xx = tt.matrix()
-            #start_dict = {pred: xx}
-
-            #sg = theano.subgraph_grad(
-            #    start=start_dict,
-            #    wrt=[input_maxpooling.input_var],
-            #    end=[input_maxpooling.input_var]
-            #)
-
             logging.info('Creating understanding function.')
-
-            #self.fi = theano.function(
-            #    [input_maxpooling.input_var] + [y_seq_id, y_time, y_label[slot]],
-            #    sg[0]
-            #)
-
-            #self.f = theano.function(
-            #    input_args + [y_seq_id, y_time, y_label[slot]],
-            #    sg[0]
-            #)
-            #self.f2 = theano.function(
-            #    input_args + [y_seq_id, y_time, y_label[slot]],
-            #    sg2[0]
-            #)
-
-
-
-
-        if token_supervision:
-            costs.append(token_supervision_loss_layer)
 
         cost = SumOut()
         cost.connect(*costs)  #, scale=1.0 / len(slots))
@@ -265,8 +178,6 @@ class Model(NeuralModel):
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time]
         loss_args += [y_label[slot] for slot in slots]
-        if token_supervision:
-            loss_args += [y_tokens_label]
 
         if build_train:
             model_updates = updater.get_updates(params, cost_value)

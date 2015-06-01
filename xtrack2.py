@@ -32,6 +32,58 @@ from model_turn_based_rnn import TurnBasedRNNModel
 from dstc_tracker import XTrack2DSTCTracker
 
 
+
+def plot_loss(model, data):
+    params = []
+
+    directions_x = []
+    directions_y = []
+    for th_param in model.params:
+        param = th_param.get_value()
+        directions_x.append(np.array(np.random.rand(*param.shape), dtype='float32'))
+        directions_y.append(np.array(np.random.rand(*param.shape), dtype='float32'))
+        params.append(np.array(param))
+
+    """
+    res = []
+    for x in np.linspace(-0.020, 0.-0.010, num=100):
+        for th_param, param, dx, dy in zip(model.params, params, directions_x, directions_y):
+            th_param.set_value(param + x * dx)
+
+        loss = model._loss(*data)
+        res.append((x, loss, ))
+        print x, loss
+
+    import matplotlib.pyplot as plt
+    x, y = zip(*res)
+    plt.plot(x, y)
+    plt.show()"""
+
+    res = []
+    for x in np.linspace(-1.0, 0.0, num=100):
+        for y in np.linspace(-1.0, 0.0, num=100):
+            for th_param, param, dx, dy in zip(model.params, params, directions_x, directions_y):
+                th_param.set_value(param + x * dx + y * dy)
+
+            loss = model._loss(*data) / len(data[-1])
+            print x, y, loss
+            res.append((x, y, loss, ))
+
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+
+    x, y, temp = map(np.array, zip(*res))
+    nrows, ncols = 10, 10
+    grid = temp.reshape((nrows, ncols))
+
+    plt.imshow(grid, extent=(x.min(), x.max(), y.max(), y.min()),
+               interpolation='nearest', cmap=cm.Blues)
+    plt.show()
+
+
+
+
+
 def compute_stats(slots, slot_selection, classes, prediction, y,
                   joint_slot_name):
     conf_mats = {}
@@ -529,6 +581,9 @@ def main(args_lst,
     tracker_valid = XTrack2DSTCTracker(xtd_v, [model])
     tracker_train = XTrack2DSTCTracker(xtd_t, [model])
 
+    #model.visualize(xtd_v.sequences, slots)
+    #return
+
     valid_data_y = model.prepare_data_train(xtd_v.sequences, slots, debug_data)
     valid_data = model.prepare_data_predict(xtd_v.sequences, slots)
     if not eval_on_full_train:
@@ -566,6 +621,7 @@ def main(args_lst,
     epoch = 0
 
     init_valid_loss = model._loss(*valid_data_y)
+    #plot_loss(model, valid_data_y)
     logging.info('Initial valid loss: %.10f' % init_valid_loss)
 
     if not valid_after:
@@ -635,10 +691,14 @@ def main(args_lst,
             logging.info('Saving parameters: %s' % params_file)
             model.save_params(params_file)
 
+            #logging.info('Visualizing.')
+            #model.visualize(xtd_v.sequences, slots)
+
             valid_loss = model._loss(*valid_data_y)
             update_ratio = stats.mean('update_ratio')
             update_ratio = stats.mean('update_ratio')
 
+            logging.info('Valid # of examples: %d' % len(valid_data_y[-1]))
             _, track_score = tracker_valid.track(track_log)
 
             for group, accuracy in sorted(track_score.iteritems(),

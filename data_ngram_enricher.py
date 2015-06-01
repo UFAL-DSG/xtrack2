@@ -100,19 +100,26 @@ class DataNGramEnricher:
             print 'processing data'
             for seq in d['sequences']:
                 new_seq = []
+                new_seq_score = []
                 #print '----------------------------------------'
                 #print seq['data_debug']
                 curr_ngram = deque([0] * max_ngram_order, maxlen=max_ngram_order)
 
                 y = 0
-                for w in seq['data']:
+                lbl_times = set(lbl['time'] for lbl in seq['labels'])
+                for t, (w, score) in enumerate(zip(seq['data'], seq['data_score'])):
                     new_seq.append(w)
+                    new_seq_score.append(score)
 
                     wcn = False
                     if type(w) is list:
                         wcn = True
                         assert len(w) == 1
                         w = w[0]
+
+                    if t in lbl_times:  # Reset ngram buffer on boundaries of input.
+                        curr_ngram = deque([0] * max_ngram_order, maxlen=max_ngram_order)
+
 
                     curr_ngram.append(w)
 
@@ -137,6 +144,7 @@ class DataNGramEnricher:
                     y += 1
 
                 seq['data'] = new_seq
+                seq['data_score'] = new_seq_score
 
 
     def _build_cummul(self, ngrams):

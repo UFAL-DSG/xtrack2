@@ -132,7 +132,8 @@ class XTrack2DSTCTracker(object):
 
         goal_labels_debug = {
                 slot: goal_labels[slot].keys()[0] for slot in goal_labels
-            }
+        }
+
         return {
             "goal-labels": goal_labels,
             "method-label": method_label,
