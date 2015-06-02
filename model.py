@@ -69,8 +69,9 @@ class Model(NeuralModel):
 
         #self.x_include_score = x_include_score
 
-        conf_layer = Dense(name="conf", size=1, activation='rectify')
-        conf_layer.connect(IdentityInput(x_conf.dimshuffle(0, 1, 'x'), 1))
+        #conf_layer = Dense(name="conf", size=1, activation='rectify')
+        #conf_layer.connect()
+        conf_layer = IdentityInput(x_conf[:, :, np.newaxis], 1)
 
         prev_layer = ZipLayer(2, [conf_layer, prev_layer])
 
