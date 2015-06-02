@@ -61,12 +61,24 @@ class Sequence(dict):
         self.data_score = []
         self.data_actor = []
         self.labels = []
-        self.token_labels = []
         self.tags = collections.defaultdict(list)
         self.true_input = []
 
     def __repr__(self):
         return json.dumps(self.__dict__)
+
+    def clone_from_label(self, lbl):
+        t = lbl['time']
+        res = Sequence(self.id, self.source_dir)
+        res.data = list(self.data[:t + 1])
+        res.data_debug = list(self.data_debug[:t + 1])
+        res.data_score = list(self.data_score[:t + 1])
+        res.data_actor = list(self.data_actor[:t + 1])
+        res.tags = list(self.tags)
+        res.true_input = list(self.true_input)
+        res.labels = [dict(lbl)]
+
+        return res
 
 
 class DataBuilder(object):
@@ -89,7 +101,7 @@ class DataBuilder(object):
     def __init__(self, slots, slot_groups, based_on, include_base_seqs,
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
               score_bins, debug_dir, tagged, ontology, no_label_weight,
-              concat_whole_nbest):
+              concat_whole_nbest, split_dialogs):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -103,6 +115,7 @@ class DataBuilder(object):
         self.debug_dir = debug_dir
         self.tagged = tagged
         self.concat_whole_nbest = concat_whole_nbest
+        self.split_dialogs = split_dialogs
         if tagged:
             self.tagger = Tagger()
         else:
@@ -200,11 +213,12 @@ class DataBuilder(object):
                 continue
             else:
                 ## TODO: Hack.
-                #if not actor_is_system:
-                #    msg, msg_score = msgs[1]
-                #    wcn = map(lambda x: ([x], [msg_score]), msg.split())
-                #import ipdb; ipdb.set_trace()
                 if not actor_is_system:
+                    msg, msg_score = msgs[1]
+                    wcn = map(lambda x: ([x], [msg_score]), msg.split())
+
+                #import ipdb; ipdb.set_trace()
+                if not actor_is_system and False:
                     wcn = []
                     for msg, msg_score in msgs[1:2]:
 
@@ -421,7 +435,15 @@ class DataBuilder(object):
 
     def _append_seq_if_nonempty(self, seq):
         if len(seq.data) > 0:
-            self.xd.add_sequence(seq)
+            if not self.split_dialogs:
+                self.xd.add_sequence(seq)
+            else:
+                self._split_seq_and_append(seq)
+
+    def _split_seq_and_append(self, seq):
+        for lbl in seq.labels:
+            new_seq = seq.clone_from_label(lbl)
+            self.xd.add_sequence(new_seq)
 
 
 

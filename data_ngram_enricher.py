@@ -136,6 +136,7 @@ class DataNGramEnricher:
                             if wcn:
                                 new_item = [new_item]
                             new_seq.insert(y + 1, new_item)
+                            new_seq_score.insert(y + 1, score)
                             y += 1
                             for label in seq['labels']:
                                 if label['time'] >= y:

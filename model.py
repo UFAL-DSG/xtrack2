@@ -49,14 +49,14 @@ class Model(NeuralModel):
         x_conf = T.matrix(name='x_conf')
         input_args = [x]
         input_args.append(x_conf)
-        #input_token_layer = Embedding(name="emb",
-        #                              size=emb_size,
-        #                              n_features=n_input_tokens,
-        #                              input=x[:, :, 0],
-        #                              static=no_train_emb)
-        input_token_layer = OneHot(name="emb",
+        input_token_layer = Embedding(name="emb",
+                                      size=emb_size,
                                       n_features=n_input_tokens,
-                                      input=x[:, :, 0])
+                                      input=x[:, :, 0],
+                                      static=no_train_emb)
+        #input_token_layer = OneHot(name="emb",
+        #                              n_features=n_input_tokens,
+        #                              input=x[:, :, 0])
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
             logging.info('Initializing token embeddings from: %s'
@@ -67,9 +67,9 @@ class Model(NeuralModel):
 
         prev_layer = input_token_layer
 
-        self.x_include_score = x_include_score
+        #self.x_include_score = x_include_score
 
-        conf_layer = Dense(name="conf", size=emb_size, activation='tanh')
+        conf_layer = Dense(name="conf", size=1, activation='rectify')
         conf_layer.connect(IdentityInput(x_conf.dimshuffle(0, 1, 'x'), 1))
 
         prev_layer = ZipLayer(2, [conf_layer, prev_layer])
@@ -82,26 +82,28 @@ class Model(NeuralModel):
 
         # Forward LSTM layer.
         logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
-        assert lstm_type == 'with_conf'
+        lstm_args = dict(name="lstm",
+                               size=n_cells,
+                               seq_output=True,
+                               out_cells=False,
+                               peepholes=lstm_peepholes,
+                               p_drop=p_drop,
+                               enable_branch_exp=enable_branch_exp)
+        lstm_connect_args = [prev_layer]
+
         if lstm_type == 'ngram':
             lstm_cls = NGramLSTM
         elif lstm_type == 'vanilla':
             lstm_cls = LstmRecurrent
         elif lstm_type == 'with_conf':
             lstm_cls = LstmWithConfidence
+            lstm_args.update(update_thresh=lstm_update_thresh)
+            lstm_connect_args.append(x_conf)
         else:
             raise Exception('Unknown LSTM type: %s' % lstm_type)
-        lstm_layer = lstm_cls(name="lstm",
-                               size=n_cells,
-                               seq_output=True,
-                               out_cells=False,
-                               peepholes=lstm_peepholes,
-                               p_drop=p_drop,
-                               enable_branch_exp=enable_branch_exp,
-                               update_thresh=lstm_update_thresh
-        )
 
-        lstm_layer.connect(prev_layer, x_conf)
+        lstm_layer = lstm_cls(**lstm_args)
+        lstm_layer.connect(*lstm_connect_args)
 
         if debug:
             self._lstm_output = theano.function(input_args,
@@ -118,7 +120,7 @@ class Model(NeuralModel):
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
-        cpt = CherryPickDelta()
+        cpt = CherryPick()
         cpt.connect(prev_layer, y_time, y_seq_id)
 
         costs = []
@@ -237,6 +239,7 @@ class Model(NeuralModel):
         for item in seqs:
             data = []
             data_score = []
+            assert len(item['data']) == len(item['data_score'])
             for words, scores in zip(item['data'], item['data_score']):
                 new_words = []
                 new_scores = []
