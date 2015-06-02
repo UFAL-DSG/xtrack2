@@ -75,6 +75,13 @@ class Model(NeuralModel):
 
         prev_layer = ZipLayer(2, [conf_layer, prev_layer])
 
+        input_mlp_layer = MLP([input_n_hidden  ] * input_n_layers,
+                              [input_activation] * input_n_layers,
+                              [p_drop          ] * input_n_layers,
+                           name="input_mlp")
+        input_mlp_layer.connect(prev_layer)
+        prev_layer = input_mlp_layer
+
 
         logging.info('There are %d input layers.' % input_n_layers)
 
