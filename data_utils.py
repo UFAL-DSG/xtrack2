@@ -89,7 +89,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             ontology=ontology,
             debug_dir=debug_dir,
             concat_whole_nbest=concat_whole_nbest,
-            split_dialogs=split_dialogs,
+            split_dialogs=split_dialogs and dataset == 'train',
             **builder_opts
         )
         logging.info('Building.')

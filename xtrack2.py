@@ -23,7 +23,7 @@ from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
 from data import Data
 from utils import (get_git_revision_hash, pdb_on_error, ConfusionMatrix, P,
-                   inline_print)
+                   inline_print, update_progress)
 from model import Model
 from model_simple_conv import SimpleConvModel
 from model_baseline import BaselineModel
@@ -677,11 +677,14 @@ def main(args_lst,
 
         if time.time() - last_inline_print > 1.0:
             last_inline_print = time.time()
-            inline_print("     %6d examples, %4d examples/s" % (
+            progress = 1 - len(mb_to_go) * 1.0 / len(mb_ids)
+            inline_print("     %3d%% %6d examples, %4d examples/s" % (
+                progress * 100,
                 example_cntr,
                 example_cntr - last_inline_print_cnt
             ))
             last_inline_print_cnt = example_cntr
+
 
         if (example_cntr - last_valid) >= valid_after:
             inline_print("")
