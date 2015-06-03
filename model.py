@@ -89,36 +89,40 @@ class Model(NeuralModel):
             self._lstm_input = theano.function(input_args, prev_layer.output())
 
         # Forward LSTM layer.
-        logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
-        lstm_args = dict(name="lstm",
-                               size=n_cells,
-                               seq_output=True,
-                               out_cells=False,
-                               peepholes=lstm_peepholes,
-                               p_drop=p_drop,
-                               enable_branch_exp=enable_branch_exp)
-        lstm_connect_args = [prev_layer]
+        assert rnn_n_layers > 0
+        for i in range(rnn_n_layers):
+            logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
+            lstm_args = dict(name="lstm%d" % i,
+                                   size=n_cells,
+                                   seq_output=True,
+                                   out_cells=False,
+                                   peepholes=lstm_peepholes,
+                                   p_drop=p_drop,
+                                   enable_branch_exp=enable_branch_exp)
+            lstm_connect_args = [prev_layer]
 
-        if lstm_type == 'ngram':
-            lstm_cls = NGramLSTM
-        elif lstm_type == 'vanilla':
-            lstm_cls = LstmRecurrent
-        elif lstm_type == 'with_conf':
-            lstm_cls = LstmWithConfidence
-            lstm_args.update(update_thresh=lstm_update_thresh)
-            lstm_connect_args.append(x_conf)
-        else:
-            raise Exception('Unknown LSTM type: %s' % lstm_type)
+            if lstm_type == 'ngram':
+                lstm_cls = NGramLSTM
+            elif lstm_type == 'vanilla':
+                lstm_cls = LstmRecurrent
+            elif lstm_type == 'with_conf':
+                lstm_cls = LstmWithConfidence
+                lstm_args.update(update_thresh=lstm_update_thresh)
+                lstm_connect_args.append(x_conf)
+            else:
+                raise Exception('Unknown LSTM type: %s' % lstm_type)
 
-        lstm_layer = lstm_cls(**lstm_args)
-        lstm_layer.connect(*lstm_connect_args)
+            lstm_layer = lstm_cls(**lstm_args)
+            lstm_layer.connect(*lstm_connect_args)
+
+            prev_layer = lstm_layer
 
         if debug:
             self._lstm_output = theano.function(input_args,
                                                 [prev_layer.output(),
                                                  lstm_layer.output()])
 
-        prev_layer = lstm_layer
+        #prev_layer = lstm_layer
 
         assert prev_layer is not None
 
