@@ -101,7 +101,7 @@ class DataBuilder(object):
     def __init__(self, slots, slot_groups, based_on, include_base_seqs,
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
               score_bins, debug_dir, tagged, ontology, no_label_weight,
-              concat_whole_nbest, split_dialogs):
+              concat_whole_nbest, include_whole_nbest, split_dialogs):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -115,6 +115,7 @@ class DataBuilder(object):
         self.debug_dir = debug_dir
         self.tagged = tagged
         self.concat_whole_nbest = concat_whole_nbest
+        self.include_whole_nbest = include_whole_nbest
         self.split_dialogs = split_dialogs
         if tagged:
             self.tagger = Tagger()
@@ -214,42 +215,57 @@ class DataBuilder(object):
             else:
                 ## TODO: Hack.
                 if not actor_is_system:
-                    msg, msg_score = msgs[1]
-                    wcn = map(lambda x: ([x], [msg_score]), msg.split())
-
-                #import ipdb; ipdb.set_trace()
-                if not actor_is_system and False:
-                    wcn = []
-                    for msg, msg_score in msgs[1:2]:
-
-                        words = msg.split()
-                        n_tokens = len(words)
-
-                        if n_tokens > 0:
-                            word_score = np.power(np.exp(msg_score), 1.0 / n_tokens)
-
-                            for i, word in enumerate(words):
-                                if len(wcn) < i + 1:
-                                    wcn.append(collections.defaultdict(float))
-
-                                wcn[i][word] += word_score
-                        else:
-                            for item in wcn:
-                                item['#NOTHING'] += np.exp(msg_score)
-
-                    for cn in wcn:
-                        for k in cn.keys():
-                            if cn[k] > 0:
-                                cn[k] = np.log(cn[k])
-                            else:
-                                cn[k] = -50000.0
-
-                    wcn = map(lambda x: zip(*x.items()), wcn)
-
+                    if self.concat_whole_nbest:
+                        msgs, msg_scores = self._flatten_nbest_list(actor_is_system, msgs)
+                        wcn = self._msgs_to_wcn_full(msgs, msg_scores)
+                    else:
+                        msg, msg_score = msgs[1]
+                        wcn = map(lambda x: ([x], [msg_score]), tokenize(msg))
 
                 self._process_wcn(wcn, state, last_state, actor, seq,
                                   true_msg)
             last_state = state
+
+    def _msgs_to_wcn(self, msgs, msg_scores):
+        wcn = map(lambda x: ([x], [msg_scores[0]]), tokenize(msgs[0]))
+        curr_words = set(tokenize(msgs[0]))
+        for msg, score in zip(msgs, msg_scores)[1:]:
+            for word in tokenize(msg):
+                if not word in curr_words:
+                    wcn.insert(0, ([word], [score]))
+                    curr_words.add(word)
+
+
+        if False:
+            print '>>>>>>>>>>>>'
+            for msg, score in zip(msgs, msg_scores):
+                print '    ', '%.2f' % score, msg
+            print ''
+            for word, score in wcn:
+                print '%.2f' % score[0], word[0]
+            print ''
+            print ''
+        return wcn
+
+    def _msgs_to_wcn_full(self, msgs, msg_scores):
+        wcn = []
+        for i, (msg, score) in enumerate(reversed(zip(msgs, msg_scores))):
+            wcn.append((['#h%d' % i], [1.0]))
+            for word in tokenize(msg):
+                wcn.append(([word], [score]))
+
+        if False:
+            print '>>>>>>>>>>>>'
+            for msg, score in zip(msgs, msg_scores):
+                print '    ', '%.2f' % score, msg
+            print ''
+            for word, score in wcn:
+                print '%.2f' % score[0], word[0]
+            print ''
+            print ''
+        return wcn
+
+
 
     def _dump_seq_info(self, seq):
         self.f_dump_text.write('\nSEQ:')

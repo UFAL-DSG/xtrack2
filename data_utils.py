@@ -50,7 +50,7 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, builder_opts, builder_type, use_wcn, ngrams,
-                       concat_whole_nbest, split_dialogs):
+                       concat_whole_nbest, include_whole_nbest, split_dialogs):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -89,6 +89,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             ontology=ontology,
             debug_dir=debug_dir,
             concat_whole_nbest=concat_whole_nbest,
+            include_whole_nbest=include_whole_nbest,
             split_dialogs=split_dialogs and dataset == 'train',
             **builder_opts
         )

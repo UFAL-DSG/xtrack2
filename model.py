@@ -267,6 +267,8 @@ class Model(NeuralModel):
                 data.append(new_words)
                 data_score.append(new_scores)
 
+            #import ipdb; ipdb.set_trace()
+
             x.append(data)
             x_score.append(data_score)
             x_actor.append(item['data_actor'])

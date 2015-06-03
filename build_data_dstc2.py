@@ -6,8 +6,8 @@ import data_utils
 import xtrack2_config
 
 
-def main(builder_type, only_slot, tagged, concat_whole_nbest, use_wcn, ngrams,
-         split_dialogs, e_name):
+def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
+         use_wcn, ngrams, split_dialogs, e_name):
     import utils
     utils.pdb_on_error()
 
@@ -82,6 +82,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, use_wcn, ngrams,
         use_wcn=use_wcn,
         ngrams=ngrams,
         concat_whole_nbest=concat_whole_nbest,
+        include_whole_nbest=include_whole_nbest,
         split_dialogs=split_dialogs
     )
 
@@ -97,6 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--tagged', action='store_true', default=False)
     parser.add_argument('--ngrams', default=None)
     parser.add_argument('--concat_whole_nbest', action='store_true', default=False)
+    parser.add_argument('--include_whole_nbest', action='store_true', default=False)
     parser.add_argument('--use_wcn', action='store_true', default=False)
     parser.add_argument('--split_dialogs', action='store_true', default=False)
     parser.add_argument('--e_name', default='xx')
