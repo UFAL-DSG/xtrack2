@@ -606,11 +606,15 @@ def main(args_lst,
     def recreate_minibatches():
         seqs = list(xtd_t.sequences)
         seqs = seqs * mb_mult_data
-        random.shuffle(seqs)
+        #random.shuffle(seqs)
+        seqs.sort(key=lambda x: len(x['data']))
         minibatches = prepare_minibatches(seqs, mb_size, model, slots)
         minibatches = zip(itertools.count(), minibatches)
         mb_ids = range(len(minibatches))
         mb_to_go = []
+
+        for mb in minibatches:
+            print mb[1][0].shape[0]
 
         return minibatches, mb_ids, mb_to_go
 
@@ -642,7 +646,7 @@ def main(args_lst,
     while True:
         if len(mb_to_go) == 0:
             logging.info('Recreating minibatches.')
-            minibatches, mb_ids, mb_to_go = recreate_minibatches()
+            #minibatches, mb_ids, mb_to_go = recreate_minibatches()
             logging.info('Batches recreated.')
             mb_to_go = list(mb_ids)
             epoch += 1
