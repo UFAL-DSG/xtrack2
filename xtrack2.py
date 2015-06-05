@@ -688,12 +688,13 @@ def main(args_lst,
         mb_done += 1
 
         if time.time() - last_inline_print > 1.0:
+            diff = time.time() - last_inline_print
             last_inline_print = time.time()
             progress = 1 - len(mb_to_go) * 1.0 / len(mb_ids)
             inline_print("     %3d%% %6d examples, %4d examples/s" % (
                 progress * 100,
                 example_cntr,
-                example_cntr - last_inline_print_cnt
+                (example_cntr - last_inline_print_cnt) / diff
             ))
             last_inline_print_cnt = example_cntr
 
