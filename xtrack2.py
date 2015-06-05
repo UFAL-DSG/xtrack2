@@ -602,21 +602,27 @@ def main(args_lst,
     best_tracking_acc = 0.0
     n_valid_not_increased = 0
     et = None
-    seqs = list(xtd_t.sequences)
-    seqs = seqs * mb_mult_data
-    random.shuffle(seqs)
-    minibatches = prepare_minibatches(seqs, mb_size, model, slots)
-    minibatches = zip(itertools.count(), minibatches)
+
+    def recreate_minibatches():
+        seqs = list(xtd_t.sequences)
+        seqs = seqs * mb_mult_data
+        random.shuffle(seqs)
+        minibatches = prepare_minibatches(seqs, mb_size, model, slots)
+        minibatches = zip(itertools.count(), minibatches)
+        mb_ids = range(len(minibatches))
+        mb_to_go = []
+
+        return minibatches, mb_ids, mb_to_go
+
+    minibatches, mb_ids, mb_to_go = recreate_minibatches()
+
     minibatches_valid = minibatches[:int(len(minibatches) * 1.0 / 20)]
     logging.info('We have %d minibatches.' % len(minibatches))
 
     example_cntr = 0
     timestep_cntr = 0
     stats = TrainingStats()
-    mb_histogram = defaultdict(int)
-    mb_ids = range(len(minibatches))
-    mb_to_go = []
-    mb_bad = []
+
 
     epoch = 0
 
@@ -625,7 +631,7 @@ def main(args_lst,
     logging.info('Initial valid loss: %.10f' % init_valid_loss)
 
     if not valid_after:
-        valid_after = len(seqs)
+        valid_after = len(xtd_t.sequences)
 
     mb_loss = {}
     last_valid = 0
@@ -635,6 +641,9 @@ def main(args_lst,
     best_params = model.dump_params()
     while True:
         if len(mb_to_go) == 0:
+            logging.info('Recreating minibatches.')
+            minibatches, mb_ids, mb_to_go = recreate_minibatches()
+            logging.info('Batches recreated.')
             mb_to_go = list(mb_ids)
             epoch += 1
 
@@ -654,7 +663,6 @@ def main(args_lst,
 
         #mb_id, mb_data = random.choice(minibatches)
         mb_id, mb_data = minibatches[mb_ndx]
-        mb_histogram[mb_ndx] += 1
         #if et is not None:
         #    epoch_time = time.time() - et
         #else:
@@ -781,7 +789,7 @@ def build_argument_parser():
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--p_drop', default=0.0, type=float)
     parser.add_argument('--opt_type', default='sgd', type=str)
-    parser.add_argument('--mb_size', default=16, type=int)
+    parser.add_argument('--mb_size', default=1, type=int)
     parser.add_argument('--mb_mult_data', default=1, type=int)
     parser.add_argument('--l1', default=0.0, type=float)
     parser.add_argument('--l2', default=0.0, type=float)
