@@ -1,4 +1,5 @@
 import collections
+import itertools
 import json
 import logging
 import os
@@ -101,7 +102,8 @@ class DataBuilder(object):
     def __init__(self, slots, slot_groups, based_on, include_base_seqs,
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
               score_bins, debug_dir, tagged, ontology, no_label_weight,
-              concat_whole_nbest, include_whole_nbest, split_dialogs):
+              concat_whole_nbest, include_whole_nbest, split_dialogs,
+              sample_subdialogs):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -117,6 +119,7 @@ class DataBuilder(object):
         self.concat_whole_nbest = concat_whole_nbest
         self.include_whole_nbest = include_whole_nbest
         self.split_dialogs = split_dialogs
+        self.sample_subdialogs = sample_subdialogs
         if tagged:
             self.tagger = Tagger()
         else:
@@ -138,15 +141,18 @@ class DataBuilder(object):
         for dialog_ndx, dialog in enumerate(dialogs):
             #self.f_dump_text.write('> %s\n' % dialog.session_id)
 
-            seq = self._create_seq(dialog)
+            for n in self.nth_best:
+                for i in range(1 + self.sample_subdialogs):
+                    seq = self._create_seq(dialog)
 
-            if use_wcn:
-                self._process_dialog_wcn(dialog, seq)
-            else:
-                self._process_dialog(dialog, seq)
-            self._perform_sanity_checks(seq)
-            self._append_seq_if_nonempty(seq)
-            n_labels += len(seq.labels)
+                    if use_wcn:
+                        self._process_dialog_wcn(dialog, seq, i > 0, n)
+                    else:
+                        assert self.sample_subdialogs == 0
+                        self._process_dialog(dialog, seq)
+                    self._perform_sanity_checks(seq)
+                    self._append_seq_if_nonempty(seq)
+                    n_labels += len(seq.labels)
 
             #self._dump_seq_info(seq)
             #self.f_dump_text.write('\n')
@@ -199,17 +205,53 @@ class DataBuilder(object):
                                   true_msg)
             last_state = state
 
-    def _process_dialog_wcn(self, dialog, seq):
+    def _process_dialog_wcn(self, dialog, seq, random_subdialog, nth_best):
         last_state = None
 
-        for wcn, msgs, state, actor in zip(dialog.wcn,
-                                           dialog.messages,
-                                           dialog.states,
-                                           dialog.actors):
+        n_messages = len(dialog.wcn)
+        n_turns = n_messages / 2
+        if not random_subdialog:
+            i_from = 0
+            i_to = n_messages
+        else:
+            i_from = random.randint(0, n_turns - 1) * 2
+            i_to = (random.randint(i_from / 2, n_turns - 1) + 1) * 2
+            i_from, i_to = min(i_from, i_to), max(i_from, i_to)
+
+        indices = slice(i_from, i_to)
+
+
+        diff_state = None
+        if i_from > 0:
+            diff_state = dialog.states[i_from - 1]
+
+        #logging.info(str((i_from, i_to)) + " " + str(diff_state))
+        slots_mentioned_so_far = set()
+        for i, wcn, msgs, state, actor, slots_mentioned in zip(itertools.count(),
+                                              dialog.wcn,
+                                              dialog.messages,
+                                              dialog.states,
+                                              dialog.actors,
+                                              dialog.slots_mentioned)[indices]:
             actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
 
             true_msg, _ = msgs[0]
+            #logging.info('orig: %s' % state)
+            if diff_state:
+                state = dict(state)
 
+                for slot in slots_mentioned:
+                    if slot in diff_state:
+                        del diff_state[slot]
+
+                for slot in diff_state:
+                    if slot in state:
+                        del state[slot]
+
+
+            slots_mentioned_so_far.update(slots_mentioned)
+
+            #logging.info(state)
             if not self.include_system_utterances and actor_is_system:
                 continue
             else:
@@ -219,11 +261,11 @@ class DataBuilder(object):
                         msgs, msg_scores = self._flatten_nbest_list(actor_is_system, msgs)
                         wcn = self._msgs_to_wcn_full(msgs, msg_scores)
                     else:
-                        msg, msg_score = msgs[1]
+                        msg, msg_score = msgs[nth_best]
                         wcn = map(lambda x: ([x], [msg_score]), tokenize(msg))
 
                 self._process_wcn(wcn, state, last_state, actor, seq,
-                                  true_msg)
+                                  true_msg, list(slots_mentioned_so_far))
             last_state = state
 
     def _msgs_to_wcn(self, msgs, msg_scores):
@@ -249,8 +291,8 @@ class DataBuilder(object):
 
     def _msgs_to_wcn_full(self, msgs, msg_scores):
         wcn = []
-        for i, (msg, score) in enumerate(zip(msgs, msg_scores)):
-            wcn.append((['#h%d' % i], [1.0]))
+        for i, (msg, score) in enumerate(reversed(zip(msgs, msg_scores))):
+            wcn.append((['#h%d' % i], [0.0]))
             for word in tokenize(msg):
                 wcn.append(([word], [score]))
 
@@ -302,7 +344,7 @@ class DataBuilder(object):
         if actor == data_model.Dialog.ACTOR_USER:
             self._append_label_to_seq(seq, state)
 
-    def _process_wcn(self, wcn, state, last_state, actor, seq, true_msg):
+    def _process_wcn(self, wcn, state, last_state, actor, seq, true_msg, slots_mentioned):
         for i, words in enumerate(wcn):
             if self.word_drop_p > random.random():
                 continue
@@ -314,7 +356,7 @@ class DataBuilder(object):
 
         seq.true_input.append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:
-            self._append_label_to_seq(seq, state)
+            self._append_label_to_seq(seq, state, slots_mentioned)
 
     def _append_wcn_to_seq(self, actor, words, seq, state):
         tokens, token_scores = words
@@ -406,11 +448,12 @@ class DataBuilder(object):
         else:
             return token
 
-    def _append_label_to_seq(self, seq, state):
+    def _append_label_to_seq(self, seq, state, slots_mentioned):
         label = {
             'time': len(seq.data) - 1,
             #'score': np.exp(msg_score),
-            'slots': {}
+            'slots': {},
+            'slots_mentioned': slots_mentioned
         }
         if self.no_label_weight:
             label['score'] = 1.0

@@ -20,4 +20,5 @@ python dstc_scripts/score.py \
     --scorefile ${SCORE_FILE}
 
 python dstc_scripts/report.py --scorefile ${SCORE_FILE}
-rm $SCORE_FILE
+#rm $SCORE_FILE
+echo $SCORE_FILE

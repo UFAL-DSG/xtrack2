@@ -7,7 +7,7 @@ import xtrack2_config
 
 
 def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
-         use_wcn, ngrams, split_dialogs, e_name):
+         use_wcn, ngrams, split_dialogs, sample_subdialogs, e_name):
     import utils
     utils.pdb_on_error()
 
@@ -67,7 +67,6 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         }
         experiment_name += "_%s" % only_slot
 
-
     data_utils.prepare_experiment(
         experiment_name=experiment_name,
         data_directory=xtrack2_config.data_directory,
@@ -83,13 +82,17 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         ngrams=ngrams,
         concat_whole_nbest=concat_whole_nbest,
         include_whole_nbest=include_whole_nbest,
-        split_dialogs=split_dialogs
+        split_dialogs=split_dialogs,
+        sample_subdialogs=sample_subdialogs
     )
 
     print experiment_name
 
 
 if __name__ == '__main__':
+    import utils
+    utils.init_logging('BuildDataDSTC2')
+
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -102,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_wcn', action='store_true', default=False)
     parser.add_argument('--split_dialogs', action='store_true', default=False)
     parser.add_argument('--e_name', default='xx')
+    parser.add_argument('--sample_subdialogs', type=int, default=0)
 
     args = parser.parse_args()
     main(**vars(args))

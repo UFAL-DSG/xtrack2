@@ -392,7 +392,7 @@ class LstmRecurrent(Layer):
             g_i += c_tm1 * p_vec_i
 
         g_f = self.gate_act(g_f)
-        g_i = self.gate_act(g_i)
+        g_i = self.modul_act(g_i)
         g_m = self.modul_act(g_m)
 
         c_t = g_f * c_tm1 + g_i * g_m
