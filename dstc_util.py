@@ -97,6 +97,38 @@ class Turn(object):
             slot_normaliser: instance of a normaliser with normalise method
 
         """
+        mact = []
+        if "dialog-acts" in turn["output"] :
+            mact = turn["output"]["dialog-acts"]
+        this_slot = None
+        for act in mact :
+            if act["act"] in ["request"]:
+                this_slot = act["slots"][0][1]
+            elif act["act"] in ["expl-conf", "select"]:
+                this_slot = act["slots"][0][0]
+        # return a dict of informable slots to mentioned values in a turn
+        out = defaultdict(set)
+        for act in mact :
+            if "conf" in act["act"]  :
+                for slot, value in act["slots"] :
+                    out[slot].add(value)
+
+
+        for slu_hyp in turn["input"]["live"]["slu-hyps"] :
+            for act in slu_hyp["slu-hyp"] :
+                for slot, value in act["slots"] :
+                    if slot == "this" :
+                        slot = this_slot
+
+                    out[slot].add(value)
+
+        if 'slot' in out:
+            for val in out['slot']:
+                out['req_%s' % val] = True
+            del out['slot']
+
+        self.slots_mentioned = out.keys()
+
         self.turn_index = turn['turn-index']
         self.transcription = ''
 

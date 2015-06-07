@@ -128,6 +128,7 @@ class Model(NeuralModel):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
+        y_masks = tt.imatrix()
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
@@ -137,7 +138,7 @@ class Model(NeuralModel):
 
         costs = []
         predictions = []
-        for slot in slots:
+        for i, slot in enumerate(slots):
             logging.info('Building output classifier for %s.' % slot)
             n_classes = len(slot_classes[slot])
             slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
@@ -149,10 +150,11 @@ class Model(NeuralModel):
             pred = slot_mlp.output(dropout_active=False)
             predictions.append(pred)
 
-            slot_objective = CrossEntropyObjective()
+            slot_objective = WeightedCrossEntropyObjective()
             slot_objective.connect(
                 y_hat_layer=slot_mlp,
-                y_true=y_label[slot]
+                y_true=y_label[slot],
+                y_weights=y_masks[:, i]
             )
             costs.append(slot_objective)
 
@@ -171,18 +173,18 @@ class Model(NeuralModel):
         cost_value = cost.output(dropout_active=True)
 
         lr = tt.scalar('lr')
-        clipnorm = 5.0
+        clip = 5.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr, clipnorm=clipnorm)
             model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
-            updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
+            updater = updates.SGD(lr=lr, clipnorm=clip, regularizer=reg)
         elif opt_type == "rmsprop":
             updater = updates.RMSprop(lr=lr, clipnorm=clipnorm, regularizer=reg)  #, regularizer=reg)
         elif opt_type == "adam":
             #reg = updates.Regularizer(maxnorm=5.0)
-            updater = updates.Adam(lr=lr, clipnorm=clipnorm, regularizer=reg)  #,
+            updater = updates.Adam(lr=lr, clip=clip, regularizer=reg)  #,
             # regularizer=reg)
         elif opt_type == "momentum":
             updater = updates.Momentum(lr=lr, momentum=momentum, clipnorm=clipnorm, regularizer=reg)
@@ -190,7 +192,7 @@ class Model(NeuralModel):
             raise Exception("Unknonw opt.")
 
         loss_args = list(input_args)
-        loss_args += [y_seq_id, y_time]
+        loss_args += [y_seq_id, y_time, y_masks]
         loss_args += [y_label[slot] for slot in slots]
 
         if build_train:
@@ -225,8 +227,8 @@ class Model(NeuralModel):
     def init_word_embeddings(self, w):
         self.input_emb.set_value(w)
 
-    def prepare_data_train(self, seqs, slots, debug_data=False):
-        return self._prepare_data(seqs, slots, with_labels=True, debug_data=debug_data)
+    def prepare_data_train(self, seqs, slots, debug_data=False, dense_labels=False):
+        return self._prepare_data(seqs, slots, with_labels=True, debug_data=debug_data, dense_labels=dense_labels)
 
     def prepare_data_predict(self, seqs, slots):
         return self._prepare_data(seqs, slots, with_labels=False)
@@ -239,7 +241,7 @@ class Model(NeuralModel):
 
         return [token_padding]
 
-    def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False):
+    def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False, dense_labels=False):
         x = []
         x_score = []
         x_actor = []
@@ -247,6 +249,7 @@ class Model(NeuralModel):
         y_time = []
         y_labels = [[] for slot in slots]
         y_weights = []
+        y_masks = []
         wcn_cnt = 5
         for item in seqs:
             data = []
@@ -279,7 +282,27 @@ class Model(NeuralModel):
 
             labels = item['labels']
 
+            prev_y_time = 0
             for label in labels:
+                if dense_labels:
+                    for i in range(prev_y_time, label['time']):
+                        y_seq_id.append(len(x) - 1)
+                        y_seq_id.append(len(x) - 1)
+                        y_time.append(i)
+                        y_time.append(i)
+                        for i, slot in enumerate(slots):
+                            if prev_y_time == 0:
+                                y_labels[i].append(0)
+                            else:
+                                y_labels[i].append(y_labels[i][-1])
+
+                            lbl_val = label['slots'][slot]
+                            if lbl_val < 0:
+                                lbl_val = len(self.slot_classes[slot]) + lbl_val
+                            y_labels[i].append(lbl_val)
+
+                    prev_y_time = label['time'] + 1
+
                 y_seq_id.append(len(x) - 1)
                 y_time.append(label['time'])
 
@@ -289,6 +312,14 @@ class Model(NeuralModel):
                         lbl_val = len(self.slot_classes[slot]) + lbl_val
                     y_labels[i].append(lbl_val)
                 y_weights.append(label['score'])
+
+                y_mask = []
+                for i, slot in enumerate(slots):
+                    if slot in label['slots_mentioned']:
+                        y_mask.append(1)
+                    else:
+                        y_mask.append(0)
+                y_masks.append(y_mask)
 
 
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
@@ -303,6 +334,7 @@ class Model(NeuralModel):
 
         data.extend([y_seq_id, y_time])
         if with_labels:
+            data.append(y_masks)
             data.extend(y_labels)
 
         return tuple(data)

@@ -240,7 +240,7 @@ def prepare_minibatches(seqs, mb_size, model, slots):
     minibatches = []
     seqs_mb = iter_data(seqs, size=mb_size)
     for mb in seqs_mb:
-        data = model.prepare_data_train(mb, slots)
+        data = model.prepare_data_train(mb, slots, dense_labels=False)
         minibatches.append(data)
 
     return minibatches
@@ -585,7 +585,7 @@ def main(args_lst,
     #return
 
     valid_data_y = model.prepare_data_train(xtd_v.sequences, slots, debug_data)
-    valid_data = model.prepare_data_predict(xtd_v.sequences, slots)
+    #valid_data = model.prepare_data_predict(xtd_v.sequences, slots)
     if not eval_on_full_train:
         selected_train_seqs = []
         for i in range(100):
@@ -594,11 +594,11 @@ def main(args_lst,
     else:
         selected_train_seqs = xtd_t.sequences
 
-    train_data = model.prepare_data_train(selected_train_seqs, slots)
+    #train_data = model.prepare_data_train(selected_train_seqs, slots)
 
     joint_slots = ['joint_%s' % str(grp) for grp in class_groups.keys()]
-    best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
-    best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
+    #best_acc = {slot: 0 for slot in xtd_v.slots + joint_slots}
+    #best_acc_train = {slot: 0 for slot in xtd_v.slots + joint_slots}
     best_tracking_acc = 0.0
     n_valid_not_increased = 0
     et = None
@@ -613,8 +613,8 @@ def main(args_lst,
         mb_ids = range(len(minibatches))
         mb_to_go = []
 
-        for mb in minibatches:
-            print mb[1][0].shape[0]
+        #for mb in minibatches:
+        #    print mb[1][0].shape[0]
 
         return minibatches, mb_ids, mb_to_go
 
@@ -645,9 +645,9 @@ def main(args_lst,
     best_params = model.dump_params()
     while True:
         if len(mb_to_go) == 0:
-            logging.info('Recreating minibatches.')
+            #logging.info('Recreating minibatches.')
             #minibatches, mb_ids, mb_to_go = recreate_minibatches()
-            logging.info('Batches recreated.')
+            #logging.info('Batches recreated.')
             mb_to_go = list(mb_ids)
             epoch += 1
 

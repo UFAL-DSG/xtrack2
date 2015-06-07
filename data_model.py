@@ -10,14 +10,16 @@ class Dialog(object):
         self.wcn = []
         self.states = []  # Each message has one state.
         self.actors = []  # Each message has an actor id associated.
+        self.slots_mentioned = []
         self.object_id = object_id
         self.session_id = session_id
 
-    def add_message(self, text, wcn, state, actor):
+    def add_message(self, text, wcn, state, actor, slots_mentioned):
         self.messages.append(text)
         self.states.append(state)
         self.actors.append(actor)
         self._add_wcn(wcn)
+        self.slots_mentioned.append(slots_mentioned)
 
     def _add_wcn(self, wcn):
         new_wcn = []

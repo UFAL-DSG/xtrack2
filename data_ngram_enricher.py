@@ -75,7 +75,7 @@ class DataNGramEnricher:
                         ngrams[tuple(curr_ngram)] += 1
 
                         #print map({val: key for key, val in d['vocab'].iteritems()}.__getitem__, curr_ngram)
-
+                self._rm_spurious(ngrams, d['vocab'])
             hist = self._build_cummul(ngrams)
 
             thresh = 0
@@ -92,6 +92,13 @@ class DataNGramEnricher:
                     res.append(ngram)
 
         return set(res)
+
+    def _rm_spurious(self, ngrams, vocab):
+        vocab_rev = {v: k for k, v in vocab.iteritems()}
+        for key in ngrams.keys():
+            for w in key:
+                if vocab_rev[w].startswith('#'):
+                    del ngrams[key]
 
     def _add_ngrams(self, data, ngram_map):
         max_ngram_order = max(len(x) for x in ngram_map)

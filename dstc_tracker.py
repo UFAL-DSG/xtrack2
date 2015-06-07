@@ -223,10 +223,11 @@ class XTrack2DSTCTracker(object):
                 turns.append(out)
                 pred_ptr += 1
 
-                if not self._label_empty(lbl['slots']) or state_component_mentioned:
-                    state_component_mentioned = True
+                #if not self._label_empty(lbl['slots']) or state_component_mentioned:
+                #    state_component_mentioned = True
 
-                    for group, slots in self.slot_groups.iteritems():
+                for group, slots in self.slot_groups.iteritems():
+                    if set(slots).intersection(lbl['slots_mentioned']):
                         if goals_correct[group]:
                             accuracy[group] += 1
                             len_accuracy[last_pos][group] += 1

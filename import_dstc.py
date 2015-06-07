@@ -292,7 +292,8 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
             out_dialog.add_message([(msg, 0.0)],
                                    _prepare_sys_wcn(msg),
                                    last_state,
-                                   Dialog.ACTOR_SYSTEM)
+                                   Dialog.ACTOR_SYSTEM,
+                                   [])
 
 
             state = dict(turn.input.user_goal)
@@ -312,7 +313,8 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
                 user_messages,
                 turn.input.batch_asr_wcn,
                 state,
-                Dialog.ACTOR_USER
+                Dialog.ACTOR_USER,
+                turn.slots_mentioned
             )
 
             last_state = state  #turn.input.user_goal

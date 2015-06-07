@@ -82,7 +82,7 @@ class SGD(Update):
         grads = T.grad(cost, params)
         self.grads = grads
         assert self.clip == 0.0
-        #grads = [T.clip(g, -self.clip, self.clip) for g in grads]
+        grads = [T.clip(g, -self.clip, self.clip) for g in grads]
         grads = clip_norms(grads, self.clipnorm)
         for p, g in zip(params, grads):
             #g = self.regularizer.gradient_regularize(p, g)
@@ -163,17 +163,20 @@ class RMSprop(Update):
 
 class Adam(Update):
 
-    def __init__(self, lr=0.0002, b1=0.1, b2=0.001, e=1e-8, *args, **kwargs):
+    def __init__(self, lr=0.0002, b1=0.1, b2=0.001, e=1e-8, clip=0.0, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
         self.lr = lr
         self.b1 = b1
         self.b2 = b2
         self.e = e
+        self.clip = clip
+        self.clipnorm = clip
 
     def get_updates(self, params, cost):
         updates = []
         grads = T.grad(cost, params)
         grads = clip_norms(grads, self.clipnorm)
+        #grads = [T.clip(g, -self.clip, self.clip) for g in grads]
         i = theano.shared(floatX(0.))
         i_t = i + 1.
         fix1 = 1. - self.b1**(i_t)
@@ -185,7 +188,7 @@ class Adam(Update):
             m_t = (self.b1 * g) + ((1. - self.b1) * m)
             v_t = (self.b2 * T.sqr(g)) + ((1. - self.b2) * v)
             g_t = m_t / (T.sqrt(v_t) + self.e)
-            #g_t = self.regularizer.gradient_regularize(p, g_t)
+            g_t = self.regularizer.gradient_regularize(p, g_t)
             p_t = p - (lr_t * g_t)
             #p_t = self.regularizer.weight_regularize(p_t)
             updates.append((m, m_t))

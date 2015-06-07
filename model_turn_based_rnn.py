@@ -92,11 +92,16 @@ class TurnBasedRNNModel(NeuralModel):
 
         cost_value = cost.output(dropout_active=True)
 
-        assert opt_type == 'sgd'
         lr = tt.scalar('lr')
         clipnorm = 5.0
         reg = updates.Regularizer(l1=l1, l2=l2)
-        updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
+
+        if opt_type == 'sgd':
+            updater = updates.SGD(lr=lr, clipnorm=clipnorm, regularizer=reg)
+        elif opt_type == 'adam':
+            updater = updates.Adam(lr=lr, clip=clipnorm, regularizer=reg)
+        else:
+            assert False, 'unknown opt_type'
 
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time]
@@ -126,7 +131,8 @@ class TurnBasedRNNModel(NeuralModel):
         )
         logging.info('Done. Took: %.1f' % (time.time() - t))
 
-    def prepare_data_train(self, seqs, slots, debug_data=False):
+    def prepare_data_train(self, seqs, slots, debug_data=False, dense_labels=False):
+        assert dense_labels == False
         return self._prepare_data(seqs, slots, with_labels=True, debug_data=debug_data)
 
     def prepare_data_predict(self, seqs, slots):
@@ -148,6 +154,7 @@ class TurnBasedRNNModel(NeuralModel):
         y_weights = []
         for dlg in seqs:
             data = dlg['data']
+            data_score = dlg['data_score']
             labels = dlg['labels']
 
             turn_bounds = [-1] + [label['time'] for label in labels]
@@ -155,11 +162,15 @@ class TurnBasedRNNModel(NeuralModel):
             if type(data[0]) is list:
                 assert len(data[0]) == 1
                 data = [i[0] for i in data]
+                data_score = [i[0] for i in data_score]
 
             turns = []
             for turn_start, turn_end in zip(turn_bounds, turn_bounds[1:]):
                 turn_vec = np.zeros((len(self.vocab), ))
-                turn_vec[data[turn_start + 1:turn_end + 1]] = 1.0
+                data_points = zip(data[turn_start + 1:turn_end + 1], np.exp(data_score[turn_start + 1:turn_end + 1]))
+                for i, val in data_points:
+                    turn_vec[i] = max(val, turn_vec[i])
+
                 turns.append(turn_vec)
             x.append(turns)
 
