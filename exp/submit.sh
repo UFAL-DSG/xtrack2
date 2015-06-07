@@ -11,7 +11,7 @@ cfg_cnt=0
 while read cfg; do
     cfg_cnt=$((cfg_cnt+1))
     for i in $(seq 1 $2); do
-        eid=${EXPERIMENT_NAME}_cfg${cfg_cnt}_${i}
+        eid=${EXPERIMENT_NAME}_cfg$(printf "%02d" $cfg_cnt)_${i}
         echo Submitting $eid
 
         STDOUT_LOCATION=${EXPERIMENT_OUT}/${eid}.stdout.txt

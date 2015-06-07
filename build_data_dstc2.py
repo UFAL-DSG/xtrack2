@@ -63,7 +63,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
     if only_slot:
         slots = [only_slot]
         slot_groups = {
-            'food': ['food'],
+            only_slot: [only_slot],
         }
         experiment_name += "_%s" % only_slot
 

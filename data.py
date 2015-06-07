@@ -249,7 +249,7 @@ class DataBuilder(object):
 
     def _msgs_to_wcn_full(self, msgs, msg_scores):
         wcn = []
-        for i, (msg, score) in enumerate(reversed(zip(msgs, msg_scores))):
+        for i, (msg, score) in enumerate(zip(msgs, msg_scores)):
             wcn.append((['#h%d' % i], [1.0]))
             for word in tokenize(msg):
                 wcn.append(([word], [score]))

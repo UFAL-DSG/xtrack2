@@ -157,7 +157,7 @@ class Model(NeuralModel):
         grad_vector = updater.get_grad_vector()
         self._train = theano.function(
             [x, y] + lstm_init_states,
-            [loss_value, grad_norm, grad_vector, update_ratio] + lstm_final_states,
+            [loss_value, grad_norm, update_ratio] + lstm_final_states,
             updates=model_updates
         )
 
@@ -271,20 +271,18 @@ def main(train, valid, final_params, seq_length, mb_size,
                 x = x[:, :y.shape[1]]
                 #init_states = [i[:y.shape[1], :] for i in init_states]
             train_res = model._train(x, y, *init_states)
-            loss, dw_norm, dw, ur = train_res[:4]
-            init_states = train_res[4:]
+            loss, dw_norm, ur = train_res[:3]
+            init_states = train_res[3:]
             #init_states = [x[-1, :, :] for x in train_res[2:]]
             loss /= np.prod(x.shape)
             logging.info('epoch(%2d) pos(%5d) loss(%.4f) ratio(%.5f) dw(%.5f) %d%%' %
                         (epoch, pos, loss, ur, dw_norm, pos * 100.0 / data_train_x.shape[1])
             )
-            logging.info('   %.4f %.4f %s' % (dw.min(), dw.max(), dw[:10]))
 
             pos += seq_length
 
-        #model.gradchecks()
-        #if epoch > 6:
-        #    model.set_lr(model.get_lr() / 1.2)
+        if epoch > 4:
+            model.set_lr(model.get_lr() / 2.0)
 
     import ipdb; ipdb.set_trace()
 

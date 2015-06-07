@@ -17,10 +17,13 @@ for f in os.listdir(dir):
 vocab = None
 vocab_rev = None
 data = []
-for fname in param_files:
+for fname in sorted(param_files)[-30:]:
     with open(fname) as f_in:
         print 'loading', fname
-        fdata = cPickle.load(f_in)
+        try:
+            fdata = cPickle.load(f_in)
+        except EOFError:
+            print 'could not!'
 
         if not vocab:
             vocab = fdata['init_args']['vocab']
@@ -43,5 +46,9 @@ varnorms = [np.linalg.norm(wordvar) for wordvar in var]
 
 
 for word_id in list(reversed(np.argsort(varnorms)))[:100]:
+    varnorm = varnorms[word_id]
+    print "%30s\t%.4f" % (vocab_rev[word_id], varnorm, )
+print '...'
+for word_id in list(reversed(np.argsort(varnorms)))[-100:]:
     varnorm = varnorms[word_id]
     print "%30s\t%.4f" % (vocab_rev[word_id], varnorm, )
