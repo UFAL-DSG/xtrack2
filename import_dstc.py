@@ -240,6 +240,9 @@ def _stringify_act(acts):
     for act in acts:
         if len(act.slots) > 0:
             for slot_name, slot_value in act.slots:
+                # HACK: Ignore all count system acts.
+                if slot_name == "count":
+                    continue
                 res.append(act.act)
                 res.append(slot_name)
                 res.append(slot_value.replace(' ', '_'))

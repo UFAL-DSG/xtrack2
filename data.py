@@ -145,11 +145,8 @@ class DataBuilder(object):
                 for i in range(1 + self.sample_subdialogs):
                     seq = self._create_seq(dialog)
 
-                    if use_wcn:
-                        self._process_dialog_wcn(dialog, seq, i > 0, n)
-                    else:
-                        assert self.sample_subdialogs == 0
-                        self._process_dialog(dialog, seq)
+                    self._process_dialog_wcn(dialog, seq, i > 0, n, use_wcn)
+
                     self._perform_sanity_checks(seq)
                     self._append_seq_if_nonempty(seq)
                     n_labels += len(seq.labels)
@@ -187,25 +184,25 @@ class DataBuilder(object):
             return all_msgs, all_msg_scores
 
 
-    def _process_dialog(self, dialog, seq):
-        last_state = None
+    # def _process_dialog(self, dialog, seq):
+    #     last_state = None
+    #
+    #     for msgs, state, actor in zip(dialog.messages,
+    #                                   dialog.states,
+    #                                   dialog.actors):
+    #         actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
+    #
+    #         msg, msg_score = self._flatten_nbest_list(actor_is_system, msgs)
+    #         true_msg, _ = msgs[0]
+    #
+    #         if not self.include_system_utterances and actor_is_system:
+    #             continue
+    #         else:
+    #             self._process_msg(msg, msg_score, state, last_state, actor, seq,
+    #                               true_msg)
+    #         last_state = state
 
-        for msgs, state, actor in zip(dialog.messages,
-                                      dialog.states,
-                                      dialog.actors):
-            actor_is_system = actor == data_model.Dialog.ACTOR_SYSTEM
-
-            msg, msg_score = self._flatten_nbest_list(actor_is_system, msgs)
-            true_msg, _ = msgs[0]
-
-            if not self.include_system_utterances and actor_is_system:
-                continue
-            else:
-                self._process_msg(msg, msg_score, state, last_state, actor, seq,
-                                  true_msg)
-            last_state = state
-
-    def _process_dialog_wcn(self, dialog, seq, random_subdialog, nth_best):
+    def _process_dialog_wcn(self, dialog, seq, random_subdialog, nth_best, use_wcn):
         last_state = None
 
         n_messages = len(dialog.wcn)
@@ -255,14 +252,27 @@ class DataBuilder(object):
             if not self.include_system_utterances and actor_is_system:
                 continue
             else:
-                ## TODO: Hack.
-                if not actor_is_system:
-                    if self.concat_whole_nbest:
-                        msgs, msg_scores = self._flatten_nbest_list(actor_is_system, msgs)
-                        wcn = self._msgs_to_wcn_full(msgs, msg_scores)
-                    else:
-                        msg, msg_score = msgs[nth_best]
-                        wcn = map(lambda x: ([x], [msg_score]), tokenize(msg))
+                if not use_wcn:
+                    if not actor_is_system:
+                        if self.concat_whole_nbest:
+                            msgs, msg_scores = self._flatten_nbest_list(actor_is_system, msgs)
+                            wcn = self._msgs_to_wcn_full(msgs, msg_scores)
+                        else:
+                            msg, msg_score = msgs[nth_best]
+                            wcn = map(lambda x: ([x], [msg_score]), tokenize(msg))
+
+                # if not actor_is_system:
+                #     msg, score = msgs[1]
+                #
+                #     for word in msg.split():
+                #         somewhere = False
+                #         for words in wcn:
+                #             if word in words[0]:
+                #                 somewhere = True
+                #
+                #         if not somewhere:
+                #             #import ipdb; ipdb.set_trace()
+                #             print word
 
                 self._process_wcn(wcn, state, last_state, actor, seq,
                                   true_msg, list(slots_mentioned_so_far))
@@ -316,33 +326,33 @@ class DataBuilder(object):
             self.f_dump_text.write('%s ' % token_str)
         self.f_dump_text.write('\n')
 
-    def _process_msg(self, msgs, msgs_score, state, last_state, actor, seq,
-                     true_msg):
-
-        if type(msgs) in (str, unicode, ):
-            msgs = (msgs, )
-            msgs_score = (msgs_score, )
-
-        for msg, msg_score in zip(msgs, msgs_score):
-            #msg_score_bin = self.xd.get_score_bin(msg_score)
-            token_seq = self._tokenize_msg(actor, msg)
-            self._dump_msg_info(last_state, msg_score, msg_score, state,
-                                token_seq, true_msg)
-
-            for i, token in enumerate(token_seq):
-                if self.word_drop_p > random.random():
-                    continue
-
-                self.word_freq[token] += 1
-
-                if random.random() < self.oov_ins_p:
-                    token = '#OOV'
-
-                self._append_token_to_seq(actor, msg_score, seq, token, state)
-
-        seq.true_input.append(true_msg)
-        if actor == data_model.Dialog.ACTOR_USER:
-            self._append_label_to_seq(seq, state)
+    # def _process_msg(self, msgs, msgs_score, state, last_state, actor, seq,
+    #                  true_msg):
+    #
+    #     if type(msgs) in (str, unicode, ):
+    #         msgs = (msgs, )
+    #         msgs_score = (msgs_score, )
+    #
+    #     for msg, msg_score in zip(msgs, msgs_score):
+    #         #msg_score_bin = self.xd.get_score_bin(msg_score)
+    #         token_seq = self._tokenize_msg(actor, msg)
+    #         self._dump_msg_info(last_state, msg_score, msg_score, state,
+    #                             token_seq, true_msg)
+    #
+    #         for i, token in enumerate(token_seq):
+    #             if self.word_drop_p > random.random():
+    #                 continue
+    #
+    #             self.word_freq[token] += 1
+    #
+    #             if random.random() < self.oov_ins_p:
+    #                 token = '#OOV'
+    #
+    #             self._append_token_to_seq(actor, msg_score, seq, token, state)
+    #
+    #     seq.true_input.append(true_msg)
+    #     if actor == data_model.Dialog.ACTOR_USER:
+    #         self._append_label_to_seq(seq, state)
 
     def _process_wcn(self, wcn, state, last_state, actor, seq, true_msg, slots_mentioned):
         for i, words in enumerate(wcn):
@@ -352,7 +362,17 @@ class DataBuilder(object):
             if random.random() < self.oov_ins_p:
                 token = '#OOV'
 
-            self._append_wcn_to_seq(actor, words, seq, state)
+            wcn = []
+            for word, word_p in zip(*words):
+                if word_p > -100 and word != '<s>':  # and word != 'ah' and word != 'uh' and word != 'uh':
+                    wcn.append((word, word_p))
+
+            if wcn:
+                if len(wcn) == 1 and wcn[0][0] == '!null':
+                    continue
+
+                wcn = tuple(zip(*wcn))
+                self._append_wcn_to_seq(actor, wcn, seq, state)
 
         seq.true_input.append(true_msg)
         if actor == data_model.Dialog.ACTOR_USER:

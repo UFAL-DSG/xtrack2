@@ -399,7 +399,7 @@ def get_extreme_examples(mb_loss, minibatches, xtd_t):
 def main(args_lst,
          eid, experiment_path, out, valid_after,
          load_params, save_params,
-         debug, debug_data, debug_theano, track_log,
+         debug, debug_data, debug_theano, track_log, track_log_test,
          n_cells, emb_size, x_include_score, no_train_emb,
          n_epochs, lr, lr_anneal_factor, opt_type, momentum,
          n_early_stopping, early_stopping_group,
@@ -447,6 +447,9 @@ def main(args_lst,
 
     valid_path = os.path.join(experiment_path, 'dev.json')
     xtd_v = Data.load(valid_path)
+
+    test_path = os.path.join(experiment_path, 'test.json')
+    xtd_s = Data.load(test_path)
 
     slots = xtd_t.slots
     classes = xtd_t.classes
@@ -582,6 +585,7 @@ def main(args_lst,
 
     tracker_valid = XTrack2DSTCTracker(xtd_v, [model])
     tracker_train = XTrack2DSTCTracker(xtd_t, [model])
+    tracker_test = XTrack2DSTCTracker(xtd_s, [model])
 
     #model.visualize(xtd_v.sequences, slots)
     #return
@@ -629,6 +633,13 @@ def main(args_lst,
     timestep_cntr = 0
     stats = TrainingStats()
 
+    def test_model():
+        _, test_track_score = tracker_test.track(track_log_test)
+        for group, accuracy in sorted(test_track_score.iteritems(),
+                                  key=lambda (g, _): g):
+            logging.info('Test acc %15s: %10.2f %%'
+                         % (group, accuracy * 100))
+
 
     epoch = 0
 
@@ -638,6 +649,10 @@ def main(args_lst,
 
     if not valid_after:
         valid_after = len(xtd_t.sequences)
+
+    if load_params:
+        logging.info('Running test.')
+        test_model()
 
     mb_loss = {}
     last_valid = 0
@@ -660,6 +675,8 @@ def main(args_lst,
                 lr = lr / lr_anneal_factor
                 logging.info('New learning rate: %.5f' % lr)
                 model.push_params(best_params)
+
+                test_model()
 
             if lr < 0.000001:
                 break
@@ -842,6 +859,7 @@ def build_argument_parser():
     parser.add_argument('--debug_theano', default=False,
                         action='store_true')
     parser.add_argument('--track_log', default='track_log.txt', type=str)
+    parser.add_argument('--track_log_test', default='track_log_test.txt', type=str)
     parser.add_argument('--eval_on_full_train', default=False,
                         action='store_true')
 

@@ -51,7 +51,7 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, builder_opts, builder_type, use_wcn, ngrams,
                        concat_whole_nbest, include_whole_nbest, split_dialogs,
-                       sample_subdialogs):
+                       sample_subdialogs, nth_best):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -85,7 +85,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             oov_ins_p=0.1 if dataset == 'train' else 0.0,
             word_drop_p=0.0,
             include_system_utterances=True,
-            nth_best=[1], #[0, 1, 2, 3] if dataset == 'train' else [1],
+            nth_best=nth_best if dataset == 'train' else [1],
             score_bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.01],
             ontology=ontology,
             debug_dir=debug_dir,

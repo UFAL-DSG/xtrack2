@@ -7,7 +7,8 @@ import xtrack2_config
 
 
 def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
-         use_wcn, ngrams, split_dialogs, sample_subdialogs, e_name):
+         use_wcn, ngrams, split_dialogs, sample_subdialogs, train_nbest_entries,
+         e_name):
     import utils
     utils.pdb_on_error()
 
@@ -45,7 +46,12 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
     if concat_whole_nbest:
         experiment_name += '_nbest'
     else:
-        experiment_name += '_1best'
+        if train_nbest_entries:
+            nth_best=map(int, train_nbest_entries.split(','))
+            experiment_name += '_%sbest' % ("n".join(map(str, nth_best)), )
+        else:
+            nth_best = [1]
+            experiment_name += '_1best'
 
     if use_wcn:
         experiment_name += '_wcn'
@@ -83,7 +89,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         concat_whole_nbest=concat_whole_nbest,
         include_whole_nbest=include_whole_nbest,
         split_dialogs=split_dialogs,
-        sample_subdialogs=sample_subdialogs
+        sample_subdialogs=sample_subdialogs,
+        nth_best=nth_best
     )
 
     print experiment_name
@@ -106,6 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('--split_dialogs', action='store_true', default=False)
     parser.add_argument('--e_name', default='xx')
     parser.add_argument('--sample_subdialogs', type=int, default=0)
+    parser.add_argument('--train_nbest_entries', type=str, default="1")
 
     args = parser.parse_args()
     main(**vars(args))
