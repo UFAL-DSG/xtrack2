@@ -411,7 +411,8 @@ def main(args_lst,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
          x_include_mlp, enable_token_supervision, model_type,
-         mlp_n_hidden, mlp_n_layers, mlp_activation
+         mlp_n_hidden, mlp_n_layers, mlp_activation,
+         use_loss_mask
 
          ):
 
@@ -485,6 +486,7 @@ def main(args_lst,
                       input_n_hidden=input_n_hidden,
                       input_activation=input_activation,
                       token_features=None,
+                      use_loss_mask=use_loss_mask,
                       enable_branch_exp=enable_branch_exp,
                       token_supervision=enable_token_supervision,
                       l1=l1,
@@ -827,6 +829,9 @@ def build_argument_parser():
     parser.add_argument('--lstm_peepholes', default=False,
                         action='store_true')
     parser.add_argument('--lstm_bidi', default=False,
+                        action='store_true')
+
+    parser.add_argument('--use_loss_mask', default=False,
                         action='store_true')
 
 

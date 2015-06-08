@@ -28,7 +28,7 @@ class Model(NeuralModel):
                  debug, p_drop,
                  init_emb_from, vocab,
                  input_n_layers, input_n_hidden, input_activation,
-                 token_features, token_supervision,
+                 token_features, token_supervision, use_loss_mask,
                  momentum, enable_branch_exp, l1, l2, build_train=True):
         args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
         self.init_args = {}
@@ -135,6 +135,9 @@ class Model(NeuralModel):
 
         cpt = CherryPick()
         cpt.connect(prev_layer, y_time, y_seq_id)
+
+        if not use_loss_mask:
+            y_masks = y_masks * 0 + 1
 
         costs = []
         predictions = []
