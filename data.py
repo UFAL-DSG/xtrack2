@@ -103,7 +103,7 @@ class DataBuilder(object):
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
               score_bins, debug_dir, tagged, ontology, no_label_weight,
               concat_whole_nbest, include_whole_nbest, split_dialogs,
-              sample_subdialogs):
+              sample_subdialogs, tag_only):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -116,6 +116,7 @@ class DataBuilder(object):
         self.nth_best = nth_best
         self.debug_dir = debug_dir
         self.tagged = tagged
+        self.tag_only = tag_only
         self.concat_whole_nbest = concat_whole_nbest
         self.include_whole_nbest = include_whole_nbest
         self.split_dialogs = split_dialogs
@@ -252,7 +253,7 @@ class DataBuilder(object):
             if not self.include_system_utterances and actor_is_system:
                 continue
             else:
-                if not use_wcn:
+                if not use_wcn or nth_best == 0:
                     if not actor_is_system:
                         if self.concat_whole_nbest:
                             msgs, msg_scores = self._flatten_nbest_list(actor_is_system, msgs)
@@ -276,6 +277,7 @@ class DataBuilder(object):
 
                 self._process_wcn(wcn, state, last_state, actor, seq,
                                   true_msg, list(slots_mentioned_so_far))
+
             last_state = state
 
     def _msgs_to_wcn(self, msgs, msg_scores):
@@ -364,14 +366,18 @@ class DataBuilder(object):
 
             wcn = []
             for word, word_p in zip(*words):
-                if word_p > -100 and word != '<s>':  # and word != 'ah' and word != 'uh' and word != 'uh':
+                if word_p > -100 and word != '<s>' and word != '</s>':  # and word != 'ah' and word != 'uh' and word != 'uh':
                     wcn.append((word, word_p))
 
             if wcn:
                 if len(wcn) == 1 and wcn[0][0] == '!null':
                     continue
 
+                wcn.sort(key=lambda x: -x[1])
+                if wcn[0][0] == '!null': # Ignore times when null is the best.
+                    continue
                 wcn = tuple(zip(*wcn))
+
                 self._append_wcn_to_seq(actor, wcn, seq, state)
 
         seq.true_input.append(true_msg)
@@ -414,38 +420,39 @@ class DataBuilder(object):
         self.f_dump_cca.write(get_cca_y(token_seq, state, last_state))
         self.f_dump_cca.write('\n')
 
-    def _tokenize_msg(self, actor, msg):
-        msg = msg.lower()
-        if self.tagged:
-            msg = self._make_input_tagged(msg)
+    # def _tokenize_msg(self, actor, msg):
+    #     msg = msg.lower()
+    #     if self.tagged:
+    #         msg = self._make_input_tagged(msg)
+    #
+    #
+    #     token_seq = list(tokenize(msg))
+    #
+    #     if actor == data_model.Dialog.ACTOR_SYSTEM:
+    #         token_seq = ["@%s" % token for token in token_seq]
+    #
+    #     if not token_seq:
+    #         token_seq = ['#NOTHING']
+    #
+    #     return token_seq
+    #
+    # def _make_input_tagged(self, msg):
+    #     for slot, slot_values in self.xd.classes.iteritems():
+    #         for slot_value in slot_values:
+    #             if slot_value in self.tag_only:
+    #                 msg = msg.replace(self.tagger.denormalize_slot_value(
+    #                     slot_value), slot_value)
+    #     return msg
 
 
-        token_seq = list(tokenize(msg))
 
-        if actor == data_model.Dialog.ACTOR_SYSTEM:
-            token_seq = ["@%s" % token for token in token_seq]
-
-        if not token_seq:
-            token_seq = ['#NOTHING']
-
-        return token_seq
-
-    def _make_input_tagged(self, msg):
-        for slot, slot_values in self.xd.classes.iteritems():
-            for slot_value in slot_values:
-                msg = msg.replace(self.tagger.denormalize_slot_value(
-                    slot_value), slot_value)
-        return msg
-
-
-
-    def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
-        token_ndx = self._get_token_ndx(actor, seq, token)
-
-        seq.data.append(token_ndx)
-        seq.data_score.append(msg_score_bin)
-        seq.data_actor.append(actor)
-        seq.data_debug.append(token)
+    # def _append_token_to_seq(self, actor, msg_score_bin, seq, token, state):
+    #     token_ndx = self._get_token_ndx(actor, seq, token)
+    #
+    #     seq.data.append(token_ndx)
+    #     seq.data_score.append(msg_score_bin)
+    #     seq.data_actor.append(actor)
+    #     seq.data_debug.append(token)
 
     def _get_token_ndx(self, actor, seq, token):
         token_ndx = self.xd.get_token_ndx(token)
@@ -459,6 +466,9 @@ class DataBuilder(object):
         return token_ndx
 
     def _tag_token(self, token, seq):
+        if not token in self.tag_only:
+            return token
+
         tag = self.xd.tag_token(token)
         if tag:
             if not token in seq.tags[tag]:

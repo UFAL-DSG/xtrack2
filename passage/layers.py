@@ -87,6 +87,44 @@ class ZipLayer(object):
         return set(flatten([layer.get_params() for layer in self.layers]))
 
 
+class FlattenLayer(object):
+    def __init__(self, last_dim, n_times):
+        self.last_dim = last_dim
+        self.n_times = n_times
+
+    def connect(self, layer):
+        self.layer = layer
+        self.size = layer.size * self.n_times
+
+    def output(self, dropout_active=False):
+        x = self.layer.output(dropout_active=dropout_active)
+        res = T.flatten(x, self.last_dim)
+        return T.cast(res, dtype=theano.config.floatX)
+
+    def get_params(self):
+        return self.layer.get_params()
+
+
+class ReshapeLayer(object):
+    def __init__(self, *new_shape):
+        assert type(new_shape[-1]) is int
+        self.new_shape = new_shape
+
+    def connect(self, layer):
+        self.layer = layer
+        self.size = self.new_shape[-1]
+
+    def output(self, dropout_active=False):
+        x = self.layer.output(dropout_active=dropout_active)
+
+        res = T.reshape(x, self.new_shape)
+
+        return T.cast(res, dtype=theano.config.floatX)
+
+    def get_params(self):
+        return self.layer.get_params()
+
+
 class Broadcast(object):
     def __init__(self, n_times):
         self.n_times = n_times

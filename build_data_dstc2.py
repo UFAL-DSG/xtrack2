@@ -24,19 +24,20 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
             method=dstc_ontology['method']
         )
 
-    slots = ['food', 'area', 'pricerange', 'name', 'method', 'req_food',
-             'req_area', 'req_pricerange', 'req_name', 'req_phone',
-             'req_addr', 'req_postcode', 'req_signature']
+    slots = ['food', 'area', 'pricerange', 'name', ]
+            #'method', 'req_food',
+            # 'req_area', 'req_pricerange', 'req_name', 'req_phone',
+            # 'req_addr', 'req_postcode', 'req_signature']
 
     slot_groups = dict(
         food=['food'],
         area=['area'],
         pricerange=['pricerange'],
         name=['name'],
-        method=['method'],
+        #method=['method'],
         goals=['food', 'area', 'pricerange', 'name'],
-        requested=['req_food', 'req_area', 'req_pricerange', 'req_name',
-                   'req_phone', 'req_addr', 'req_postcode', 'req_signature']
+        #requested=['req_food', 'req_area', 'req_pricerange', 'req_name',
+        #           'req_phone', 'req_addr', 'req_postcode', 'req_signature']
     )
 
     experiment_name = e_name
@@ -45,6 +46,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
 
     if concat_whole_nbest:
         experiment_name += '_nbest'
+        nth_best=None
     else:
         if train_nbest_entries:
             nth_best=map(int, train_nbest_entries.split(','))
@@ -81,7 +83,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         ontology=ontology,
         builder_opts=dict(
             tagged=tagged,
-            no_label_weight=True
+            no_label_weight=True,
+            tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse',], # 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican']
         ),
         builder_type=builder_type,
         use_wcn=use_wcn,

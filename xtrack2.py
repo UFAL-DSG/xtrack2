@@ -268,91 +268,6 @@ def visualize_mb(model, mb):
     #print_mb(xtd_v, prediction_valid)
 
 
-def eval_model(model, slots, classes, xtd_t, xtd_v, train_data, valid_data,
-               class_groups,
-               best_acc, best_acc_train, tracker_valid, tracker_train,
-               track_log):
-    prediction_valid = model._predict(*valid_data)
-    import ipdb; ipdb.set_trace()
-    visualize_prediction(xtd_v, prediction_valid)
-
-    eval_train = train_data is not None
-
-    if eval_train:
-        prediction_train = model._predict(*train_data)
-        pass
-    else:
-        prediction_train = None
-
-    logging.info('Results:')
-    for group_name, slot_selection in class_groups.iteritems():
-        joint_slot_name = 'joint_%s' % str(group_name)
-        if eval_train:
-            train_conf_mats = compute_stats(slots, slot_selection, classes,
-                                        prediction_train,
-                                        train_data['y_labels'],
-                                        joint_slot_name)
-
-        valid_conf_mats = compute_stats(slots, slot_selection, classes,
-                                        prediction_valid,
-                                        valid_data['y_labels'], joint_slot_name)
-
-        for slot in slot_selection + [joint_slot_name]:
-            p = P()
-            p.tab(3)
-            p.print_out(slot)
-            p.tab(15)
-            acc = int(valid_conf_mats[slot].accuracy() * 100)
-            best_acc[slot] = max(best_acc[slot], acc)
-            p.print_out("%d (best %d)" % (acc, best_acc[slot]))
-            if eval_train:
-                p.tab(30)
-                acc = int(train_conf_mats[slot].accuracy() * 100)
-                best_acc_train[slot] = max(best_acc_train[slot], acc)
-                p.print_out("%d (%d)" % (acc, best_acc_train[slot]))
-            logging.info(p.render())
-
-            cmat = valid_conf_mats[slot].mat
-            if eval_train:
-                cmat_train = train_conf_mats[slot].mat
-            else:
-                cmat_train = None
-
-
-            if slot != joint_slot_name:
-                slot_classes = classes[slot]
-            else:
-                slot_classes = {'correct': 1, 'incorrect': 0}
-            #slot_classes_rev = {v: k for k, v in slot_classes.iteritems()}
-
-            for cls_name, i in sorted(slot_classes.iteritems()):
-                p, r, total_i = compute_prt(cmat, i)
-                pp = P()
-                pp.tab(4)
-                pp.print_out("%10s P(%3d) R(%3d) Total(%4d)" % (cls_name[:10],
-                                                     int(p),
-                                                     int(r),
-                                                     total_i))
-                if eval_train:
-                    p, r, total_i = compute_prt(cmat_train, i)
-                    pp.tab(43)
-                    pp.print_out("%10s P(%3d) R(%3d) Total(%4d)" % (cls_name[:10],
-                                                         int(p),
-                                                         int(r),
-                                                         total_i))
-                logging.info(pp.render())
-
-
-    _, accuracy = tracker_valid.track(tracking_log_file_name=track_log)
-    logging.info('Tracking accuracy: %d (valid)' % int(accuracy * 100))
-
-    #if eval_train:
-    #_, accuracy_train = tracker_train.track(
-    #    tracking_log_file_name=track_log + ".train")
-    #logging.info('Tracking accuracy: %d (train)' % int(accuracy_train *
-    # 100))
-
-    return accuracy
 
 class TrainingStats(object):
     def __init__(self):
@@ -412,7 +327,7 @@ def main(args_lst,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
          x_include_mlp, enable_token_supervision, model_type,
          mlp_n_hidden, mlp_n_layers, mlp_activation,
-         use_loss_mask
+         use_loss_mask, wcn_aggreg
 
          ):
 
@@ -427,7 +342,10 @@ def main(args_lst,
     )
 
     logging.info('XTrack has been started.')
-    logging.info('GIT rev: %s' % get_git_revision_hash())
+    try:
+        logging.info('GIT rev: %s' % get_git_revision_hash())
+    except:
+        logging.info('GIT rev: unknown')
     logging.info('Output dir: %s' % output_dir)
     logging.info('Initializing random seed to 0.')
     random.seed(0)
@@ -468,6 +386,7 @@ def main(args_lst,
                       x_include_score=x_include_score,
                       x_include_token_ftrs=x_include_token_ftrs,
                       x_include_mlp=x_include_mlp,
+                      wcn_aggreg=wcn_aggreg,
                       n_input_score_bins=n_input_score_bins,
                       n_cells=n_cells,
                       n_input_tokens=n_input_tokens,
@@ -652,7 +571,10 @@ def main(args_lst,
 
     if load_params:
         logging.info('Running test.')
-        test_model()
+        try:
+            test_model()
+        except Exception, e:
+            logging.error('Testing the model failed: %s' % e)
 
     mb_loss = {}
     last_valid = 0
@@ -676,7 +598,10 @@ def main(args_lst,
                 logging.info('New learning rate: %.5f' % lr)
                 model.push_params(best_params)
 
-                test_model()
+                try:
+                    test_model()
+                except Exception, e:
+                    logging.error('Testing the model failed: %s' % e)
 
             if lr < 0.000001:
                 break
@@ -820,6 +745,7 @@ def build_argument_parser():
 
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
+    parser.add_argument('--wcn_aggreg', default='flatten')
     parser.add_argument('--x_include_score', default=False, action='store_true')
     parser.add_argument('--x_include_token_ftrs', default=False,
                         action='store_true')

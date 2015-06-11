@@ -21,6 +21,7 @@ class Model(NeuralModel):
 
     def __init__(self, slots, slot_classes, emb_size, no_train_emb,
                  x_include_score, x_include_token_ftrs, x_include_mlp,
+                 wcn_aggreg,
                  n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
                  lstm_type, lstm_update_thresh, lstm_peepholes, lstm_bidi, opt_type,
@@ -46,17 +47,18 @@ class Model(NeuralModel):
         self._log_classes_info()
 
         x = T.itensor3(name='x')
-        x_conf = T.matrix(name='x_conf')
-        input_args = [x]
-        input_args.append(x_conf)
+        x_conf = T.tensor3(name='x_conf')
+        input_args = []
+        input_args.append(x)
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
-                                      input=x[:, :, 0],
+                                      input=x,
                                       static=no_train_emb)
         #input_token_layer = OneHot(name="emb",
         #                              n_features=n_input_tokens,
         #                              input=x[:, :, 0])
+        prev_layer = input_token_layer
         if init_emb_from:
             input_token_layer.init_from(init_emb_from, vocab)
             logging.info('Initializing token embeddings from: %s'
@@ -65,15 +67,13 @@ class Model(NeuralModel):
             logging.info('Initializing token embedding randomly.')
         #self.input_emb = input_token_layer.wv
 
-        prev_layer = input_token_layer
+        input_args.append(x_conf)
+        conf_layer = IdentityInput(x_conf[:, :, :, np.newaxis], 1)
+        prev_layer = ZipLayer(3, [conf_layer, prev_layer])
 
-        #self.x_include_score = x_include_score
-
-        #conf_layer = Dense(name="conf", size=1, activation='rectify')
-        #conf_layer.connect()
-        conf_layer = IdentityInput(x_conf[:, :, np.newaxis], 1)
-
-        prev_layer = ZipLayer(2, [conf_layer, prev_layer])
+        rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1] * x.shape[2], emb_size + 1)
+        rev_flat.connect(prev_layer)
+        prev_layer = rev_flat
 
         input_mlp_layer = MLP([input_n_hidden  ] * input_n_layers,
                               [input_activation] * input_n_layers,
@@ -82,6 +82,38 @@ class Model(NeuralModel):
         input_mlp_layer.connect(prev_layer)
         prev_layer = input_mlp_layer
 
+        reshape_back = ReshapeLayer(x.shape[0], x.shape[1], x.shape[2], input_n_hidden)
+        reshape_back.connect(prev_layer)
+        prev_layer = reshape_back
+
+        #logging.info("reshape_back size %d" % reshape_back.size)
+
+        if wcn_aggreg == 'flatten':
+            wcn_aggreg_layer = FlattenLayer(3, 5)
+            wcn_aggreg_layer.connect(prev_layer)
+            prev_layer = wcn_aggreg_layer
+
+            wcn_out = Dense(name="wcn_out", size=emb_size, activation=input_activation)
+            wcn_out.connect(prev_layer)
+            prev_layer = wcn_out
+        elif wcn_aggreg == 'max':
+            wcn_aggreg_layer = MaxPooling("wcn_max", pool_dimension=2)
+            wcn_aggreg_layer.connect(prev_layer)
+            prev_layer = wcn_aggreg_layer
+        else:
+            assert False, "Unknown wcn_aggreg: %s" % wcn_aggreg
+
+        logging.info("wcn_aggreg size %d" % prev_layer.size)
+
+        #flat_wcn_out = ReshapeLayer(x.shape[0] * x.shape[1], 5 * input_n_hidden)
+        #flat_wcn_out.connect(prev_layer)
+        #prev_layer = flat_wcn_out
+
+
+
+        #flat_wcn_out_rev = ReshapeLayer(x.shape[0], x.shape[1], emb_size)
+        #flat_wcn_out_rev.connect(prev_layer)
+        #prev_layer = flat_wcn_out_rev
 
         logging.info('There are %d input layers.' % input_n_layers)
 
@@ -326,7 +358,7 @@ class Model(NeuralModel):
 
 
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
-        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)[:, :, 0]
+        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2) #[:, :, 0]
 
         if debug_data:
             import ipdb; ipdb.set_trace()

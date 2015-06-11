@@ -82,7 +82,7 @@ class SGD(Update):
         grads = T.grad(cost, params)
         self.grads = grads
         assert self.clip == 0.0
-        grads = [T.clip(g, -self.clip, self.clip) for g in grads]
+        #grads = [T.clip(g, -self.clip, self.clip) for g in grads]
         grads = clip_norms(grads, self.clipnorm)
         for p, g in zip(params, grads):
             #g = self.regularizer.gradient_regularize(p, g)
