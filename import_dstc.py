@@ -303,6 +303,7 @@ def import_dstc(data_dir, out_dir, flist, constraint_slots,
 
             state['method'] = (turn.input.method if turn.input.method != 'none'
                                                  else None)
+
             for slot in requestable_slots:
                 if slot in turn.input.requested_slots:
                     state['req_%s' % slot] = '@_yes'

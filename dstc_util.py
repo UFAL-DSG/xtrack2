@@ -122,6 +122,27 @@ class Turn(object):
 
                     out[slot].add(value)
 
+        mact = turn["output"]["dialog-acts"]
+        for slu_hyp in turn["input"]["live"]["slu-hyps"] :
+            user_act = slu_hyp["slu-hyp"]
+
+            method="none"
+            act_types = [act["act"] for act in user_act]
+            mact_types = [act["act"] for act in mact]
+            if "reqalts" in act_types :
+                method = "byalternatives"
+            elif "bye" in act_types :
+                method = "finished"
+            elif "inform" in act_types:
+                method = "byconstraints"
+                for act in [uact for uact in user_act if uact["act"] == "inform"] :
+                    slots = [slot for slot, _ in act["slots"]]
+                    if "name" in slots :
+                        method = "byname"
+
+            if method != 'none':
+                out['method'] = method
+
         if 'slot' in out:
             for val in out['slot']:
                 out['req_%s' % val] = True

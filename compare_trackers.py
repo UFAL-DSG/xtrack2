@@ -2,6 +2,8 @@ from collections import defaultdict
 import json
 import os
 
+import numpy as np
+
 
 from data import Data
 
@@ -19,6 +21,8 @@ def load_labels(flist_path, flist_root):
 
 def get_best_hypothesis(turn):
     food_vals = turn['goal-labels'].get('food', {'_null_': 1.0})
+    if not len(food_vals):
+        food_vals['_null_'] = 1.0
 
     v, p = sorted(food_vals.items(), key=lambda x: x[1])[-1]
     p_mass = sum(p for _, p in turn['goal-labels'].get('food', {}).items())
@@ -32,7 +36,8 @@ def get_best_hypothesis(turn):
 def main():
     #data_file = '/xdisk/data/dstc/xtrack/e2_food/valid.json'
     #data_file = '/xdisk/data/dstc/xtrack/e2dev/test.json'
-    data_file = '/xdisk/data/dstc/xtrack/e2_tagged_baseline/dev.json'
+    #data_file = '/xdisk/data/dstc/xtrack/e2_tagged_baseline/dev.json'
+    data_file = 'data/xtrack/e095_asru_tagged_0n1best_nowcn_xtrack/dev.json'
     data = Data.load(data_file)
     data.vocab_rev = {val: key for key, val in data.vocab.iteritems()}
 
@@ -47,10 +52,10 @@ def main():
         texts = []
         scores = []
         curr = []
-        for i, d in enumerate(seq['data']):
+        for i, (d, ds) in enumerate(zip(seq['data'], seq['data_score'])):
             curr.append(d) #data.vocab_rev[d])
             if i in labeling:
-                texts.append((0.0, str(curr)))
+                texts.append((np.exp(ds[0]), str(curr)))
                 #texts.append((0.0, " ".join(curr)))
                 curr = []
         assert len(curr) == 0
@@ -64,14 +69,16 @@ def main():
         #'/xdisk/data/dstc/dstc2/scripts/baseline_output.json',
         #'/xdisk/tmp/dstc2_results/team4/entry0.test.json',
         #'/xdisk/tmp/dstc2_results/team4/entry0.test.json'
-        '/tmp/trackb.json',
-        '/tmp/trackb.json',
+        #'/tmp/trackb.json',
+        #'/tmp/trackb.json',
+        'baseline_focus.json',
+        '/tmp/e095_asru.dev.goals.json'
 
     ]
 
-    flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_dev.flist'
+    flist_path = 'data/dstc2/scripts/config/dstc2_dev.flist'
     #flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_test.flist'
-    flist_root = '/xdisk/data/dstc/dstc2/data/'
+    flist_root = 'data/dstc2/data/'
 
     labels = load_labels(flist_path, flist_root)
 

@@ -108,7 +108,8 @@ def main(argv):
                     tracker_goal_labels[slot] = normalise_dist(tracker_goal_labels[slot].items(), (session_id, turn_num, "goal."+slot))
                 else :
                     tracker_goal_labels[slot] = [(None, 1.0)]
-            
+
+
             
             # prepare for joint goals scoring:
             tracker_goal_joint_labels = "independent"
@@ -119,7 +120,7 @@ def main(argv):
                 # tracker_goal_joint_labels must be a list of joint hyps
                 tracker_goal_joint_labels = [(hyp["slots"], hyp["score"]) for hyp in tracker_goal_joint_labels]
                 tracker_goal_joint_labels = normalise_dist(tracker_goal_joint_labels, (session_id, turn_num, "goal.joint"))
-            
+
             # also gather the correct joint label
             true_goal_joint = None
             for slot in label_turn["goal-labels"]:
@@ -184,7 +185,7 @@ def main(argv):
                         if schedule ==2 and len(S[slot]) == 0 :
                             continue
                         dist = tracker_goal_labels[slot]
-                        
+
                         true_label = None
                         if slot in label_turn["goal-labels"] :
                             true_label = label_turn["goal-labels"][slot]
@@ -193,7 +194,7 @@ def main(argv):
                             true_label = None
                             if slot in goal_labels_b[turn_num] :
                                 true_label = goal_labels_b[turn_num][slot]
-                            
+
                         stat_class.add(dist, true_label, (session_id, turn_num, component, schedule, label_scheme))
                 
                 
@@ -610,6 +611,8 @@ def tophyp_independent(dists) :
                 top_hyp = {}
             top_hyp[slot] = top
         top_score *= score
+
+
     return (top_hyp, top_score)
         
 

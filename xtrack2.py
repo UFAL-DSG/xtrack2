@@ -11,8 +11,8 @@ import theano.gradient
 import time
 
 theano.config.floatX = 'float32'
-#theano.config.allow_gc=False
-#theano.scan.allow_gc=False
+theano.config.allow_gc=False
+theano.scan.allow_gc=False
 #theano.config.profile=True
 #theano.config.mode = 'FAST_COMPILE'
 #theano.config.linker = 'py'
@@ -314,8 +314,8 @@ def get_extreme_examples(mb_loss, minibatches, xtd_t):
 def main(args_lst,
          eid, experiment_path, out, valid_after,
          load_params, save_params,
-         debug, debug_data, debug_theano, track_log, track_log_test,
-         n_cells, emb_size, x_include_score, no_train_emb,
+         debug, debug_data, debug_theano,
+         n_cells, emb_size, x_include_score, no_train_emb, ftr_emb_size, token_features,
          n_epochs, lr, lr_anneal_factor, opt_type, momentum,
          n_early_stopping, early_stopping_group,
          mb_size, mb_mult_data,
@@ -327,7 +327,8 @@ def main(args_lst,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
          x_include_mlp, enable_token_supervision, model_type,
          mlp_n_hidden, mlp_n_layers, mlp_activation,
-         use_loss_mask, wcn_aggreg
+         use_loss_mask, wcn_aggreg,
+         override_slots
 
          ):
 
@@ -369,7 +370,7 @@ def main(args_lst,
     test_path = os.path.join(experiment_path, 'test.json')
     xtd_s = Data.load(test_path)
 
-    slots = xtd_t.slots
+    slots = xtd_t.slots if not override_slots else override_slots.split(',')
     classes = xtd_t.classes
     class_groups = xtd_t.slot_groups
     n_input_tokens = len(xtd_t.vocab)
@@ -404,10 +405,12 @@ def main(args_lst,
                       p_drop=p_drop,
                       init_emb_from=init_emb_from,
                       vocab=xtd_t.vocab,
+                      vocab_ftr_map=xtd_t.vocab_ftrs,
+                      ftr_emb_size=ftr_emb_size,
                       input_n_layers=input_n_layers,
                       input_n_hidden=input_n_hidden,
                       input_activation=input_activation,
-                      token_features=None,
+                      token_features=token_features,
                       use_loss_mask=use_loss_mask,
                       enable_branch_exp=enable_branch_exp,
                       token_supervision=enable_token_supervision,
@@ -502,9 +505,9 @@ def main(args_lst,
         logging.info('Loading parameters from: %s' % load_params)
         model.load_params(load_params)
 
-    tracker_valid = XTrack2DSTCTracker(xtd_v, [model])
-    tracker_train = XTrack2DSTCTracker(xtd_t, [model])
-    tracker_test = XTrack2DSTCTracker(xtd_s, [model])
+    tracker_valid = XTrack2DSTCTracker(xtd_v, [model], slots)
+    tracker_train = XTrack2DSTCTracker(xtd_t, [model], slots)
+    tracker_test = XTrack2DSTCTracker(xtd_s, [model], slots)
 
     #model.visualize(xtd_v.sequences, slots)
     #return
@@ -552,7 +555,8 @@ def main(args_lst,
     timestep_cntr = 0
     stats = TrainingStats()
 
-    def test_model():
+    def test_model(i):
+        track_log_test = os.path.join(output_dir, 'track_log_test.%.10d.txt' % i)
         _, test_track_score = tracker_test.track(track_log_test)
         for group, accuracy in sorted(test_track_score.iteritems(),
                                   key=lambda (g, _): g):
@@ -572,7 +576,7 @@ def main(args_lst,
     if load_params:
         logging.info('Running test.')
         try:
-            test_model()
+            test_model(0)
         except Exception, e:
             logging.error('Testing the model failed: %s' % e)
 
@@ -593,17 +597,19 @@ def main(args_lst,
             if n_epochs > 0 and n_epochs < epoch:
                 break
 
-            if n_valid_not_increased >= n_early_stopping:
-                lr = lr / lr_anneal_factor
+            #if n_valid_not_increased >= n_early_stopping:
+            if epoch > n_early_stopping:
+                lr = lr * 0.95 #/ lr_anneal_factor
                 logging.info('New learning rate: %.5f' % lr)
+                n_valid_not_increased = 0
                 model.push_params(best_params)
 
                 try:
-                    test_model()
+                    test_model(epoch)
                 except Exception, e:
                     logging.error('Testing the model failed: %s' % e)
 
-            if lr < 0.000001:
+            if lr < 0.000001 or epoch > n_early_stopping + 10:
                 break
 
         mb_ndx = random.choice(mb_to_go)
@@ -646,8 +652,8 @@ def main(args_lst,
         if (example_cntr - last_valid) >= valid_after:
             inline_print("")
             last_valid = example_cntr
-            params_file = os.path.join(output_dir, 'params.%.10d.p' %
-                                       example_cntr)
+            params_file = os.path.join(output_dir, 'params.%.3d.p' %
+                                       epoch)
             logging.info('Saving parameters: %s' % params_file)
             model.save_params(params_file)
 
@@ -659,6 +665,7 @@ def main(args_lst,
             update_ratio = stats.mean('update_ratio')
 
             logging.info('Valid # of examples: %d' % len(valid_data_y[-1]))
+            track_log = os.path.join(output_dir, 'track_log.%.3d.txt' % epoch)
             _, track_score = tracker_valid.track(track_log)
 
             for group, accuracy in sorted(track_score.iteritems(),
@@ -731,7 +738,7 @@ def build_argument_parser():
 
     # XTrack params.
     parser.add_argument('--n_epochs', default=0, type=int)
-    parser.add_argument('--n_early_stopping', default=5, type=int)
+    parser.add_argument('--n_early_stopping', default=10, type=int)
     parser.add_argument('--early_stopping_group', default="goals", type=str)
     parser.add_argument('--lr', default=0.1, type=float)
     parser.add_argument('--lr_anneal_factor', default=2.0, type=float)
@@ -745,6 +752,7 @@ def build_argument_parser():
 
     parser.add_argument('--n_cells', default=5, type=int)
     parser.add_argument('--emb_size', default=7, type=int)
+    parser.add_argument('--ftr_emb_size', default=5, type=int)
     parser.add_argument('--wcn_aggreg', default='flatten')
     parser.add_argument('--x_include_score', default=False, action='store_true')
     parser.add_argument('--x_include_token_ftrs', default=False,
@@ -752,6 +760,8 @@ def build_argument_parser():
     parser.add_argument('--x_include_mlp', default=False, action='store_true')
     parser.add_argument('--init_emb_from', default=None, type=str)
     parser.add_argument('--no_train_emb', default=False, action='store_true')
+    parser.add_argument('--token_features', default=False,
+                        action='store_true')
 
     parser.add_argument('--input_n_hidden', default=32, type=int)
     parser.add_argument('--input_n_layers', default=0, type=int)
@@ -784,8 +794,8 @@ def build_argument_parser():
                         action='store_true')
     parser.add_argument('--debug_theano', default=False,
                         action='store_true')
-    parser.add_argument('--track_log', default='track_log.txt', type=str)
-    parser.add_argument('--track_log_test', default='track_log_test.txt', type=str)
+    #parser.add_argument('--track_log', default='track_log.txt', type=str)
+    #parser.add_argument('--track_log_test', default='track_log_test.txt', type=str)
     parser.add_argument('--eval_on_full_train', default=False,
                         action='store_true')
 
@@ -793,6 +803,8 @@ def build_argument_parser():
                         action='store_true')
     parser.add_argument('--enable_token_supervision', default=False,
                         action='store_true')
+
+    parser.add_argument('--override_slots', default=None)
 
     return parser
 

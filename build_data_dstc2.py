@@ -23,21 +23,21 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
             name=dstc_ontology['informable']['name'],
             method=dstc_ontology['method']
         )
+        ontology['method'].remove('none')
 
-    slots = ['food', 'area', 'pricerange', 'name', ]
-            #'method', 'req_food',
-            # 'req_area', 'req_pricerange', 'req_name', 'req_phone',
-            # 'req_addr', 'req_postcode', 'req_signature']
+    slots = ['food', 'area', 'pricerange', 'name', 'method', 'req_food',
+             'req_area', 'req_pricerange', 'req_name', 'req_phone',
+             'req_addr', 'req_postcode', 'req_signature']
 
     slot_groups = dict(
         food=['food'],
         area=['area'],
         pricerange=['pricerange'],
         name=['name'],
-        #method=['method'],
+        method=['method'],
         goals=['food', 'area', 'pricerange', 'name'],
-        #requested=['req_food', 'req_area', 'req_pricerange', 'req_name',
-        #           'req_phone', 'req_addr', 'req_postcode', 'req_signature']
+        requested=['req_food', 'req_area', 'req_pricerange', 'req_name',
+                   'req_phone', 'req_addr', 'req_postcode', 'req_signature']
     )
 
     experiment_name = e_name
@@ -69,11 +69,12 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
     experiment_name += '_%s' % builder_type
 
     if only_slot:
-        slots = [only_slot]
-        slot_groups = {
-            only_slot: [only_slot],
-        }
-        experiment_name += "_%s" % only_slot
+        slots = only_slot.split(',')
+        slot_groups = {}
+        for slot in slots:
+            slot_groups[slot] = [slot]
+        slot_groups['all'] = slots
+        experiment_name += "_%s" % only_slot.replace(',', '-')
 
     data_utils.prepare_experiment(
         experiment_name=experiment_name,
@@ -84,7 +85,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         builder_opts=dict(
             tagged=tagged,
             no_label_weight=True,
-            tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse',], # 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican']
+            tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse', 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican']
         ),
         builder_type=builder_type,
         use_wcn=use_wcn,

@@ -60,7 +60,8 @@ class Sequence(dict):
         self.data = []
         self.data_debug = []
         self.data_score = []
-        self.data_actor = []
+        #self.data_actor = []
+        self.ftrs = []
         self.labels = []
         self.tags = collections.defaultdict(list)
         self.true_input = []
@@ -74,7 +75,8 @@ class Sequence(dict):
         res.data = list(self.data[:t + 1])
         res.data_debug = list(self.data_debug[:t + 1])
         res.data_score = list(self.data_score[:t + 1])
-        res.data_actor = list(self.data_actor[:t + 1])
+        #res.data_actor = list(self.data_actor[:t + 1])
+        res.ftrs = list(self.data_ftrs[:t+1])
         res.tags = list(self.tags)
         res.true_input = list(self.true_input)
         res.labels = [dict(lbl)]
@@ -397,9 +399,15 @@ class DataBuilder(object):
             token_ndx = self._get_token_ndx(actor, seq, token)
             token_ndxs.append(token_ndx)
 
+        #ftrs = []
+        #for token in zip(tokens):
+        #    ftr = [actor] + self._get_token_ftrs(token)
+        #    ftrs.append(ftr)
+
         seq.data.append(token_ndxs)
         seq.data_score.append(token_scores)
-        seq.data_actor.append(actor)
+        #seq.data_actor.append(actor)
+        #seq.ftrs.append(ftrs)
         seq.data_debug.append(tokens)
 
     def _prefix_wcn_by(self, words, char):
@@ -543,13 +551,15 @@ class UnknownClassException(Exception):
 
 
 class Data(object):
-    attrs_to_save = ['sequences', 'vocab', 'classes', 'slots',
-                     'slot_groups', 'stats', 'score_bins', 'tagged']
+    attrs_to_save = ['sequences', 'vocab', 'vocab_ftrs', 'classes', 'slots',
+                     'slot_groups', 'stats', 'score_bins', 'tagged', 'ontology']
 
     null_class = '_null_'
     slots = None
     vocab = None
+    vocab_ftrs = None
     slot_groups = None
+    ontology = None
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -577,6 +587,7 @@ class Data(object):
         self.tagged = tagged
         self.vocab_rev = {}
         self.tagger = tagger
+        self.ontology = ontology
 
         if based_on:
             if type(based_on) is str:
@@ -584,6 +595,7 @@ class Data(object):
             else:
                 data = based_on
             self.vocab = data.vocab
+            self.vocab_ftrs = data.vocab_ftrs
             self.classes = data.classes
             self.vocab_fixed = True
             self.stats = data.stats
@@ -597,6 +609,11 @@ class Data(object):
                 "#NOTHING": 0,
                 "#EOS": 1,
                 "#OOV": 2,
+            }
+            self.vocab_ftrs = {
+                "#NOTHING": [],
+                "#EOS": [],
+                "#OOV": [],
             }
 
             self.vocab_fixed = False
@@ -619,10 +636,34 @@ class Data(object):
             if not self.vocab_fixed:
                 self.vocab[token] = res = len(self.vocab)
                 self.vocab_rev[self.vocab[token]] = token
+                self.vocab_ftrs[token] = self._get_token_ftrs(token)
                 return res
             else:
                 logging.warning('Mapping to OOV: %s' % token)
                 return self.vocab['#OOV']
+
+    def _get_token_ftrs(self, token):
+        res = []
+        ftr_id = 0
+        if token in ['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse', 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican']:
+            res.append(ftr_id)
+        ftr_id += 1
+        for slot, values in self.ontology.iteritems():
+            if slot == 'name':
+                continue
+
+            if slot in token:
+                res.append(ftr_id)
+            ftr_id += 1
+            for val in values:
+                is_in = False
+                for val in val.split():
+                    if val in token:
+                        is_in = True
+                if is_in:
+                    res.append(ftr_id)
+                ftr_id += 1
+        return res
 
     def tag_token(self, token):
         for cls, vals in self.classes.iteritems():
@@ -658,6 +699,7 @@ class Data(object):
             if slot_value:
                 if self.tagged:
                     slot_value = self.tagger.normalize_slot_value(slot_value)
+
                 res = self.get_value_index_for_slot(slot, slot_value)
             else:
                 res = self.classes[slot][self.null_class]

@@ -167,8 +167,8 @@ class BaselineModel(NeuralModel):
     def prepare_data_train(self, seqs, slots):
         return self._prepare_data(seqs, slots, with_labels=True)
 
-    def prepare_data_predict(self, seqs, slots):
-        return self._prepare_data(seqs, slots, with_labels=False)
+    def prepare_data_predict(self, seqs):
+        return self._prepare_data(seqs, [], with_labels=False)
 
     def _prepare_y_token_labels_padding(self):
         token_padding = []

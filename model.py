@@ -27,7 +27,7 @@ class Model(NeuralModel):
                  lstm_type, lstm_update_thresh, lstm_peepholes, lstm_bidi, opt_type,
                  oclf_n_hidden, oclf_n_layers, oclf_activation,
                  debug, p_drop,
-                 init_emb_from, vocab,
+                 init_emb_from, vocab, vocab_ftr_map, ftr_emb_size,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features, token_supervision, use_loss_mask,
                  momentum, enable_branch_exp, l1, l2, build_train=True):
@@ -47,31 +47,32 @@ class Model(NeuralModel):
         self._log_classes_info()
 
         x = T.itensor3(name='x')
-        x_conf = T.tensor3(name='x_conf')
         input_args = []
+        input_zip_layers = []
         input_args.append(x)
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
                                       input=x,
                                       static=no_train_emb)
-        #input_token_layer = OneHot(name="emb",
-        #                              n_features=n_input_tokens,
-        #                              input=x[:, :, 0])
-        prev_layer = input_token_layer
-        if init_emb_from:
-            input_token_layer.init_from(init_emb_from, vocab)
-            logging.info('Initializing token embeddings from: %s'
-                         % init_emb_from)
-        else:
-            logging.info('Initializing token embedding randomly.')
-        #self.input_emb = input_token_layer.wv
+        input_zip_layers.append(input_token_layer)
 
+        if token_features:
+            input_ftrs_layer = FeatureEmbedding(name="ftremb",
+                                                size=ftr_emb_size,
+                                                vocab=vocab,
+                                                vocab_ftr_map=vocab_ftr_map,
+                                                input=x)
+            input_zip_layers.append(input_ftrs_layer)
+
+        x_conf = T.tensor3(name='x_conf')
         input_args.append(x_conf)
-        conf_layer = IdentityInput(x_conf[:, :, :, np.newaxis], 1)
-        prev_layer = ZipLayer(3, [conf_layer, prev_layer])
+        input_conf_layer = IdentityInput(x_conf[:, :, :, np.newaxis], 1)
+        input_zip_layers.append(input_conf_layer)
 
-        rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1] * x.shape[2], emb_size + 1)
+        prev_layer = ZipLayer(3, input_zip_layers)
+
+        rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1] * x.shape[2], prev_layer.size)
         rev_flat.connect(prev_layer)
         prev_layer = rev_flat
 
@@ -140,7 +141,7 @@ class Model(NeuralModel):
             elif lstm_type == 'with_conf':
                 lstm_cls = LstmWithConfidence
                 lstm_args.update(update_thresh=lstm_update_thresh)
-                lstm_connect_args.append(x_conf)
+                lstm_connect_args.append(x_ftrs)
             else:
                 raise Exception('Unknown LSTM type: %s' % lstm_type)
 
@@ -265,8 +266,8 @@ class Model(NeuralModel):
     def prepare_data_train(self, seqs, slots, debug_data=False, dense_labels=False):
         return self._prepare_data(seqs, slots, with_labels=True, debug_data=debug_data, dense_labels=dense_labels)
 
-    def prepare_data_predict(self, seqs, slots):
-        return self._prepare_data(seqs, slots, with_labels=False)
+    def prepare_data_predict(self, seqs):
+        return self._prepare_data(seqs, [], with_labels=False)
 
     def _prepare_y_token_labels_padding(self):
         token_padding = []
@@ -279,7 +280,7 @@ class Model(NeuralModel):
     def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False, dense_labels=False):
         x = []
         x_score = []
-        x_actor = []
+        #x_ftrs = []
         y_seq_id = []
         y_time = []
         y_labels = [[] for slot in slots]
@@ -289,31 +290,33 @@ class Model(NeuralModel):
         for item in seqs:
             data = []
             data_score = []
+            #data_ftrs = []
+            #assert len(item['data']) == len(item['ftrs'])
             assert len(item['data']) == len(item['data_score'])
-            for words, scores in zip(item['data'], item['data_score']):
+            for words, score in zip(item['data'], item['data_score']): #, item['ftrs']):
                 new_words = []
-                new_scores = []
-                if type(words) is list:
-                    for word, score in sorted(zip(words, scores), key=lambda (w, s, ): -s)[:wcn_cnt]:
-                        new_words.append(word)
-                        new_scores.append(np.exp(score))
-                        #new_scores.append([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0][score])
+                new_score = []
+                #new_ftrs = []
+                assert type(words) is list
+                for word, word_score in sorted(zip(words, score), key=lambda (w, s, ): -s)[:wcn_cnt]:
+                    new_words.append(word)
+                    new_score.append(np.exp(word_score))
+                    #new_ftrs.append(word_ftrs)
 
-                    n_missing = max(0, wcn_cnt - len(words))
-                    new_words.extend(n_missing * [0])
-                    new_scores.extend(n_missing * [0.0])
-                else:
-                    new_words = [words]
-                    new_scores = [scores]
+                n_missing = max(0, wcn_cnt - len(words))
+                new_words.extend(n_missing * [0])
+                new_score.extend(n_missing * [1.0])
+                #new_ftrs.extend(n_missing * [[0] * len(ftrs[0])])
 
                 data.append(new_words)
-                data_score.append(new_scores)
+                data_score.append(new_score)
+                #data_ftrs.append(new_ftrs)
 
             #import ipdb; ipdb.set_trace()
 
             x.append(data)
             x_score.append(data_score)
-            x_actor.append(item['data_actor'])
+            #x_ftrs.append(data_ftrs)
 
             labels = item['labels']
 
@@ -358,7 +361,8 @@ class Model(NeuralModel):
 
 
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
-        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2) #[:, :, 0]
+        x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)
+        #x_ftrs = padded(x_ftrs, pad_by=[[[0.0] * len(x_ftrs[0][0][0])] * wcn_cnt]).transpose(1, 0, 2, 3) #[:, :, 0]
 
         if debug_data:
             import ipdb; ipdb.set_trace()
@@ -366,6 +370,7 @@ class Model(NeuralModel):
         data = [x]
         #if self.x_include_score:
         data.append(x_score)
+        #data.append(x_ftrs)
 
         data.extend([y_seq_id, y_time])
         if with_labels:

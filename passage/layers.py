@@ -259,6 +259,52 @@ class Embedding(Layer):
         self.wv.set_value(emb)
 
 
+class FeatureEmbedding(Layer):
+    def __init__(self, name=None, size=128, vocab=None, vocab_ftr_map=None, init=inits.normal,
+                 static=False, input=None):
+        assert vocab and vocab_ftr_map
+        if name:
+            self.name = name
+        self.init = init
+        self.size = size
+        ftrs = set()
+        for word, item in vocab_ftr_map.iteritems():
+            ftrs.update(item)
+        self.n_features = max(ftrs) + 1
+
+        self.vocab = vocab
+        self.vocab_ftr_map = vocab_ftr_map
+        self.input = input
+        self.ftr_embs = self.init((self.n_features, self.size),
+                            fan_in=self.n_features,
+                            name=self._name_param("emb"))
+
+        self.params = {self.ftr_embs}
+        #self.params = set()
+
+
+        emb_mat = [] #T.zeros((len(self.vocab), self.size))
+        max_len = max(len(x) for x in self.vocab_ftr_map.values())
+        for word, i in sorted(self.vocab.items(), key=lambda x: x[1]):
+            emb_mat.append(vocab_ftr_map[word] + [0] * (max_len - len(vocab_ftr_map[word])))
+
+        #import ipdb; ipdb.set_trace()
+
+        self.emb_matrix = self.ftr_embs[emb_mat].sum(axis=1)
+
+        #self.emb_matrix = self.init((len(self.vocab), self.size),
+        #                    fan_in=self.n_features,
+        #                    name=self._name_param("emb"))
+        #self.params = {self.emb_matrix}
+        #self.emb_matrix = T.zeros((len(self.vocab), self.size))
+        #self.emb_matrix = self.ftr_embs[0].dimshuffle('x', 0)
+
+    def output(self, dropout_active=False):
+        #return self.ftr_embs[T.clip(self.input, 0, 10)] #self.emb_matrix[self.input]
+        return self.emb_matrix[self.input]
+
+    def get_params(self):
+        return self.params
 
 
 class Recurrent(Layer):
