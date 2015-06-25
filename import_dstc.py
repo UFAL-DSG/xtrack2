@@ -239,6 +239,9 @@ def _stringify_act(acts):
     res = []
     for act in acts:
         if len(act.slots) > 0:
+            #if not act.act in ['request']:
+            #    continue
+
             for slot_name, slot_value in act.slots:
                 # HACK: Ignore all count system acts.
                 if slot_name == "count":
@@ -249,8 +252,6 @@ def _stringify_act(acts):
         else:
             res.append("%s" % act.act)
 
-    if len(res) == 0:
-        res = ["sys"]
     return " ".join(res)
 
 

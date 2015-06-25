@@ -33,12 +33,9 @@ def get_best_hypothesis(turn):
         return '_null_'
 
 
-def main():
-    #data_file = '/xdisk/data/dstc/xtrack/e2_food/valid.json'
-    #data_file = '/xdisk/data/dstc/xtrack/e2dev/test.json'
-    #data_file = '/xdisk/data/dstc/xtrack/e2_tagged_baseline/dev.json'
-    data_file = 'data/xtrack/e095_asru_tagged_0n1best_nowcn_xtrack/dev.json'
-    data = Data.load(data_file)
+def main(xtrack_data, tracker, dataset):
+    assert len(tracker) == 2
+    data = Data.load('data/xtrack/%s/%s.json' % (xtrack_data, dataset, ))
     data.vocab_rev = {val: key for key, val in data.vocab.iteritems()}
 
     data_map = {}
@@ -55,35 +52,21 @@ def main():
         for i, (d, ds) in enumerate(zip(seq['data'], seq['data_score'])):
             curr.append(d) #data.vocab_rev[d])
             if i in labeling:
-                texts.append((np.exp(ds[0]), str(curr)))
+                texts.append((np.exp(ds[0]), " ".join(data.vocab_rev[i[0]] for i in curr), seq['tags']))
                 #texts.append((0.0, " ".join(curr)))
                 curr = []
         assert len(curr) == 0
         #print seq['id']
         data_map[seq['id']] = texts
 
-    tracker_files = [
-        #trackfile1,
-        #trackfile2
-
-        #'/xdisk/data/dstc/dstc2/scripts/baseline_output.json',
-        #'/xdisk/tmp/dstc2_results/team4/entry0.test.json',
-        #'/xdisk/tmp/dstc2_results/team4/entry0.test.json'
-        #'/tmp/trackb.json',
-        #'/tmp/trackb.json',
-        'baseline_focus.json',
-        '/tmp/e095_asru.dev.goals.json'
-
-    ]
-
-    flist_path = 'data/dstc2/scripts/config/dstc2_dev.flist'
+    flist_path = 'data/dstc2/scripts/config/dstc2_%s.flist' % dataset
     #flist_path = '/xdisk/data/dstc/dstc2/scripts/config/dstc2_test.flist'
     flist_root = 'data/dstc2/data/'
 
     labels = load_labels(flist_path, flist_root)
 
     tracker_data = []
-    for t_file in tracker_files:
+    for t_file in tracker:
         tracker_data.append(json.load(open(t_file)))
 
     sess_map = defaultdict(dict)
@@ -96,6 +79,10 @@ def main():
         sess_ids.add(s1['session-id'])
         sess_ids.add(s2['session-id'])
 
+    stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    stats1 = defaultdict(int)
+    stats2 = defaultdict(int)
+
     acc_good = 0.0
     acc_total = 0.0
     acc_good_our = 0.0
@@ -105,10 +92,11 @@ def main():
         texts =  data_map[id]
         s1, s2 = sess_map[0][id], sess_map[1][id]
         lbl = labels[id]
-        for (score, text), turn1, turn2, turn_true in \
+        for (score, text, tags), turn1, turn2, turn_true in \
             zip(texts, s1['turns'], s2['turns'], lbl['turns']):
             print ">> Turn:"
-            print "  %8.2f  " % score, text
+            print "  %8.2f  " % score, text #
+            print "                 tags:", tags.get('food')
             print "           true input: %s" % turn_true['transcription']
             food_d1 = get_best_hypothesis(turn1)
             food_d2 = get_best_hypothesis(turn2)
@@ -150,14 +138,43 @@ def main():
                                                           food_d2, food_t)
                 print
 
+            stats[food_t][food_d1][food_d2] += 1
+            stats1[food_d1] += 1
+            stats2[food_d2] += 1
+
+    res = []
+    for food in stats:
+        n_baseline_good = sum(stats[food][food].values())
+        n_baseline_total = stats1[food]
+
+        n_our_good = 0
+        for food2 in stats[food]:
+            n_our_good += stats[food][food2][food]
+
+        n_our_total = stats2[food]
+
+        res.append((food, n_baseline_good * 1.0 / n_baseline_total, n_our_good * 1.0 / n_our_total, n_our_total ))
+
+    res.sort(key=lambda x: x[-1])
+
+    for x in res:
+        print '%30s: bas(%.2f) our(%.2f) our_total(%d)' % x
 
     print 'baseline accuracy', acc_good / acc_total
     print 'our accuracy', acc_good_our / acc_total_our
 
 
-
-
 if __name__ == '__main__':
     from utils import pdb_on_error
     pdb_on_error()
-    main()
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset')
+    parser.add_argument('xtrack_data')
+    parser.add_argument('--tracker', action='append')
+
+    args = parser.parse_args()
+
+    main(**vars(args))

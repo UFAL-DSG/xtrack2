@@ -200,7 +200,7 @@ class XTrack2DSTCTracker(object):
 
 
     def track(self, tracking_log_file_name=None, output_len_accuracy=False):
-        max_batch_size = 200
+        max_batch_size = 10
         preds = []
         all_preds = []
         slots = []
@@ -369,6 +369,13 @@ class XTrack2DSTCTracker(object):
         values.clear()
         values.update(new_res)
 
+    def prepare_dstc_format(self, wall_time, dataset, result):
+        tracker_output = {
+            'wall-time': wall_time,
+            'dataset': dataset,
+            'sessions': result
+        }
+        return tracker_output
 
 def main(dataset_name, data_file, output_file, track_log, params_file, model_type):
     models = []
@@ -397,12 +404,9 @@ def main(dataset_name, data_file, output_file, track_log, params_file, model_typ
         #for t in len_accuracy:
         #    print '%d %.2f %d' % (t, len_accuracy[t][group], len_accuracy_n[t][group])
 
+    tracker_output = tracker.prepare_dstc_format(t, dataset_name, result)
 
-    tracker_output = {
-        'wall-time': t,
-        'dataset': dataset_name,
-        'sessions': result
-    }
+
 
     logging.info('Writing to: %s' % output_file)
     with open(output_file, 'w') as f_out:

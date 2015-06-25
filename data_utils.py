@@ -51,7 +51,7 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, builder_opts, builder_type, use_wcn, ngrams,
                        concat_whole_nbest, include_whole_nbest, split_dialogs,
-                       sample_subdialogs, nth_best):
+                       sample_subdialogs, nth_best, words):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -70,14 +70,8 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                              out_dir=out_dir)
 
         logging.info('Initializing.')
-        if builder_type == 'baseline':
-            builder_cls = DataBuilderBaseline
-        elif builder_type == 'xtrack':
-            builder_cls = DataBuilder
-        else:
-            raise Exception('unknown builder')
 
-        xtd_builder = builder_cls(
+        xtd_builder = DataBuilder(
             based_on=based_on,
             include_base_seqs=False,
             slots=slots,
@@ -93,10 +87,22 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             include_whole_nbest=include_whole_nbest,
             split_dialogs=split_dialogs and dataset == 'train',
             sample_subdialogs=sample_subdialogs if dataset == 'train' else 0,
+            words=words,
             **builder_opts
         )
         logging.info('Building.')
         xtd = xtd_builder.build(dialogs, use_wcn=use_wcn)
+
+        for k in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
+            wf_fname = os.path.join(e_root, 'words_%s_%d.txt' % (dataset, k, ))
+            with open(wf_fname, 'w') as f:
+                d = xtd.token_cntr.most_common(k)
+                f.write("\n".join(i[0] for i in d))
+
+        with open(os.path.join(e_root, 'words_%s.tsv' % (dataset, )), 'w') as f_out:
+            for w, wf in xtd.token_cntr.most_common():
+                f_out.write("%d\t%s\n" % (wf, w, ))
+
         out_file = os.path.join(e_root, '%s.json' % dataset)
 
         dataset_objs.append((xtd, out_file))

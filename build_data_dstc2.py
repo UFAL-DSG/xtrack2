@@ -8,9 +8,14 @@ import xtrack2_config
 
 def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
          use_wcn, ngrams, split_dialogs, sample_subdialogs, train_nbest_entries,
-         e_name):
+         vocab, e_name):
     import utils
     utils.pdb_on_error()
+
+    words = None
+    if vocab:
+        with open(vocab) as f_in:
+            words = set(f_in.read().split())
 
     ontology_path = os.path.join(xtrack2_config.data_directory,
                                  'dstc2/scripts/config/ontology_dstc2.json')
@@ -85,7 +90,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         builder_opts=dict(
             tagged=tagged,
             no_label_weight=True,
-            tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse', 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican']
+            #tag_only=None
+            tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse', 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican'] + ['halal', 'seafood']
         ),
         builder_type=builder_type,
         use_wcn=use_wcn,
@@ -94,7 +100,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         include_whole_nbest=include_whole_nbest,
         split_dialogs=split_dialogs,
         sample_subdialogs=sample_subdialogs,
-        nth_best=nth_best
+        nth_best=nth_best,
+        words=words
     )
 
     print experiment_name
@@ -118,6 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('--e_name', default='xx')
     parser.add_argument('--sample_subdialogs', type=int, default=0)
     parser.add_argument('--train_nbest_entries', type=str, default="1")
+    parser.add_argument('--vocab', default=None)
 
     args = parser.parse_args()
     main(**vars(args))

@@ -325,7 +325,7 @@ def main(args_lst,
          p_drop, init_emb_from, input_n_layers, input_n_hidden,
          input_activation,
          eval_on_full_train, x_include_token_ftrs, enable_branch_exp, l1, l2,
-         x_include_mlp, enable_token_supervision, model_type,
+         x_include_mlp, x_include_orig, enable_token_supervision, model_type,
          mlp_n_hidden, mlp_n_layers, mlp_activation,
          use_loss_mask, wcn_aggreg,
          override_slots
@@ -348,8 +348,9 @@ def main(args_lst,
     except:
         logging.info('GIT rev: unknown')
     logging.info('Output dir: %s' % output_dir)
-    logging.info('Initializing random seed to 0.')
-    random.seed(0)
+    #logging.info('Initializing random seed to 0.')
+    #random.seed(0)
+    #np.random.seed(0)
     logging.info('Argv: %s' % str(sys.argv))
     logging.info('Effective args:')
     for arg_name, arg_value in args_lst:
@@ -387,6 +388,7 @@ def main(args_lst,
                       x_include_score=x_include_score,
                       x_include_token_ftrs=x_include_token_ftrs,
                       x_include_mlp=x_include_mlp,
+                      x_include_orig=x_include_orig,
                       wcn_aggreg=wcn_aggreg,
                       n_input_score_bins=n_input_score_bins,
                       n_cells=n_cells,
@@ -560,6 +562,8 @@ def main(args_lst,
         _, test_track_score = tracker_test.track(track_log_test)
         for group, accuracy in sorted(test_track_score.iteritems(),
                                   key=lambda (g, _): g):
+            if override_slots and not group in override_slots:
+                    continue
             logging.info('Test acc %15s: %10.2f %%'
                          % (group, accuracy * 100))
 
@@ -594,9 +598,6 @@ def main(args_lst,
             mb_to_go = list(mb_ids)
             epoch += 1
 
-            if n_epochs > 0 and n_epochs < epoch:
-                break
-
             #if n_valid_not_increased >= n_early_stopping:
             if epoch > n_early_stopping:
                 lr = lr * 0.95 #/ lr_anneal_factor
@@ -609,7 +610,7 @@ def main(args_lst,
                 except Exception, e:
                     logging.error('Testing the model failed: %s' % e)
 
-            if lr < 0.000001 or epoch > n_early_stopping + 10:
+            if lr < 0.000001 or n_epochs > 0 and n_epochs < epoch:
                 break
 
         mb_ndx = random.choice(mb_to_go)
@@ -666,10 +667,17 @@ def main(args_lst,
 
             logging.info('Valid # of examples: %d' % len(valid_data_y[-1]))
             track_log = os.path.join(output_dir, 'track_log.%.3d.txt' % epoch)
-            _, track_score = tracker_valid.track(track_log)
+            track_result, track_score = tracker_valid.track(track_log)
+
+            tracker_output = tracker_valid.prepare_dstc_format(0.0, "valid", track_result)
+            params_file = os.path.join(output_dir, 'params.%.3d.p' %
+                                       epoch)
 
             for group, accuracy in sorted(track_score.iteritems(),
                                           key=lambda (g, _): g):
+                if override_slots and not group in override_slots:
+                    continue
+
                 logging.info('Valid acc %15s: %10.2f %%'
                              % (group, accuracy * 100))
 
@@ -685,6 +693,9 @@ def main(args_lst,
                 best_track_acc[group] = max(accuracy, best_track_acc[group])
 
             for group in sorted(track_score, key=lambda g: g):
+                if override_slots and not group in override_slots:
+                    continue
+
                 logging.info('Best acc %15s:  %10.2f %%'
                              % (group, best_track_acc[group] * 100))
             logging.info('Train loss:         %10.2f' % stats.mean('loss'))
@@ -737,7 +748,7 @@ def build_argument_parser():
     parser.add_argument('--model_type', default="lstm", type=str)
 
     # XTrack params.
-    parser.add_argument('--n_epochs', default=0, type=int)
+    parser.add_argument('--n_epochs', default=10, type=int)
     parser.add_argument('--n_early_stopping', default=10, type=int)
     parser.add_argument('--early_stopping_group', default="goals", type=str)
     parser.add_argument('--lr', default=0.1, type=float)
@@ -755,6 +766,7 @@ def build_argument_parser():
     parser.add_argument('--ftr_emb_size', default=5, type=int)
     parser.add_argument('--wcn_aggreg', default='flatten')
     parser.add_argument('--x_include_score', default=False, action='store_true')
+    parser.add_argument('--x_include_orig', default=False, action='store_true')
     parser.add_argument('--x_include_token_ftrs', default=False,
                         action='store_true')
     parser.add_argument('--x_include_mlp', default=False, action='store_true')

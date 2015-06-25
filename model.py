@@ -30,7 +30,7 @@ class Model(NeuralModel):
                  init_emb_from, vocab, vocab_ftr_map, ftr_emb_size,
                  input_n_layers, input_n_hidden, input_activation,
                  token_features, token_supervision, use_loss_mask,
-                 momentum, enable_branch_exp, l1, l2, build_train=True):
+                 momentum, enable_branch_exp, l1, l2, build_train=True, x_include_orig=False):
         args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
         self.init_args = {}
         for arg in args:
@@ -41,6 +41,8 @@ class Model(NeuralModel):
 
         self.slots = slots
         self.slot_classes = slot_classes
+
+        self.x_include_orig = x_include_orig
 
 
         logging.info('We have the following classes:')
@@ -56,6 +58,15 @@ class Model(NeuralModel):
                                       input=x,
                                       static=no_train_emb)
         input_zip_layers.append(input_token_layer)
+
+        if self.x_include_orig:
+            x_orig = T.itensor3(name='x_orig')
+            input_args.append(x_orig)
+            input_token_layer = Embedding(name="emb2",
+                                          size=emb_size,
+                                          n_features=n_input_tokens,
+                                          input=x_orig)
+            input_zip_layers.append(input_token_layer)
 
         if token_features:
             input_ftrs_layer = FeatureEmbedding(name="ftremb",
@@ -279,6 +290,7 @@ class Model(NeuralModel):
 
     def _prepare_data(self, seqs, slots, with_labels=True, debug_data=False, dense_labels=False):
         x = []
+        x_orig = []
         x_score = []
         #x_ftrs = []
         y_seq_id = []
@@ -289,32 +301,45 @@ class Model(NeuralModel):
         wcn_cnt = 5
         for item in seqs:
             data = []
+            data_orig = []
             data_score = []
             #data_ftrs = []
             #assert len(item['data']) == len(item['ftrs'])
             assert len(item['data']) == len(item['data_score'])
-            for words, score in zip(item['data'], item['data_score']): #, item['ftrs']):
+
+            if not 'data_orig' in item:
+                item['data_orig'] = item['data']
+                #logging.warning("Replacing data_orig with data because data_orig does not exist.")
+
+            assert len(item['data']) == len(item['data_orig'])
+
+            for words, words_orig, score in zip(item['data'], item['data_orig'], item['data_score']): #, item['ftrs']):
                 new_words = []
+                new_words_orig = []
                 new_score = []
                 #new_ftrs = []
                 assert type(words) is list
-                for word, word_score in sorted(zip(words, score), key=lambda (w, s, ): -s)[:wcn_cnt]:
+                for word, word_orig, word_score in sorted(zip(words, words_orig, score), key=lambda (w, wo, s, ): -s)[:wcn_cnt]:
                     new_words.append(word)
+                    new_words_orig.append(word_orig)
                     new_score.append(np.exp(word_score))
                     #new_ftrs.append(word_ftrs)
 
                 n_missing = max(0, wcn_cnt - len(words))
                 new_words.extend(n_missing * [0])
+                new_words_orig.extend(n_missing * [0])
                 new_score.extend(n_missing * [1.0])
                 #new_ftrs.extend(n_missing * [[0] * len(ftrs[0])])
 
                 data.append(new_words)
+                data_orig.append(new_words)
                 data_score.append(new_score)
                 #data_ftrs.append(new_ftrs)
 
             #import ipdb; ipdb.set_trace()
 
             x.append(data)
+            x_orig.append(data_orig)
             x_score.append(data_score)
             #x_ftrs.append(data_ftrs)
 
@@ -361,6 +386,7 @@ class Model(NeuralModel):
 
 
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
+        x_orig = padded(x_orig, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
         x_score = padded(x_score, pad_by=[[0.0] * wcn_cnt]).transpose(1, 0, 2)
         #x_ftrs = padded(x_ftrs, pad_by=[[[0.0] * len(x_ftrs[0][0][0])] * wcn_cnt]).transpose(1, 0, 2, 3) #[:, :, 0]
 
@@ -368,6 +394,8 @@ class Model(NeuralModel):
             import ipdb; ipdb.set_trace()
 
         data = [x]
+        if self.x_include_orig:
+            data.append(x_orig)
         #if self.x_include_score:
         data.append(x_score)
         #data.append(x_ftrs)

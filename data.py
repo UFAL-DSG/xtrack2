@@ -58,6 +58,7 @@ class Sequence(dict):
         self.id = seq_id
         self.source_dir = source_dir
         self.data = []
+        self.data_orig = []
         self.data_debug = []
         self.data_score = []
         #self.data_actor = []
@@ -73,10 +74,11 @@ class Sequence(dict):
         t = lbl['time']
         res = Sequence(self.id, self.source_dir)
         res.data = list(self.data[:t + 1])
+        res.data_orig = list(self.data_orig[:t + 1])
         res.data_debug = list(self.data_debug[:t + 1])
         res.data_score = list(self.data_score[:t + 1])
         #res.data_actor = list(self.data_actor[:t + 1])
-        res.ftrs = list(self.data_ftrs[:t+1])
+        res.ftrs = list(self.ftrs[:t+1])
         res.tags = list(self.tags)
         res.true_input = list(self.true_input)
         res.labels = [dict(lbl)]
@@ -105,7 +107,7 @@ class DataBuilder(object):
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
               score_bins, debug_dir, tagged, ontology, no_label_weight,
               concat_whole_nbest, include_whole_nbest, split_dialogs,
-              sample_subdialogs, tag_only):
+              sample_subdialogs, tag_only, words):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -119,6 +121,7 @@ class DataBuilder(object):
         self.debug_dir = debug_dir
         self.tagged = tagged
         self.tag_only = tag_only
+        self.word_constraints = words
         self.concat_whole_nbest = concat_whole_nbest
         self.include_whole_nbest = include_whole_nbest
         self.split_dialogs = split_dialogs
@@ -393,11 +396,14 @@ class DataBuilder(object):
             tokens = self._prefix_wcn_by(tokens, "@")
 
         token_ndxs = []
+        token_ndxs_orig = []
         for token in tokens:
             if token == '!null':
                 token = "#NOTHING"
             token_ndx = self._get_token_ndx(actor, seq, token)
+            token_ndx_orig = self._get_token_ndx(actor, seq, token, orig=True)
             token_ndxs.append(token_ndx)
+            token_ndxs_orig.append(token_ndx_orig)
 
         #ftrs = []
         #for token in zip(tokens):
@@ -405,6 +411,7 @@ class DataBuilder(object):
         #    ftrs.append(ftr)
 
         seq.data.append(token_ndxs)
+        seq.data_orig.append(token_ndxs_orig)
         seq.data_score.append(token_scores)
         #seq.data_actor.append(actor)
         #seq.ftrs.append(ftrs)
@@ -462,29 +469,45 @@ class DataBuilder(object):
     #     seq.data_actor.append(actor)
     #     seq.data_debug.append(token)
 
-    def _get_token_ndx(self, actor, seq, token):
-        token_ndx = self.xd.get_token_ndx(token)
-        if self.tagged:
+    def _get_token_ndx(self, actor, seq, token, orig=False):
+        self.xd.token_cntr[token] += 1
+        if orig:
+            token_ndx = self.xd.get_token_ndx(token)
+        elif self.tagged:
             if actor == data_model.Dialog.ACTOR_SYSTEM:
                 token = token[1:]
-            tagged_token = self._tag_token(token, seq)
+
+            if self.word_constraints and (token in self.word_constraints or '@' + token in self.word_constraints):
+                tagged_token = token
+                was_tagged = False
+            else:
+                was_tagged, tagged_token = self._tag_token(token, seq)
+
             if actor == data_model.Dialog.ACTOR_SYSTEM:
                 tagged_token = '@' + tagged_token
+
+            if not was_tagged and self.word_constraints and not tagged_token in self.word_constraints:
+                tagged_token = '#OOV'
             token_ndx = self.xd.get_token_ndx(tagged_token)
+        else:
+            if self.word_constraints and not token in self.word_constraints:
+                token = '#OOV'
+            token_ndx = self.xd.get_token_ndx(token)
+
         return token_ndx
 
     def _tag_token(self, token, seq):
-        if not token in self.tag_only:
-            return token
+        if self.tag_only and not token in self.tag_only:
+            return False, token
 
         tag = self.xd.tag_token(token)
         if tag:
             if not token in seq.tags[tag]:
                 seq.tags[tag].append(token)
 
-            return '#%s%d#' % (tag, seq.tags[tag].index(token), )
+            return True, '#%s%d#' % (tag, seq.tags[tag].index(token), )
         else:
-            return token
+            return False, token
 
     def _append_label_to_seq(self, seq, state, slots_mentioned):
         label = {
@@ -567,13 +590,13 @@ class Data(object):
     def _build_initial_classes(self, ontology):
         classes = {}
         for slot in self.slots:
-            self.get_token_ndx(slot)
+            #self.get_token_ndx(slot)
             classes[slot] = {self.null_class: 0}
             for slot_val in ontology.get(slot, []):
                 if self.tagged:
                     slot_val = self.tagger.normalize_slot_value(slot_val)
                 classes[slot][slot_val] = len(classes[slot])
-                self.get_token_ndx(slot_val)
+                #self.get_token_ndx(slot_val)
 
         return classes
 
@@ -588,6 +611,8 @@ class Data(object):
         self.vocab_rev = {}
         self.tagger = tagger
         self.ontology = ontology
+
+        self.token_cntr = collections.Counter()
 
         if based_on:
             if type(based_on) is str:
