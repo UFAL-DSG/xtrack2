@@ -355,14 +355,14 @@ class XTrack2DSTCTracker(object):
                 except IndexError:
                     # This happens when the we predict a tag that
                     # does not exist.
-                    #new_res['_null_'] = p
-                    if last_turn:
-                        try:
-                            last_v, last_p = last_turn['goal-labels'][slot].items()[0]
-                            new_res[last_v] = last_p
-                        except Exception, e:
-                            print e
-                            print slot, last_turn['goal-labels']
+                    new_res['_null_'] = p
+                    #if last_turn:
+                    #    try:
+                    #        last_v, last_p = last_turn['goal-labels'][slot].items()[0]
+                    #        new_res[last_v] = last_p
+                    #    except Exception, e:
+                    #        print e
+                    #        print slot, last_turn['goal-labels']
 
             else:
                 new_res[slot_val] = p
@@ -387,7 +387,12 @@ def main(dataset_name, data_file, output_file, track_log, params_file, model_typ
             model_cls = BaselineModel
         else:
             raise Exception('Unknown model type.')
-        models.append(model_cls.load(pf, build_train=False))
+        if os.path.exists(pf):
+            models.append(model_cls.load(pf, build_train=False))
+        else:
+            logging.warning('Specified params file does not exist: %s' % pf)
+
+    assert len(models) > 0
 
     logging.info('Loading data: %s' % data_file)
     data = Data.load(data_file)

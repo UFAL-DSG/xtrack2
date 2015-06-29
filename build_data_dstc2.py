@@ -103,7 +103,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         nth_best=nth_best,
         words=words
     )
-
+    print
     print experiment_name
 
 

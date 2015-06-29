@@ -43,6 +43,7 @@ class Model(NeuralModel):
         self.slot_classes = slot_classes
 
         self.x_include_orig = x_include_orig
+        self.x_include_score = x_include_score
 
 
         logging.info('We have the following classes:')
@@ -322,7 +323,10 @@ class Model(NeuralModel):
                 for word, word_orig, word_score in sorted(zip(words, words_orig, score), key=lambda (w, wo, s, ): -s)[:wcn_cnt]:
                     new_words.append(word)
                     new_words_orig.append(word_orig)
-                    new_score.append(np.exp(word_score))
+                    if self.x_include_score:
+                        new_score.append(np.exp(word_score))
+                    else:
+                        new_score.append(0.0)
                     #new_ftrs.append(word_ftrs)
 
                 n_missing = max(0, wcn_cnt - len(words))
