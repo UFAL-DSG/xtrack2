@@ -21,6 +21,7 @@ class Model(NeuralModel):
 
     def __init__(self, slots, slot_classes, emb_size, no_train_emb,
                  x_include_score, x_include_token_ftrs, x_include_mlp,
+                 split_cost,
                  wcn_aggreg,
                  n_input_tokens, n_input_score_bins, n_cells,
                  rnn_n_layers,
@@ -198,15 +199,12 @@ class Model(NeuralModel):
             pred = slot_mlp.output(dropout_active=False)
             predictions.append(pred)
 
-            slot_objective = WeightedCrossEntropyObjective()
+            slot_objective = CrossEntropyObjective()
             slot_objective.connect(
                 y_hat_layer=slot_mlp,
-                y_true=y_label[slot],
-                y_weights=y_masks[:, i]
+                y_true=y_label[slot]
             )
             costs.append(slot_objective)
-
-            logging.info('Creating understanding function.')
 
         cost = SumOut()
         cost.connect(*costs)  #, scale=1.0 / len(slots))
@@ -218,14 +216,13 @@ class Model(NeuralModel):
 
             ).size, ))
 
-        cost_value = cost.output(dropout_active=True)
+
 
         lr = tt.scalar('lr')
         clip = 5.0
         reg = updates.Regularizer(l1=l1, l2=l2)
         if opt_type == "rprop":
             updater = updates.RProp(lr=lr, clipnorm=clipnorm)
-            model_updates = updater.get_updates(params, cost_value)
         elif opt_type == "sgd":
             updater = updates.SGD(lr=lr, clipnorm=clip, regularizer=reg)
         elif opt_type == "rmsprop":
@@ -239,23 +236,36 @@ class Model(NeuralModel):
         else:
             raise Exception("Unknonw opt.")
 
+        self._train = []
+
+        train_obj = []
+        if not split_cost:
+            train_obj.append(('joint', cost, [y_label[slot] for slot in slots]))
+        else:
+            for slot, slot_cost in zip(slots, costs):
+                train_obj.append((slot, slot_cost, [y_label[slot]]))
+
         loss_args = list(input_args)
         loss_args += [y_seq_id, y_time, y_masks]
         loss_args += [y_label[slot] for slot in slots]
 
-        if build_train:
-            model_updates = updater.get_updates(params, cost_value)
+        for obj_name, obj, y_label_args in train_obj:
+            cost_value = obj.output(dropout_active=True)
+            obj_params = list(obj.get_params())
 
-            train_args = [lr] + loss_args
-            update_ratio = updater.get_update_ratio(params, model_updates)
+            if build_train:
+                model_updates = updater.get_updates(obj_params, cost_value)
 
-            logging.info('Preparing %s train function.' % opt_type)
-            t = time.time()
-            self._train = theano.function(train_args, [cost_value / y_time.shape[0], update_ratio],
-                                          updates=model_updates)
-            logging.info('Preparation done. Took: %.1f' % (time.time() - t))
+                train_args = [lr] + loss_args
+                update_ratio = updater.get_update_ratio(obj_params, model_updates)
 
-        self._loss = theano.function(loss_args, cost_value)
+                logging.info('Preparing %s train function for %s.' % (opt_type, obj_name, ))
+                t = time.time()
+                self._train.append(theano.function(train_args, [cost_value / y_time.shape[0], update_ratio],
+                                              updates=model_updates, on_unused_input='ignore'))
+                logging.info('Preparation done. Took: %.1f' % (time.time() - t))
+
+        self._loss = theano.function(loss_args, cost.output(dropout_active=True))
 
         logging.info('Preparing predict function.')
         t = time.time()
@@ -382,10 +392,11 @@ class Model(NeuralModel):
 
                 y_mask = []
                 for i, slot in enumerate(slots):
-                    if slot in label['slots_mentioned']:
-                        y_mask.append(1)
-                    else:
-                        y_mask.append(0)
+                    #if slot in label['slots_mentioned']:
+                    #    y_mask.append(1)
+                    #else:
+                    #    y_mask.append(0)
+                    y_mask.append(1)
                 y_masks.append(y_mask)
 
 

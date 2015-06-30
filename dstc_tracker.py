@@ -64,7 +64,7 @@ def init_logging():
 
 
 class XTrack2DSTCTracker(object):
-    def __init__(self, data, models, override_slots):
+    def __init__(self, data, models, override_slots, override_groups=None):
         assert len(models) > 0, 'You need to specify some models.'
 
         self.data = data
@@ -78,6 +78,8 @@ class XTrack2DSTCTracker(object):
                                       self.data.classes[slot].iteritems()}
 
         self.slot_groups = data.slot_groups
+        if override_groups:
+            self.slot_groups = override_groups
         self.tagger = Tagger()
 
     def _label_id_to_str(self, slots, label):
@@ -317,7 +319,11 @@ class XTrack2DSTCTracker(object):
 
         for group in self.slot_groups:
             logging.info(accuracy_n[group])
-            accuracy[group] = accuracy[group] * 1.0 / max(1, accuracy_n[group])
+            if accuracy_n[group] > 0:
+                accuracy[group] = accuracy[group] * 1.0 / accuracy_n[group]
+            else:
+                accuracy[group] = -1.0
+
             for t in len_accuracy:
                 factor = 1.0 / max(1, len_accuracy_n[t][group])
                 len_accuracy[t][group] = len_accuracy[t][group] * factor

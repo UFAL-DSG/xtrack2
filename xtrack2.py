@@ -311,11 +311,48 @@ def get_extreme_examples(mb_loss, minibatches, xtd_t):
     return (worst_examples, worst_mb_ndxs), (best_examples, best_mb_ndxs)
 
 
+def add_train_noise(mb_data, train_noise, vocab_size):
+    res = list(mb_data)
+    x = res[0] = np.array(res[0])
+
+    d_lens = (x[:, :, 0] > 0).sum(axis=0)
+    d_map = []
+    d_pos_map = []
+
+    curr_len = 0
+    curr_d = 0
+    for i in range(d_lens.sum()):
+        d_map.append(curr_d)
+        d_pos_map.append(curr_len)
+        curr_len += 1
+
+        if curr_len == d_lens[curr_d]:
+            curr_d += 1
+            curr_len = 0
+
+    n_corrupt = (x.shape[0] * x.shape[1]) * train_noise
+    curr_corrupt = 0
+    while curr_corrupt < n_corrupt:
+        t = random.randint(0, len(d_map) - 1)
+        d_id = d_map[t]
+        t_id = d_pos_map[t]
+        x[t_id, d_id, 0] = random.randint(0, vocab_size - 1)
+
+        curr_corrupt += 1
+
+    #import ipdb; ipdb.set_trace()
+
+    return res
+
+
+
+
 def main(args_lst,
          eid, experiment_path, out, valid_after,
          load_params, save_params,
          debug, debug_data, debug_theano,
          n_cells, emb_size, x_include_score, no_train_emb, ftr_emb_size, token_features,
+         split_cost, train_noise,
          n_epochs, lr, lr_anneal_factor, opt_type, momentum,
          n_early_stopping, early_stopping_group,
          mb_size, mb_mult_data,
@@ -331,6 +368,10 @@ def main(args_lst,
          override_slots
 
          ):
+
+    # HACK:
+    if early_stopping_group.startswith('req_'):
+        early_stopping_group = "requested"
 
     output_dir = init_env(out)
     mon_train = TrainingStats()
@@ -374,6 +415,16 @@ def main(args_lst,
     slots = xtd_t.slots if not override_slots else override_slots.split(',')
     classes = xtd_t.classes
     class_groups = xtd_t.slot_groups
+    shown_groups = []
+    for group, group_slots in class_groups.iteritems():
+        if set(group_slots).intersection(slots):
+            shown_groups.append(group)
+
+    for slot in slots:
+        shown_groups.append(slot)
+        class_groups[slot] = [slot]
+
+
     n_input_tokens = len(xtd_t.vocab)
     n_input_score_bins = len(xtd_t.score_bins)
 
@@ -389,6 +440,7 @@ def main(args_lst,
                       x_include_token_ftrs=x_include_token_ftrs,
                       x_include_mlp=x_include_mlp,
                       x_include_orig=x_include_orig,
+                      split_cost=split_cost,
                       wcn_aggreg=wcn_aggreg,
                       n_input_score_bins=n_input_score_bins,
                       n_cells=n_cells,
@@ -507,9 +559,8 @@ def main(args_lst,
         logging.info('Loading parameters from: %s' % load_params)
         model.load_params(load_params)
 
-    tracker_valid = XTrack2DSTCTracker(xtd_v, [model], slots)
-    tracker_train = XTrack2DSTCTracker(xtd_t, [model], slots)
-    tracker_test = XTrack2DSTCTracker(xtd_s, [model], slots)
+    tracker_valid = XTrack2DSTCTracker(xtd_v, [model], slots, override_groups=class_groups)
+    tracker_test = XTrack2DSTCTracker(xtd_s, [model], slots, override_groups=class_groups)
 
     #model.visualize(xtd_v.sequences, slots)
     #return
@@ -562,7 +613,7 @@ def main(args_lst,
         _, test_track_score = tracker_test.track(track_log_test)
         for group, accuracy in sorted(test_track_score.iteritems(),
                                   key=lambda (g, _): g):
-            if override_slots and not group in override_slots:
+            if not group in shown_groups:
                     continue
             logging.info('Test acc %15s: %10.2f %%'
                          % (group, accuracy * 100))
@@ -618,6 +669,9 @@ def main(args_lst,
 
         #mb_id, mb_data = random.choice(minibatches)
         mb_id, mb_data = minibatches[mb_ndx]
+
+        if train_noise:
+            mb_data = add_train_noise(mb_data, train_noise, len(xtd_t.vocab))
         #if et is not None:
         #    epoch_time = time.time() - et
         #else:
@@ -628,7 +682,8 @@ def main(args_lst,
         #et = time.time()
         mb_done = 0
         t = time.time()
-        (loss, update_ratio) = model._train(lr, *mb_data)
+        _train = random.choice(model._train)
+        (loss, update_ratio) = _train(lr, *mb_data)
         mb_loss[mb_ndx] = loss
         t = time.time() - t
         stats.insert(loss=loss, update_ratio=update_ratio, time=t)
@@ -675,7 +730,7 @@ def main(args_lst,
 
             for group, accuracy in sorted(track_score.iteritems(),
                                           key=lambda (g, _): g):
-                if override_slots and not group in override_slots:
+                if not group in shown_groups:
                     continue
 
                 logging.info('Valid acc %15s: %10.2f %%'
@@ -693,7 +748,7 @@ def main(args_lst,
                 best_track_acc[group] = max(accuracy, best_track_acc[group])
 
             for group in sorted(track_score, key=lambda g: g):
-                if override_slots and not group in override_slots:
+                if not group in shown_groups:
                     continue
 
                 logging.info('Best acc %15s:  %10.2f %%'
@@ -774,6 +829,8 @@ def build_argument_parser():
     parser.add_argument('--no_train_emb', default=False, action='store_true')
     parser.add_argument('--token_features', default=False,
                         action='store_true')
+    parser.add_argument('--split_cost', default=False, action='store_true')
+    parser.add_argument('--train_noise', default=0.0, type=float)
 
     parser.add_argument('--input_n_hidden', default=32, type=int)
     parser.add_argument('--input_n_layers', default=0, type=int)

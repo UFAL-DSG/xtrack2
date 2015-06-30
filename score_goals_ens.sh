@@ -20,7 +20,7 @@ for dataset in dev test; do
 
         echo "--params_file /a/SSD/zilka/tmp/${E_NAME}_0/name/params.final.p"
         for i in $(seq 0 9); do
-            for slot in food area pricerange method; do
+            for slot in food area pricerange method req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature; do
                 echo "--params_file /a/SSD/zilka/tmp/${E_NAME}_${i}/${slot}/params.final.p"
             done
         done
