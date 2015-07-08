@@ -8,7 +8,7 @@ import xtrack2_config
 
 def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
          use_wcn, ngrams, split_dialogs, sample_subdialogs, train_nbest_entries,
-         vocab, e_name):
+         vocab, include_dev_in_train, e_name):
     import utils
     utils.pdb_on_error()
 
@@ -71,6 +71,9 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
     if split_dialogs:
         experiment_name += '_split'
 
+    if include_dev_in_train:
+        experiment_name += '_devtrain'
+
     experiment_name += '_%s' % builder_type
 
     if only_slot:
@@ -101,7 +104,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         split_dialogs=split_dialogs,
         sample_subdialogs=sample_subdialogs,
         nth_best=nth_best,
-        words=words
+        words=words,
+        include_dev_in_train=include_dev_in_train
     )
     print
     print experiment_name
@@ -126,6 +130,7 @@ if __name__ == '__main__':
     parser.add_argument('--sample_subdialogs', type=int, default=0)
     parser.add_argument('--train_nbest_entries', type=str, default="1")
     parser.add_argument('--vocab', default=None)
+    parser.add_argument('--include_dev_in_train', action='store_true', default=False)
 
     args = parser.parse_args()
     main(**vars(args))

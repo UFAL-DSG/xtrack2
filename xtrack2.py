@@ -620,6 +620,7 @@ def main(args_lst,
 
 
     epoch = 0
+    last_es_epoch = 0
 
     init_valid_loss = model._loss(*valid_data_y)
     #plot_loss(model, valid_data_y)
@@ -650,10 +651,11 @@ def main(args_lst,
             epoch += 1
 
             #if n_valid_not_increased >= n_early_stopping:
-            if epoch > n_early_stopping:
+            if epoch - last_es_epoch > n_early_stopping:
                 lr = lr * 0.95 #/ lr_anneal_factor
                 logging.info('New learning rate: %.5f' % lr)
                 n_valid_not_increased = 0
+                last_es_epoch = epoch
                 model.push_params(best_params)
 
                 try:

@@ -51,7 +51,7 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, builder_opts, builder_type, use_wcn, ngrams,
                        concat_whole_nbest, include_whole_nbest, split_dialogs,
-                       sample_subdialogs, nth_best, words):
+                       sample_subdialogs, nth_best, words, include_dev_in_train):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -68,6 +68,14 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                              dataset=dataset,
                              data_name=experiment_name,
                              out_dir=out_dir)
+        if include_dev_in_train:
+            if dataset == "train":
+                dialogs2 = import_dstc_data(data_directory=data_directory,
+                                           e_root=e_root,
+                                           dataset="dev",
+                                           data_name=experiment_name,
+                                           out_dir=out_dir)
+                dialogs = itertools.chain(dialogs, dialogs2)
 
         logging.info('Initializing.')
 

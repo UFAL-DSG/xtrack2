@@ -77,6 +77,9 @@ class XTrack2DSTCTracker(object):
             self.classes_rev[slot] = {val: key for key, val in
                                       self.data.classes[slot].iteritems()}
 
+        # HACK:
+        self.classes_rev['method'][0] = 'none'
+
         self.slot_groups = data.slot_groups
         if override_groups:
             self.slot_groups = override_groups
@@ -361,12 +364,13 @@ class XTrack2DSTCTracker(object):
                 except IndexError:
                     # This happens when the we predict a tag that
                     # does not exist.
-                    new_res['_null_'] = p
-                    #if last_turn:
-                    #    try:
-                    #        last_v, last_p = last_turn['goal-labels'][slot].items()[0]
-                    #        new_res[last_v] = last_p
-                    #    except Exception, e:
+                    #new_res['_null_'] = p
+                    if last_turn:
+                        try:
+                            last_v, last_p = last_turn['goal-labels'][slot].items()[0]
+                            new_res[last_v] = last_p
+                        except Exception, e:
+                            new_res['_null_'] = p
                     #        print e
                     #        print slot, last_turn['goal-labels']
 

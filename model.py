@@ -57,35 +57,37 @@ class Model(NeuralModel):
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
-                                      input=x,
+                                      input=x[:, :, 0],
                                       static=no_train_emb)
         input_zip_layers.append(input_token_layer)
 
-        if self.x_include_orig:
-            x_orig = T.itensor3(name='x_orig')
-            input_args.append(x_orig)
-            input_token_layer = Embedding(name="emb2",
-                                          size=emb_size,
-                                          n_features=n_input_tokens,
-                                          input=x_orig)
-            input_zip_layers.append(input_token_layer)
-
-        if token_features:
-            input_ftrs_layer = FeatureEmbedding(name="ftremb",
-                                                size=ftr_emb_size,
-                                                vocab=vocab,
-                                                vocab_ftr_map=vocab_ftr_map,
-                                                input=x)
-            input_zip_layers.append(input_ftrs_layer)
+        if self.x_include_orig: assert False
+        if token_features: assert False
+        #if self.x_include_orig:
+        #    x_orig = T.itensor3(name='x_orig')
+        #    input_args.append(x_orig)
+        #    input_token_layer = Embedding(name="emb2",
+        #                                  size=emb_size,
+        #                                  n_features=n_input_tokens,
+        #                                  input=x_orig)
+        #    input_zip_layers.append(input_token_layer)
+        #
+        #if token_features:
+        #    input_ftrs_layer = FeatureEmbedding(name="ftremb",
+        #                                        size=ftr_emb_size,
+        #                                        vocab=vocab,
+        #                                        vocab_ftr_map=vocab_ftr_map,
+        #                                        input=x)
+        #    input_zip_layers.append(input_ftrs_layer)
 
         x_conf = T.tensor3(name='x_conf')
         input_args.append(x_conf)
-        input_conf_layer = IdentityInput(x_conf[:, :, :, np.newaxis], 1)
+        input_conf_layer = IdentityInput(x_conf[:, :, 0, np.newaxis], 1)
         input_zip_layers.append(input_conf_layer)
 
-        prev_layer = ZipLayer(3, input_zip_layers)
+        prev_layer = ZipLayer(2, input_zip_layers)
 
-        rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1] * x.shape[2], prev_layer.size)
+        rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1], prev_layer.size)
         rev_flat.connect(prev_layer)
         prev_layer = rev_flat
 
@@ -96,28 +98,28 @@ class Model(NeuralModel):
         input_mlp_layer.connect(prev_layer)
         prev_layer = input_mlp_layer
 
-        reshape_back = ReshapeLayer(x.shape[0], x.shape[1], x.shape[2], input_n_hidden)
+        reshape_back = ReshapeLayer(x.shape[0], x.shape[1], input_n_hidden)
         reshape_back.connect(prev_layer)
         prev_layer = reshape_back
 
         #logging.info("reshape_back size %d" % reshape_back.size)
 
-        if wcn_aggreg == 'flatten':
-            wcn_aggreg_layer = FlattenLayer(3, 5)
-            wcn_aggreg_layer.connect(prev_layer)
-            prev_layer = wcn_aggreg_layer
+        # if wcn_aggreg == 'flatten':
+        #     wcn_aggreg_layer = FlattenLayer(3, 5)
+        #     wcn_aggreg_layer.connect(prev_layer)
+        #     prev_layer = wcn_aggreg_layer
 
-            wcn_out = Dense(name="wcn_out", size=emb_size, activation=input_activation)
-            wcn_out.connect(prev_layer)
-            prev_layer = wcn_out
-        elif wcn_aggreg == 'max':
-            wcn_aggreg_layer = MaxPooling("wcn_max", pool_dimension=2)
-            wcn_aggreg_layer.connect(prev_layer)
-            prev_layer = wcn_aggreg_layer
-        else:
-            assert False, "Unknown wcn_aggreg: %s" % wcn_aggreg
+        #    wcn_out = Dense(name="wcn_out", size=emb_size, activation=input_activation)
+        #    wcn_out.connect(prev_layer)
+        #    prev_layer = wcn_out
+        #elif wcn_aggreg == 'max':
+        #    wcn_aggreg_layer = MaxPooling("wcn_max", pool_dimension=2)
+        #    wcn_aggreg_layer.connect(prev_layer)
+        #    prev_layer = wcn_aggreg_layer
+        #else:
+        #    assert False, "Unknown wcn_aggreg: %s" % wcn_aggreg
 
-        logging.info("wcn_aggreg size %d" % prev_layer.size)
+        # logging.info("wcn_aggreg size %d" % prev_layer.size)
 
         #flat_wcn_out = ReshapeLayer(x.shape[0] * x.shape[1], 5 * input_n_hidden)
         #flat_wcn_out.connect(prev_layer)
@@ -174,16 +176,13 @@ class Model(NeuralModel):
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
-        y_masks = tt.imatrix()
+        #y_masks = tt.imatrix()
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
 
         cpt = CherryPick()
         cpt.connect(prev_layer, y_time, y_seq_id)
-
-        if not use_loss_mask:
-            y_masks = y_masks * 0 + 1
 
         costs = []
         predictions = []
@@ -202,7 +201,8 @@ class Model(NeuralModel):
             slot_objective = CrossEntropyObjective()
             slot_objective.connect(
                 y_hat_layer=slot_mlp,
-                y_true=y_label[slot]
+                y_true=y_label[slot],
+                #y_weights=y_masks
             )
             costs.append(slot_objective)
 
@@ -246,7 +246,7 @@ class Model(NeuralModel):
                 train_obj.append((slot, slot_cost, [y_label[slot]]))
 
         loss_args = list(input_args)
-        loss_args += [y_seq_id, y_time, y_masks]
+        loss_args += [y_seq_id, y_time]
         loss_args += [y_label[slot] for slot in slots]
 
         for obj_name, obj, y_label_args in train_obj:
@@ -392,12 +392,13 @@ class Model(NeuralModel):
 
                 y_mask = []
                 for i, slot in enumerate(slots):
-                    #if slot in label['slots_mentioned']:
-                    #    y_mask.append(1)
-                    #else:
-                    #    y_mask.append(0)
-                    y_mask.append(1)
+                    if slot in label['slots_mentioned']:
+                        y_mask.append(1)
+                    else:
+                        y_mask.append(0)
                 y_masks.append(y_mask)
+
+
 
 
         x = padded(x, is_int=True, pad_by=[[0] * wcn_cnt]).transpose(1, 0, 2)
@@ -417,7 +418,7 @@ class Model(NeuralModel):
 
         data.extend([y_seq_id, y_time])
         if with_labels:
-            data.append(y_masks)
+            #data.append(y_masks)
             data.extend(y_labels)
 
         return tuple(data)

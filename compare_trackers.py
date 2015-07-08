@@ -19,21 +19,40 @@ def load_labels(flist_path, flist_root):
     return labels
 
 
-def get_best_hypothesis(turn):
-    food_vals = turn['goal-labels'].get('food', {'_null_': 1.0})
+def get_best_hypothesis(turn, slot):
+    if slot in ['food', 'pricerange', 'area', 'name']:
+        food_vals = turn['goal-labels'].get('food', {'_null_': 1.0})
+        null_value = '_null_'
+    elif slot == 'method':
+        food_vals = turn['method-label']
+        null_value = 'none'
+    else:
+        raise Exception()
+
     if not len(food_vals):
-        food_vals['_null_'] = 1.0
+        if slot in ['food', 'pricerange', 'area', 'name']:
+            food_vals['_null_'] = 1.0
+        elif slot == 'method':
+            food_vals['none'] = 1.0
+        else:
+            raise Exception()
 
     v, p = sorted(food_vals.items(), key=lambda x: x[1])[-1]
-    p_mass = sum(p for _, p in turn['goal-labels'].get('food', {}).items())
+    if slot in ['food', 'pricerange', 'area', 'name']:
+        p_mass = sum(p for _, p in turn['goal-labels'].get(slot, {}).items())
+    elif slot == 'method':
+        p_mass = sum(p for _, p in turn['method-label'].items())
+    else:
+        raise Exception()
     p_null = 1.0 - p_mass
     if p > p_null:
         return v
     else:
-        return '_null_'
+
+        return null_value
 
 
-def main(xtrack_data, tracker, dataset):
+def main(xtrack_data, tracker, dataset, slot):
     assert len(tracker) == 2
     data = Data.load('data/xtrack/%s/%s.json' % (xtrack_data, dataset, ))
     data.vocab_rev = {val: key for key, val in data.vocab.iteritems()}
@@ -82,6 +101,7 @@ def main(xtrack_data, tracker, dataset):
     stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
     stats1 = defaultdict(int)
     stats2 = defaultdict(int)
+    statst = defaultdict(int)
 
     acc_good = 0.0
     acc_total = 0.0
@@ -96,11 +116,16 @@ def main(xtrack_data, tracker, dataset):
             zip(texts, s1['turns'], s2['turns'], lbl['turns']):
             print ">> Turn:"
             print "  %8.2f  " % score, text #
-            print "                 tags:", tags.get('food')
+            print "                 tags:", tags.get(slot)
             print "           true input: %s" % turn_true['transcription']
-            food_d1 = get_best_hypothesis(turn1)
-            food_d2 = get_best_hypothesis(turn2)
-            food_t = turn_true['goal-labels'].get('food', '_null_')
+            food_d1 = get_best_hypothesis(turn1, slot)
+            food_d2 = get_best_hypothesis(turn2, slot)
+            if slot in ['food', 'pricerange', 'area', 'name']:
+                food_t = turn_true['goal-labels'].get('food', '_null_')
+            elif slot == 'method':
+                food_t = turn_true['method-label']
+            else:
+                raise Exception()
 
 
 
@@ -141,6 +166,7 @@ def main(xtrack_data, tracker, dataset):
             stats[food_t][food_d1][food_d2] += 1
             stats1[food_d1] += 1
             stats2[food_d2] += 1
+            statst[food_t] += 1
 
     res = []
     for food in stats:
@@ -153,15 +179,39 @@ def main(xtrack_data, tracker, dataset):
 
         n_our_total = stats2[food]
 
-        res.append((food, n_baseline_good * 1.0 / n_baseline_total, n_our_good * 1.0 / n_our_total, n_our_total ))
+        try:
+            res.append((food, n_baseline_good * 1.0 / n_baseline_total, n_our_good * 1.0 / n_our_total, n_our_total, n_baseline_good - n_our_good ))
+        except Exception, e:
+            print e
 
-    res.sort(key=lambda x: x[-1])
+    res.sort(key=lambda x: x[3])
 
+    cnt_baseline_better = 0
+    cnt_baseline_better_vals = 0
+    cnt_baseline_worse_vals = 0
+    cnt_baseline_total = 0
+    cnt_baseline_total_vals = 0
+    cnt_plusminus = 0
+    cnt_cummul = 0
     for x in res:
-        print '%30s: bas(%.2f) our(%.2f) our_total(%d)' % x
+        if x[1] > x[2]:
+            cnt_baseline_better += 1
+            cnt_baseline_better_vals += x[3] * (x[1] - x[2])
+        else:
+            cnt_baseline_worse_vals += x[3] * (x[2] - x[1])
+        cnt_baseline_total += 1
+        cnt_plusminus += x[4]
+
+        cnt_cummul += x[3]
+
+
+        print '%30s: bas(%.2f) our(%.2f) our_total(%d) margin(%d)' % x, 'cummul(%d)' % cnt_cummul
 
     print 'baseline accuracy', acc_good / acc_total
     print 'our accuracy', acc_good_our / acc_total_our
+    print 'baseline was better (rel)', cnt_baseline_better * 1.0 / cnt_baseline_total
+    print 'baseline better vals', cnt_baseline_better_vals, 'worse vals', cnt_baseline_worse_vals
+    print 'plusminus', cnt_plusminus
 
 
 if __name__ == '__main__':
@@ -173,6 +223,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset')
     parser.add_argument('xtrack_data')
+    parser.add_argument('slot', default='food')
     parser.add_argument('--tracker', action='append')
 
     args = parser.parse_args()

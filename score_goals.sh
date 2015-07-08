@@ -9,6 +9,8 @@ DATA_DIR=$2
 
 for dataset in dev test; do
     RESULTS_FILE=/a/SSD/zilka/tmp/${E_NAME}.${dataset}.results.txt
+    echo "--- score_goals.sh" >> ${RESULTS_FILE}
+    date >> ${RESULTS_FILE}
     for i in $(seq 0 9); do
         TRACK_FILE=/a/SSD/zilka/tmp/${E_NAME}.${dataset}.goals.${i}.json
         TRACK_LOG=/a/SSD/zilka/tmp/${E_NAME}.${dataset}.goals.${i}.log
@@ -22,7 +24,7 @@ for dataset in dev test; do
 
             echo "--params_file /a/SSD/zilka/tmp/${E_NAME}_0/name/params.final.p"
 
-            for slot in food area pricerange name method req_food,req_area,req_pricerange,req_name,req_phone,req_addr,req_postcode,req_signature; do
+            for slot in food area pricerange name method req_food req_area req_pricerange req_name req_phone req_addr req_postcode req_signature; do
                 echo "--params_file /a/SSD/zilka/tmp/${E_NAME}_${i}/${slot}/params.final.p"
             done
         ) | xargs python dstc_tracker.py
