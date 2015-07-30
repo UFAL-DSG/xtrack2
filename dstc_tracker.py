@@ -78,7 +78,8 @@ class XTrack2DSTCTracker(object):
                                       self.data.classes[slot].iteritems()}
 
         # HACK:
-        self.classes_rev['method'][0] = 'none'
+        if 'method' in self.classes_rev:
+            self.classes_rev['method'][0] = 'none'
 
         self.slot_groups = data.slot_groups
         if override_groups:

@@ -184,6 +184,24 @@ class SumLayer(object):
         return set(flatten([layer.get_params() for layer in self.layers]))
 
 
+class ProdLayer(object):
+    def __init__(self, layers):
+        self.layers = layers
+        self.size = layers[0].size
+
+    def output(self, dropout_active=False):
+        outs = [layer.output(dropout_active=dropout_active)
+                for layer in self.layers]
+
+        res = outs[0]
+        for out in outs[1:]:
+            res *= out
+
+        return T.cast(res, dtype=theano.config.floatX)
+
+    def get_params(self):
+        return set(flatten([layer.get_params() for layer in self.layers]))
+
 
 class OneHot(Layer):
     def __init__(self, name=None, n_features=256, input=None):

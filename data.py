@@ -366,8 +366,11 @@ class DataBuilder(object):
             if self.word_drop_p > random.random():
                 continue
 
-            if random.random() < self.oov_ins_p:
-                token = '#OOV'
+            #print self.oov_ins_p
+            #print
+            #if random.random() < self.oov_ins_p:
+            #    token = '#OOV'
+            #    self._append_wcn_to_seq(actor, [('#OOV',), (0.0,)], seq, state)
 
             wcn = []
             for word, word_p in zip(*words):
@@ -402,6 +405,8 @@ class DataBuilder(object):
                 token = "#NOTHING"
             token_ndx = self._get_token_ndx(actor, seq, token)
             token_ndx_orig = self._get_token_ndx(actor, seq, token, orig=True)
+            if random.random() < self.oov_ins_p:
+                token_ndx = self._get_token_ndx(actor, seq, '#OOV')
             token_ndxs.append(token_ndx)
             token_ndxs_orig.append(token_ndx_orig)
 
@@ -510,6 +515,8 @@ class DataBuilder(object):
             return False, token
 
     def _append_label_to_seq(self, seq, state, slots_mentioned):
+        if set(['food', 'area', 'name', 'pricerange']).intersection(slots_mentioned):
+            slots_mentioned.append('joint')
         label = {
             'time': len(seq.data) - 1,
             #'score': np.exp(msg_score),
@@ -591,12 +598,25 @@ class Data(object):
         classes = {}
         for slot in self.slots:
             #self.get_token_ndx(slot)
-            classes[slot] = {self.null_class: 0}
-            for slot_val in ontology.get(slot, []):
-                if self.tagged:
-                    slot_val = self.tagger.normalize_slot_value(slot_val)
-                classes[slot][slot_val] = len(classes[slot])
-                #self.get_token_ndx(slot_val)
+            if slot != 'joint':
+                classes[slot] = {self.null_class: 0}
+                for slot_val in ontology.get(slot, []):
+                    if self.tagged:
+                        slot_val = self.tagger.normalize_slot_value(slot_val)
+                    classes[slot][slot_val] = len(classes[slot])
+                    #self.get_token_ndx(slot_val)
+            else:
+                classes[slot] = {}
+                for jval in itertools.product(ontology['food'] + ['dontcare', self.null_class], ontology['pricerange'] + ['dontcare', self.null_class], ontology['area'] + ['dontcare', self.null_class], [self.null_class]):
+                    if self.tagged:
+                        jvalx = []
+                        for slot_val in jval:
+                            slot_val = self.tagger.normalize_slot_value(slot_val)
+                            jvalx.append(slot_val)
+                        jval = tuple(jvalx)
+
+                    jval = "__".join(jval)
+                    classes[slot][jval] = len(classes[slot])
 
         return classes
 
@@ -613,6 +633,7 @@ class Data(object):
         self.ontology = ontology
 
         self.token_cntr = collections.Counter()
+        self.class_cntr = collections.defaultdict(lambda: collections.Counter())
 
         if based_on:
             if type(based_on) is str:
@@ -719,15 +740,28 @@ class Data(object):
         if not state:
             return self.classes[slot][self.null_class]
         else:
-            slot_value = state.get(slot)
+            if slot != 'joint':
+                slot_value = state.get(slot)
 
-            if slot_value:
-                if self.tagged:
-                    slot_value = self.tagger.normalize_slot_value(slot_value)
+                if slot_value:
+                    if self.tagged:
+                        slot_value = self.tagger.normalize_slot_value(slot_value)
 
-                res = self.get_value_index_for_slot(slot, slot_value)
+                    res = self.get_value_index_for_slot(slot, slot_value)
+                else:
+                    res = self.classes[slot][self.null_class]
             else:
-                res = self.classes[slot][self.null_class]
+                jval = []
+                for slot in ['food', 'pricerange', 'area']:
+                    slot_value = state.get(slot, self.null_class)
+                    if self.tagged:
+                        slot_value = self.tagger.normalize_slot_value(slot_value)
+                    jval.append(slot_value)
+
+                jval.append(self.null_class)
+                jval = "__".join(jval)
+                res = self.classes['joint'][jval]
+                self.class_cntr[slot][jval] += 1
 
             return res
 

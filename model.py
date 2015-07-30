@@ -84,8 +84,8 @@ class Model(NeuralModel):
         input_args.append(x_conf)
         input_conf_layer = IdentityInput(x_conf[:, :, 0, np.newaxis], 1)
         input_zip_layers.append(input_conf_layer)
-
         prev_layer = ZipLayer(2, input_zip_layers)
+        #prev_layer = ProdLayer([input_token_layer, input_conf_layer])
 
         rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1], prev_layer.size)
         rev_flat.connect(prev_layer)

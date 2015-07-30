@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 
 #. job_pool.sh
 
@@ -20,8 +21,23 @@ for slot in food area pricerange name method req_food req_area req_pricerange re
 
         export THEANO_FLAGS="allow_gc=False,device=gpu${GPU},floatX=float32"
         python xtrack2.py ${DATA_DIR} --override_slots ${slot} --out ${E_DIR}/${slot}/ --early_stopping_group ${slot} ${XTRACK_FLAGS}
+
+        if [[ "$slot" != "food" && "$slot" != "area" && "$slot" != "pricerange" ]]; then
+            break
+        fi
     done
 done
 
 bash score_goals_ens.sh ${WHOLE_E_NAME} ${DATA_DIR}
-bash score_goals.sh ${WHOLE_E_NAME} ${DATA_DIR}
+bash score_goals.sh ${WHOLE_E_NAME} _${DATA_DIR}
+
+
+
+for slot in food area pricerange name method req_food req_area req_pricerange req_name req_phone req_addr req_postcode req_signature; do
+    for i in $(seq 0 9); do
+        echo $slot $i
+        if [[ "$slot" != "food" && "$slot" != "area" && "$slot" != "pricerange" ]]; then
+            break
+        fi
+    done
+done

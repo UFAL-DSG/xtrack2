@@ -51,7 +51,8 @@ def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
 def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, builder_opts, builder_type, use_wcn, ngrams,
                        concat_whole_nbest, include_whole_nbest, split_dialogs,
-                       sample_subdialogs, nth_best, words, include_dev_in_train):
+                       sample_subdialogs, nth_best, words, include_dev_in_train,
+                       full_joint):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -84,7 +85,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             include_base_seqs=False,
             slots=slots,
             slot_groups=slot_groups,
-            oov_ins_p=0.1 if dataset == 'train' else 0.0,
+            oov_ins_p=0.0 if dataset == 'train' else 0.0,
             word_drop_p=0.0,
             include_system_utterances=True,
             nth_best=nth_best if dataset == 'train' else [1],
@@ -110,6 +111,13 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
         with open(os.path.join(e_root, 'words_%s.tsv' % (dataset, )), 'w') as f_out:
             for w, wf in xtd.token_cntr.most_common():
                 f_out.write("%d\t%s\n" % (wf, w, ))
+
+        wf_fname = os.path.join(e_root, 'clsfreq_%s.txt' % (dataset, ))
+        with open(wf_fname, 'w') as f:
+            for cls in xtd.class_cntr:
+                f.write('======== cls: %s' % cls)
+                d = xtd.class_cntr[cls].most_common()
+                f.write("\n".join("%d\t%s" % (i[1], i[0]) for i in d))
 
         out_file = os.path.join(e_root, '%s.json' % dataset)
 

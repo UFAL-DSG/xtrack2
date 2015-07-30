@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 
@@ -8,7 +9,7 @@ import xtrack2_config
 
 def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
          use_wcn, ngrams, split_dialogs, sample_subdialogs, train_nbest_entries,
-         vocab, include_dev_in_train, e_name):
+         vocab, include_dev_in_train, full_joint, e_name):
     import utils
     utils.pdb_on_error()
 
@@ -105,7 +106,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         sample_subdialogs=sample_subdialogs,
         nth_best=nth_best,
         words=words,
-        include_dev_in_train=include_dev_in_train
+        include_dev_in_train=include_dev_in_train,
+        full_joint=full_joint
     )
     print
     print experiment_name
@@ -131,6 +133,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_nbest_entries', type=str, default="1")
     parser.add_argument('--vocab', default=None)
     parser.add_argument('--include_dev_in_train', action='store_true', default=False)
+    parser.add_argument('--full_joint', action='store_true', default=False)
 
     args = parser.parse_args()
     main(**vars(args))
