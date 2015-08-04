@@ -206,7 +206,7 @@ class XTrack2DSTCTracker(object):
 
 
     def track(self, tracking_log_file_name=None, output_len_accuracy=False):
-        max_batch_size = 10
+        max_batch_size = 50
         preds = []
         all_preds = []
         slots = []
@@ -371,9 +371,9 @@ class XTrack2DSTCTracker(object):
                             last_v, last_p = last_turn['goal-labels'][slot].items()[0]
                             new_res[last_v] = last_p
                         except Exception, e:
-                            new_res['_null_'] = p
-                    #        print e
-                    #        print slot, last_turn['goal-labels']
+                            #new_res['_null_'] = p
+                            print e
+                            print slot, last_turn['goal-labels']
 
             else:
                 new_res[slot_val] = p

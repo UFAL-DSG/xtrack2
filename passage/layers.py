@@ -266,7 +266,13 @@ class Embedding(Layer):
     def init_from(self, f_name, vocab):
         emb = self.wv.get_value()
         import gzip
-        with gzip.GzipFile(f_name) as f_in:
+
+        if f_name.endswith('.gz'):
+            in_file = gzip.GzipFile(f_name)
+        else:
+            in_file = open(f_name)
+
+        with in_file as f_in:
             for ln in f_in:
                 ln = ln.strip().split()
                 word = ln[0]

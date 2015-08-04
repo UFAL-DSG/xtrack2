@@ -61,6 +61,18 @@ class Model(NeuralModel):
                                       static=no_train_emb)
         input_zip_layers.append(input_token_layer)
 
+        tagged_input_zip_layers = []
+        x_tagged = T.itensor3(name='x_tagged')
+        tagged_input_token_layer = Embedding(name="tagemb",
+                                      size=emb_size,
+                                      n_features=n_input_tokens,
+                                      input=x[:, :, 0],
+                                      static=no_train_emb)
+        tagged_input_zip_layers.append(input_token_layer)
+
+        if init_emb_from and (init_emb_from.endswith('.txt') or init_emb_from.endswith('.gz')):
+            input_token_layer.init_from(init_emb_from, vocab)
+
         if self.x_include_orig: assert False
         if token_features: assert False
         #if self.x_include_orig:
@@ -84,6 +96,7 @@ class Model(NeuralModel):
         input_args.append(x_conf)
         input_conf_layer = IdentityInput(x_conf[:, :, 0, np.newaxis], 1)
         input_zip_layers.append(input_conf_layer)
+        tagged_input_zip_layers.append(input_conf_layer)
         prev_layer = ZipLayer(2, input_zip_layers)
         #prev_layer = ProdLayer([input_token_layer, input_conf_layer])
 

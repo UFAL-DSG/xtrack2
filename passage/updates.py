@@ -163,8 +163,8 @@ class RMSprop(Update):
 
 class Adam(Update):
 
-    #def __init__(self, lr=0.0002, b1=0.1, b2=0.001, e=1e-8, clip=0.0, *args, **kwargs):
-    def __init__(self, lr=0.0002, b1=0.9, b2=0.999, e=1e-8, clip=0.0, *args, **kwargs):
+    #def __init__(self, lr=0.0002, b1=0.9, b2=0.999, e=1e-8, clip=0.0, *args, **kwargs):
+    def __init__(self, lr=0.0002, b1=0.1, b2=0.001, e=1e-8, clip=0.0, *args, **kwargs):
         Update.__init__(self, *args, **kwargs)
         self.lr = lr
         self.b1 = b1

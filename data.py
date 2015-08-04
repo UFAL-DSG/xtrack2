@@ -404,6 +404,8 @@ class DataBuilder(object):
             if token == '!null':
                 token = "#NOTHING"
             token_ndx = self._get_token_ndx(actor, seq, token)
+            if token_ndx == self.xd.get_token_ndx("#OOV"):
+                continue
             token_ndx_orig = self._get_token_ndx(actor, seq, token, orig=True)
             if random.random() < self.oov_ins_p:
                 token_ndx = self._get_token_ndx(actor, seq, '#OOV')
