@@ -33,13 +33,28 @@ def parse_slots_and_slot_groups(args):
     return slot_groups, slots
 
 
+def load_ontology(f_in):
+    dstc_ontology = json.load(f_in)
+    ontology = dict(
+        food=dstc_ontology['informable']['food'],
+        pricerange=dstc_ontology['informable']['pricerange'],
+        area=dstc_ontology['informable']['area'],
+        name=dstc_ontology['informable']['name'],
+        method=dstc_ontology['method']
+    )
+
+    ontology['method'].remove('none')
+
+    return ontology
+
+
 import import_dstc
 
-def import_dstc_data(data_directory, out_dir, e_root, dataset, data_name):
+def import_dstc_data(data_directory, dataset):
     input_dir = os.path.join(data_directory, 'dstc2/data')
     flist = os.path.join(data_directory,
                          'dstc2/scripts/config/dstc2_%s.flist' % dataset)
-    return import_dstc.import_dstc(data_dir=input_dir, out_dir=out_dir, flist=flist,
+    return import_dstc.import_dstc(data_dir=input_dir, flist=flist,
                             constraint_slots='food,area,pricerange,name',
                             requestable_slots='food,area,pricerange,'
                                                        'name,addr,phone,'
@@ -52,7 +67,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
                        ontology, builder_opts, builder_type, use_wcn, ngrams,
                        concat_whole_nbest, include_whole_nbest, split_dialogs,
                        sample_subdialogs, nth_best, words, include_dev_in_train,
-                       full_joint):
+                       full_joint, generate):
     e_root = os.path.join(data_directory, 'xtrack/%s' % experiment_name)
     debug_dir = os.path.join(e_root, 'debug')
 
@@ -65,17 +80,11 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
         out_dir = os.path.join(e_root, dataset)
         #if not skip_dstc_import_step:
         dialogs = import_dstc_data(data_directory=data_directory,
-                             e_root=e_root,
-                             dataset=dataset,
-                             data_name=experiment_name,
-                             out_dir=out_dir)
+                                   dataset=dataset)
         if include_dev_in_train:
             if dataset == "train":
                 dialogs2 = import_dstc_data(data_directory=data_directory,
-                                           e_root=e_root,
-                                           dataset="dev",
-                                           data_name=experiment_name,
-                                           out_dir=out_dir)
+                                            dataset="dev")
                 dialogs = itertools.chain(dialogs, dialogs2)
 
         logging.info('Initializing.')
@@ -97,6 +106,7 @@ def prepare_experiment(experiment_name, data_directory, slots, slot_groups,
             split_dialogs=split_dialogs and dataset == 'train',
             sample_subdialogs=sample_subdialogs if dataset == 'train' else 0,
             words=words,
+            generate=generate,
             **builder_opts
         )
         logging.info('Building.')

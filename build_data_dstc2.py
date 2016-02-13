@@ -9,7 +9,7 @@ import xtrack2_config
 
 def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbest,
          use_wcn, ngrams, split_dialogs, sample_subdialogs, train_nbest_entries,
-         vocab, include_dev_in_train, full_joint, e_name):
+         vocab, include_dev_in_train, full_joint, generate, e_name):
     import utils
     utils.pdb_on_error()
 
@@ -21,15 +21,7 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
     ontology_path = os.path.join(xtrack2_config.data_directory,
                                  'dstc2/scripts/config/ontology_dstc2.json')
     with open(ontology_path) as f_in:
-        dstc_ontology = json.load(f_in)
-        ontology = dict(
-            food=dstc_ontology['informable']['food'],
-            pricerange=dstc_ontology['informable']['pricerange'],
-            area=dstc_ontology['informable']['area'],
-            name=dstc_ontology['informable']['name'],
-            method=dstc_ontology['method']
-        )
-        ontology['method'].remove('none')
+        ontology = data_utils.load_ontology(f_in)
 
     slots = ['food', 'area', 'pricerange', 'name', 'method', 'req_food',
              'req_area', 'req_pricerange', 'req_name', 'req_phone',
@@ -94,8 +86,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         builder_opts=dict(
             tagged=tagged,
             no_label_weight=True,
-            #tag_only=None
-            tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse', 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican'] + ['halal', 'seafood']
+            tag_only=None
+            #tag_only=['panasian', 'basque', 'jamaican', 'singaporean', 'polish', 'russian', 'venetian', 'creative', 'welsh', 'australasian', 'scottish', 'world', 'malaysian', 'unusual', 'vegetarian', 'indonesian', 'swiss', 'caribbean', 'cantonese', 'danish', 'australian', 'brazilian', 'persian', 'fusion', 'english', 'irish', 'christmas', 'corsica', 'austrian', 'kosher', 'canapes', 'bistro', 'belgian', 'moroccan', 'traditional', 'afghan', 'barbeque', 'romanian', 'german', 'steakhouse', 'greek', 'cuban', 'african', 'scandinavian', 'japanese', 'polynesian', 'seafood', 'eritrean', 'swedish', 'catalan', 'lebanese', 'tuscan', 'mexican'] + ['halal', 'seafood']
         ),
         builder_type=builder_type,
         use_wcn=use_wcn,
@@ -107,7 +99,8 @@ def main(builder_type, only_slot, tagged, concat_whole_nbest, include_whole_nbes
         nth_best=nth_best,
         words=words,
         include_dev_in_train=include_dev_in_train,
-        full_joint=full_joint
+        full_joint=full_joint,
+        generate=generate
     )
     print
     print experiment_name
@@ -131,6 +124,7 @@ if __name__ == '__main__':
     parser.add_argument('--e_name', default='xx')
     parser.add_argument('--sample_subdialogs', type=int, default=0)
     parser.add_argument('--train_nbest_entries', type=str, default="1")
+    parser.add_argument('--generate', type=int, default=0)
     parser.add_argument('--vocab', default=None)
     parser.add_argument('--include_dev_in_train', action='store_true', default=False)
     parser.add_argument('--full_joint', action='store_true', default=False)

@@ -236,17 +236,17 @@ class Embedding(Layer):
         self.wv = self.init((self.n_features, self.size),
                             fan_in=self.n_features,
                             name=self._name_param("emb"))
-        if static:
-            self.params = set()
-        else:
-            self.params = {self.wv}
+
         self.static = static
 
     def output(self, dropout_active=False):
         return self.wv[self.input]
 
     def get_params(self):
-        return self.params
+        if self.static:
+            return []
+        else:
+            return [self.wv]
 
     def init_from_dict(self, emb_dict):
         emb = self.wv.get_value()

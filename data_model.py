@@ -7,7 +7,7 @@ class Dialog(object):
 
     def __init__(self, object_id, session_id):
         self.messages = []
-        self.wcn = []
+        #self.wcn = []
         self.states = []  # Each message has one state.
         self.actors = []  # Each message has an actor id associated.
         self.slots_mentioned = []
@@ -18,25 +18,29 @@ class Dialog(object):
         self.messages.append(text)
         self.states.append(state)
         self.actors.append(actor)
-        self._add_wcn(wcn)
+        #self._add_wcn(wcn)
         self.slots_mentioned.append(slots_mentioned)
 
-    def _add_wcn(self, wcn):
-        new_wcn = []
-        for hyp in wcn:
-            new_wcn.append((hyp.hyps, hyp.scores))
+    #def _add_wcn(self, wcn):
+    #    new_wcn = []
+    #    for hyp in wcn:
+    #        new_wcn.append((hyp.hyps, hyp.scores))
+    #
+    #    self.wcn.append(new_wcn)
 
-        self.wcn.append(new_wcn)
+    def copy(self):
+        return Dialog.deserialize(self.serialize())
 
     def serialize(self):
         return json.dumps(
             {
                 'messages': self.messages,
-                'wcn': self.wcn,
+                #'wcn': self.wcn,
                 'states': self.states,
                 'actors': self.actors,
                 'object_id': self.object_id,
-                'session_id': self.session_id
+                'session_id': self.session_id,
+                'slots_mentioned': self.slots_mentioned
             }, indent=4)
 
     @classmethod
@@ -47,6 +51,7 @@ class Dialog(object):
         obj.messages = data['messages']
         obj.wcn = data['wcn']
         obj.states = data['states']
-        obj.actors= data['actors']
+        obj.actors = data['actors']
+        obj.slots_mentioned = data['slots_mentioned']
 
         return obj

@@ -13,7 +13,8 @@ for slot in food area pricerange name method req_food req_area req_pricerange re
         E_NAME="${WHOLE_E_NAME}_${i}"
 
         DATA_BUILD_LOG=/a/SSD/zilka/tmp/${E_NAME}.${dataset}.goals.${i}.csv
-        DATA_NAME=$(python build_data_dstc2.py --e_name ${E_NAME} ${DATA_BUILD_FLAGS} 2>&1 | tee  | tail -n 1)
+        DATA_NAME=$(python build_data_dstc2.py --e_name ${E_NAME} ${DATA_BUILD_FLAGS} 2>&1 | tee ${TMP_DIR}/last_build_data.log | tee ${DATA_BUILD_LOG} | tail -n 1 && exit ${PIPESTATUS[0]})
+        test $? -eq 0 || exit 1
 
         GPU=$1
         E_DIR=${TMP_DIR}/${E_NAME}
@@ -30,3 +31,5 @@ done
 
 bash score_goals_ens.sh ${WHOLE_E_NAME} ${DATA_DIR}
 bash score_goals.sh ${WHOLE_E_NAME} ${DATA_DIR}
+
+exit 0

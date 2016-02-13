@@ -206,7 +206,7 @@ class XTrack2DSTCTracker(object):
 
 
     def track(self, tracking_log_file_name=None, output_len_accuracy=False):
-        max_batch_size = 50
+        max_batch_size = 20
         preds = []
         all_preds = []
         slots = []

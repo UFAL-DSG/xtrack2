@@ -21,15 +21,16 @@ theano.config.mode = 'FAST_RUN'
 
 from passage.iterators import (padded, SortedPadded)
 from passage.utils import iter_data
-from data import Data
+from data import Data, DataBuilder
 from utils import (get_git_revision_hash, pdb_on_error, ConfusionMatrix, P,
                    inline_print, update_progress)
-from model import Model
+from mlpmodel import Model
 from model_simple_conv import SimpleConvModel
 from model_baseline import BaselineModel
 from model_turn_based import TurnBasedModel
 from model_turn_based_rnn import TurnBasedRNNModel
 from dstc_tracker import XTrack2DSTCTracker
+from templates import TemplateExtractor
 
 
 
@@ -365,7 +366,8 @@ def main(args_lst,
          x_include_mlp, x_include_orig, enable_token_supervision, model_type,
          mlp_n_hidden, mlp_n_layers, mlp_activation,
          use_loss_mask, wcn_aggreg,
-         override_slots
+         override_slots,
+         templates_file
 
          ):
 
@@ -411,6 +413,12 @@ def main(args_lst,
 
     test_path = os.path.join(experiment_path, 'test.json')
     xtd_s = Data.load(test_path)
+
+    if templates_file:
+        tpls = TemplateExtractor.load(templates_file)
+        tpl_dialogs = tpls.sample_dialogs(ontology=xtd_t.ontology)
+    else:
+        tpl_dialogs = []
 
     slots = xtd_t.slots if not override_slots else override_slots.split(',')
     classes = xtd_t.classes
@@ -594,6 +602,8 @@ def main(args_lst,
         mb_ids = range(len(minibatches))
         mb_to_go = []
 
+        mb_ids += ['g'] * len(mb_ids)
+
         #for mb in minibatches:
         #    print mb[1][0].shape[0]
 
@@ -603,6 +613,47 @@ def main(args_lst,
 
     minibatches_valid = minibatches[:int(len(minibatches) * 1.0 / 20)]
     logging.info('We have %d minibatches.' % len(minibatches))
+
+    tpl_generate = {
+        'cache': [],
+        'cntr': 0,
+    }
+    def generate_minibatch():
+        if not tpl_generate['cache']:
+            xtd_builder = DataBuilder(
+                based_on=xtd_t,
+                include_base_seqs=False,
+                slots=slots,
+                slot_groups=xtd_t.slot_groups,
+                oov_ins_p=0.0,
+                word_drop_p=0.0,
+                include_system_utterances=True,
+                nth_best=[0],
+                score_bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.01],
+                ontology=xtd_t.ontology,
+                debug_dir='/tmp/',
+                concat_whole_nbest=False,
+                include_whole_nbest=False,
+                split_dialogs=False,
+                sample_subdialogs=0,
+                words=None,
+                generate=None,
+                tag_only=False,
+                tagged=False,
+                no_label_weight=True
+            )
+            seqs = xtd_builder.build(tpl_dialogs).sequences
+            mbs = prepare_minibatches(seqs, mb_size, model, slots)
+
+            tpl_generate['cache'].extend(mbs)
+            tpl_generate['cntr'] = 0
+
+        mb_id = tpl_generate['cntr']
+        res = tpl_generate['cache'][:mb_size]
+        del tpl_generate['cache'][:mb_size]
+        tpl_generate['cntr'] += 1
+
+        return mb_id, res
 
     example_cntr = 0
     timestep_cntr = 0
@@ -622,9 +673,9 @@ def main(args_lst,
     epoch = 0
     last_es_epoch = 0
 
-    init_valid_loss = model._loss(*valid_data_y)
+    #init_valid_loss = model._loss(*valid_data_y)
     #plot_loss(model, valid_data_y)
-    logging.info('Initial valid loss: %.10f' % init_valid_loss)
+    #logging.info('Initial valid loss: %.10f' % init_valid_loss)
 
     if not valid_after:
         valid_after = len(xtd_t.sequences)
@@ -670,7 +721,10 @@ def main(args_lst,
         mb_to_go.remove(mb_ndx)
 
         #mb_id, mb_data = random.choice(minibatches)
-        mb_id, mb_data = minibatches[mb_ndx]
+        if mb_ndx == 'g':
+            mb_id, mb_data = generate_minibatch()
+        else:
+            mb_id, mb_data = minibatches[mb_ndx]
 
         if train_noise:
             mb_data = add_train_noise(mb_data, train_noise, len(xtd_t.vocab))
@@ -876,6 +930,8 @@ def build_argument_parser():
                         action='store_true')
 
     parser.add_argument('--override_slots', default=None)
+
+    parser.add_argument('--templates_file', default=None)
 
     return parser
 

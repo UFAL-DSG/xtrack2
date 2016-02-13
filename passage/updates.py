@@ -31,10 +31,15 @@ class Regularizer(object):
         self.maxnorm = maxnorm
 
     def gradient_regularize(self, p, g):
-        if self.l1 > 0 or self.l2 > 0:
-            g += p * self.l2
-            g += T.sgn(p) * self.l1
-        return g
+        #if p.name != "emb__emb": return g
+        if p.name.startswith('input_mlp') or p.name.startswith('emb__emb'):
+            print 'regularizing!!!!!!!'
+            if self.l1 > 0 or self.l2 > 0:
+                g += p * self.l2
+                g += T.sgn(p) * self.l1
+            return g
+        else:
+            return g
 
     def weight_regularize(self, p):
         p = max_norm(p, self.maxnorm)

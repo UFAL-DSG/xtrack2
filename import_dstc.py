@@ -262,11 +262,9 @@ def _prepare_sys_wcn(msg):
     return res
 
 
-def import_dstc(data_dir, out_dir, flist, constraint_slots,
+def import_dstc(data_dir, flist, constraint_slots,
                 requestable_slots,
                 use_stringified_system_acts, show_progress=True):
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
 
     requestable_slots = requestable_slots.split(',')
 

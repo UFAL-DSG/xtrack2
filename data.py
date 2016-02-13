@@ -9,6 +9,7 @@ import numpy as np
 import math
 
 import data_model
+import utils
 
 
 word_re = re.compile(r'([A-Za-z0-9_]+)')
@@ -107,7 +108,7 @@ class DataBuilder(object):
               oov_ins_p, word_drop_p, include_system_utterances, nth_best,
               score_bins, debug_dir, tagged, ontology, no_label_weight,
               concat_whole_nbest, include_whole_nbest, split_dialogs,
-              sample_subdialogs, tag_only, words):
+              sample_subdialogs, tag_only, words, generate):
         self.slots = slots
         self.slot_groups = slot_groups
         self.score_bins = score_bins
@@ -131,11 +132,22 @@ class DataBuilder(object):
         else:
             self.tagger = None
         self.no_label_weight = no_label_weight
+        self.generate = generate
+        self.generate_map = self._build_gen_map(ontology)
 
         self.xd = None
         self.word_freq = collections.Counter()
 
         self._open_dump_files(debug_dir)
+
+    def _build_gen_map(self, ontology):
+        res = {}
+        for slot, vals in ontology.iteritems():
+            res[slot] = '#slot'
+            for val in vals:
+                res[val] = '#value'
+
+        return res
 
     def build(self, dialogs, use_wcn=False):
         self._create_new_data_instance()
@@ -144,8 +156,14 @@ class DataBuilder(object):
 
         self.msg_scores = []
 
+        if self.generate:
+            dialogs = list(dialogs)
+            dialogs = itertools.chain(dialogs, self._generate_dialogs(dialogs))
+
         for dialog_ndx, dialog in enumerate(dialogs):
             #self.f_dump_text.write('> %s\n' % dialog.session_id)
+            #if dialog_ndx == 5:
+            #    break
 
             for n in self.nth_best:
                 for i in range(1 + self.sample_subdialogs):
@@ -157,6 +175,7 @@ class DataBuilder(object):
                     self._append_seq_if_nonempty(seq)
                     n_labels += len(seq.labels)
 
+
             #self._dump_seq_info(seq)
             #self.f_dump_text.write('\n')
 
@@ -164,6 +183,86 @@ class DataBuilder(object):
                      % (n_labels, len(self.xd.sequences, )))
 
         return self.xd
+
+    def _generate_dialogs(self, dialogs):
+        abs_dialogs = self._abstract_dialogs(dialogs)
+
+        res = []
+        for i, dialog in enumerate(abs_dialogs):
+            utils.inline_print("Generating: %d" % i)
+            for slot, vals in self.ontology.iteritems():
+                for val in vals:
+                    new_dialog = self._replace_into_dialog(dialog, slot, val)
+
+                    yield new_dialog
+
+
+    def _abstract_dialogs(self, dialogs):
+        for dialog in dialogs:
+            yield self._abstract_dialog(dialog)
+
+    def _abstract_dialog(self, dialog):
+        new_dialog = dialog.copy()
+
+        res_msgs = []
+        for msg_nbest, state in zip(new_dialog.messages, new_dialog.states):
+            new_nbl = []
+            for msg, score in msg_nbest:
+                new_nbl.append((self._abstract_msg(msg, state), score))
+            res_msgs.append(new_nbl)
+
+        new_dialog.messages = res_msgs
+
+        return new_dialog
+
+    def _abstract_msg(self, msg, state):
+        res = msg
+        if state:
+            new_state = {}
+            for slot, val in state.iteritems():
+                if val is None:
+                    continue
+                orig = res
+                res = res.replace(slot, '#slot')
+                res = res.replace(val, '#value')
+                if orig != res:
+                    new_state[slot] = '#slot'
+
+            state.clear()
+            state.update(new_state)
+
+        return res
+
+        #for word in msg.split():
+        #    abs_msg.append(self.generate_map.get(word, word))
+        #
+        #return " ".join(abs_msg)
+
+    def _replace_into_dialog(self, dialog, slot, value):
+        res = dialog.copy()
+
+        res_msgs = []
+        for msg_nbest, state in zip(res.messages, res.states):
+            new_nbl = []
+            for msg, score in msg_nbest:
+                new_nbl.append((self._replace_into_msg(msg, slot, value, state), score))
+            res_msgs.append(new_nbl)
+
+        res.messages = res_msgs
+
+        return res
+
+    re_slot = re.compile(r'#slot')
+    re_value = re.compile(r'#value')
+
+    def _replace_into_msg(self, msg, slot, value, state):
+        orig_msg = msg
+        msg = self.re_slot.sub(slot, msg)
+        msg = self.re_value.sub(value, msg)
+
+        if orig_msg != msg:
+            state[slot] = value
+        return msg
 
     def _create_new_data_instance(self):
         self.xd = Data()
@@ -211,7 +310,7 @@ class DataBuilder(object):
     def _process_dialog_wcn(self, dialog, seq, random_subdialog, nth_best, use_wcn):
         last_state = None
 
-        n_messages = len(dialog.wcn)
+        n_messages = len(dialog.messages)
         n_turns = n_messages / 2
         if not random_subdialog:
             i_from = 0
@@ -230,8 +329,8 @@ class DataBuilder(object):
 
         #logging.info(str((i_from, i_to)) + " " + str(diff_state))
         slots_mentioned_so_far = set()
-        for i, wcn, msgs, state, actor, slots_mentioned in zip(itertools.count(),
-                                              dialog.wcn,
+        for i, msgs, state, actor, slots_mentioned in zip(itertools.count(),
+                                              #dialog.wcn,
                                               dialog.messages,
                                               dialog.states,
                                               dialog.actors,
@@ -602,6 +701,11 @@ class Data(object):
             #self.get_token_ndx(slot)
             if slot != 'joint':
                 classes[slot] = {self.null_class: 0}
+                if slot.startswith('req_'):
+                    classes[slot]['@_yes'] = 1
+                else:
+                    classes[slot]['dontcare'] = 1
+
                 for slot_val in ontology.get(slot, []):
                     if self.tagged:
                         slot_val = self.tagger.normalize_slot_value(slot_val)

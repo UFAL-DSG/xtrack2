@@ -33,82 +33,56 @@ class Model(NeuralModel):
                  input_n_layers, input_n_hidden, input_activation,
                  token_features, token_supervision, use_loss_mask,
                  momentum, enable_branch_exp, l1, l2, build_train=True, x_include_orig=False):
-        args = Model.__init__.func_code.co_varnames[:Model.__init__.func_code.co_argcount]
-        self.init_args = {}
-        for arg in args:
-            if arg != 'self':
-                self.init_args[arg] = locals()[arg]
+        self.store_init_args(locals())
 
         self.vocab = vocab
 
         self.slots = slots
         self.slot_classes = slot_classes
 
-        self.x_include_orig = x_include_orig
-        self.x_include_score = x_include_score
-
-
-        logging.info('We have the following classes:')
-        self._log_classes_info()
+        #
+        # Input
+        #
 
         x = T.itensor3(name='x')
+        x_tagged = T.itensor3(name='x_tagged')
+        x_conf = T.tensor3(name='x_conf')
+
         input_args = []
         input_zip_layers = []
         input_args.append(x)
+        input_args.append(x_tagged)
+        input_args.append(x_conf)
         input_token_layer = Embedding(name="emb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
                                       input=x[:, :, 0],
                                       static=no_train_emb)
-        input_zip_layers.append(input_token_layer)
-
-        tagged_input_zip_layers = []
-        x_tagged = T.itensor3(name='x_tagged')
-        input_args.append(x_tagged)
-        tagged_input_token_layer = Embedding(name="tagemb",
+        tagged_input_token_layer = Embedding(name="taggedemb",
                                       size=emb_size,
                                       n_features=n_input_tokens,
                                       input=x_tagged[:, :, 0],
                                       static=no_train_emb)
-        tagged_input_zip_layers.append(tagged_input_token_layer)
+        tagged_input_token_layer.wv = input_token_layer.wv
+
+        input_conf_layer = IdentityInput(x_conf[:, :, 0, np.newaxis], 1)
+
+        input_zip_layers.append(input_token_layer)
+        input_zip_layers.append(tagged_input_token_layer)
+        input_zip_layers.append(input_conf_layer)
 
         if init_emb_from and (init_emb_from.endswith('.txt') or init_emb_from.endswith('.gz')):
             input_token_layer.init_from(init_emb_from, vocab)
 
-
-        if token_features: assert False
-        #if self.x_include_orig:
-        #    x_orig = T.itensor3(name='x_orig')
-        #    input_args.append(x_orig)
-        #    input_token_layer = Embedding(name="emb2",
-        #                                  size=emb_size,
-        #                                  n_features=n_input_tokens,
-        #                                  input=x_orig)
-        #    input_zip_layers.append(input_token_layer)
-        #
-        #if token_features:
-        #    input_ftrs_layer = FeatureEmbedding(name="ftremb",
-        #                                        size=ftr_emb_size,
-        #                                        vocab=vocab,
-        #                                        vocab_ftr_map=vocab_ftr_map,
-        #                                        input=x)
-        #    input_zip_layers.append(input_ftrs_layer)
-
-        x_conf = T.tensor3(name='x_conf')
-        input_args.append(x_conf)
-        input_conf_layer = IdentityInput(x_conf[:, :, 0, np.newaxis], 1)
-        input_zip_layers.append(input_conf_layer)
-        tagged_input_zip_layers.append(input_conf_layer)
         prev_layer = ZipLayer(2, input_zip_layers)
-        tagged_layer = ZipLayer(2, tagged_input_zip_layers)
-        #prev_layer = ProdLayer([input_token_layer, input_conf_layer])
 
-        rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1], prev_layer.size)
+        #
+        # Input preprocessing.
+        #
+
+        rev_flat = ReshapeLayer(x.shape[0] * x.shape[1], prev_layer.size)
         rev_flat.connect(prev_layer)
         prev_layer = rev_flat
-
-        tagged_rev_flat =  ReshapeLayer(x.shape[0] * x.shape[1], tagged_layer.size)
-        tagged_rev_flat.connect(tagged_layer)
 
         input_mlp_layer = MLP([input_n_hidden  ] * input_n_layers,
                               [input_activation] * input_n_layers,
@@ -117,84 +91,35 @@ class Model(NeuralModel):
         input_mlp_layer.connect(prev_layer)
         prev_layer = input_mlp_layer
 
-        tagged_input_mlp_layer = MLP([input_n_hidden  ] * input_n_layers,
-                                     [input_activation] * input_n_layers,
-                                     [p_drop          ] * input_n_layers,
-                                     name="tagged_input_mlp")
-        tagged_input_mlp_layer.connect(tagged_rev_flat)
-
         reshape_back = ReshapeLayer(x.shape[0], x.shape[1], input_n_hidden)
         reshape_back.connect(prev_layer)
         prev_layer = reshape_back
 
-        tagged_reshape_back = ReshapeLayer(x.shape[0], x.shape[1], input_n_hidden)
-        tagged_reshape_back.connect(tagged_input_mlp_layer)
-
-        if self.x_include_orig:
-            sum_layer = SumLayer([prev_layer, tagged_reshape_back])
-
-            prev_layer = sum_layer
-
-
-        logging.info('There are %d input layers.' % input_n_layers)
-
         if debug:
             self._lstm_input = theano.function(input_args, prev_layer.output())
 
-        # Forward LSTM layer.
-        assert rnn_n_layers > 0
-        for i in range(rnn_n_layers):
-            logging.info('Creating LSTM layer with %d neurons.' % (n_cells))
-            lstm_args = dict(name="lstm%d" % i,
-                                   size=n_cells,
-                                   seq_output=True,
-                                   out_cells=False,
-                                   peepholes=lstm_peepholes,
-                                   p_drop=p_drop,
-                                   enable_branch_exp=enable_branch_exp)
-            lstm_connect_args = [prev_layer]
+        #
+        # Sequential processing with LSTM
+        #
 
-            if lstm_type == 'ngram':
-                lstm_cls = NGramLSTM
-            elif lstm_type == 'vanilla':
-                lstm_cls = LstmRecurrent
-            elif lstm_type == 'with_conf':
-                lstm_cls = LstmWithConfidence
-                lstm_args.update(update_thresh=lstm_update_thresh)
-                lstm_connect_args.append(x_ftrs)
-            elif lstm_type == 'mlp':
-                mlps = []
-                for i, slot in enumerate(slots):
-                    logging.info('Building output classifier for %s.' % slot)
-                    n_classes = len(slot_classes[slot])
-                    slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
-                                   [oclf_activation] * oclf_n_layers + ['softmax'],
-                                   [p_drop         ] * oclf_n_layers + [0.0      ],
-                                   name="mlp_%s" % slot)
-                    mlps.append(slot_mlp)
+        n_classes = len(slot_classes['food'])
+        lstm_layer = LstmWithMLP(name="lstm",
+                                 size=n_cells,
+                                 seq_output=True,
+                                 out_cells=False,
+                                 peepholes=lstm_peepholes,
+                                 p_drop=p_drop,
+                                 enable_branch_exp=enable_branch_exp,
+                                 mlp_n_classes=n_classes,
+                                 mlp_n_hidden=oclf_n_hidden,
+                                 mlp_n_layers=oclf_n_layers)
+        lstm_layer.connect(prev_layer)
+        prev_layer = lstm_layer
 
-                lstm_cls = LstmWithMLP
-                lstm_args.update(mlps=mlps)
-            else:
-                raise Exception('Unknown LSTM type: %s' % lstm_type)
-
-            lstm_layer = lstm_cls(**lstm_args)
-            lstm_layer.connect(*lstm_connect_args)
-
-            prev_layer = lstm_layer
-
-        if debug:
-            self._lstm_output = theano.function(input_args,
-                                                [prev_layer.output(),
-                                                 lstm_layer.output()])
-
-        #prev_layer = lstm_layer
-
-        assert prev_layer is not None
 
         y_seq_id = tt.ivector()
         y_time = tt.ivector()
-        #y_masks = tt.imatrix()
+
         y_label = {}
         for slot in slots:
             y_label[slot] = tt.ivector(name='y_label_%s' % slot)
@@ -204,25 +129,13 @@ class Model(NeuralModel):
 
         costs = []
         predictions = []
-        for i, slot in enumerate(slots):
-            logging.info('Building output classifier for %s.' % slot)
-            n_classes = len(slot_classes[slot])
-            slot_mlp = MLP([oclf_n_hidden  ] * oclf_n_layers + [n_classes],
-                           [oclf_activation] * oclf_n_layers + ['softmax'],
-                           [p_drop         ] * oclf_n_layers + [0.0      ],
-                           name="mlp_%s" % slot)
-            slot_mlp.connect(cpt)
-
-            pred = slot_mlp.output(dropout_active=False)
-            predictions.append(pred)
-
-            slot_objective = CrossEntropyObjective()
-            slot_objective.connect(
-                y_hat_layer=slot_mlp,
-                y_true=y_label[slot],
-                #y_weights=y_masks
-            )
-            costs.append(slot_objective)
+        slot_objective = CrossEntropyObjective()
+        slot_objective.connect(
+            y_hat_layer=cpt,
+            y_true=y_label['food']
+        )
+        costs.append(slot_objective)
+        predictions.append(cpt.output(dropout_active=False))
 
         cost = SumOut()
         cost.connect(*costs)  #, scale=1.0 / len(slots))
@@ -368,11 +281,7 @@ class Model(NeuralModel):
                     word_orig = self._get_token(vocab_rev, word)
 
                     new_words_orig.append(word_orig)
-                    if self.x_include_score:
-                        new_score.append(np.exp(word_score))
-                    else:
-                        new_score.append(0.0)
-                    #new_ftrs.append(word_ftrs)
+                    new_score.append(np.exp(word_score))
 
                 n_missing = max(0, wcn_cnt - len(words))
                 new_words.extend(n_missing * [0])
@@ -445,8 +354,7 @@ class Model(NeuralModel):
             import ipdb; ipdb.set_trace()
 
         data = []
-        if self.x_include_orig:
-            data.append(x_orig)
+        data.append(x_orig)
         data.append(x)
 
         #if self.x_include_score:
